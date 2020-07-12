@@ -1,0 +1,4 @@
+{
+    "GOOGLE_PROJECT_ID": "Your Google Project ID",
+    "SPANNER_DB": "Your Spanner Database Name"
+}

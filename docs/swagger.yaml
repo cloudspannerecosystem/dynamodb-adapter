@@ -1,0 +1,601 @@
+basePath: /v1
+definitions:
+  gin.H:
+    additionalProperties: true
+    type: object
+  models.BatchGetWithProjectionMeta:
+    properties:
+      dynamoObject:
+        items:
+          additionalProperties:
+            $ref: '#/definitions/dynamodb.AttributeValue'
+          type: object
+        type: array
+      expressionAttributeNames:
+        additionalProperties:
+          type: string
+        type: object
+      keyArray:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+      projectionExpression:
+        type: string
+      tableName:
+        type: string
+    type: object
+  models.BatchMeta:
+    properties:
+      dynamoObject:
+        items:
+          additionalProperties:
+            $ref: '#/definitions/dynamodb.AttributeValue'
+          type: object
+        type: array
+      keyArray:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+      tableName:
+        type: string
+    type: object
+  models.BatchMetaUpdate:
+    properties:
+      arrAttrMap:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+      dynamoObject:
+        items:
+          additionalProperties:
+            $ref: '#/definitions/dynamodb.AttributeValue'
+          type: object
+        type: array
+      tableName:
+        type: string
+    type: object
+  models.BulkDelete:
+    properties:
+      dynamoObject:
+        items:
+          additionalProperties:
+            $ref: '#/definitions/dynamodb.AttributeValue'
+          type: object
+        type: array
+      keyArray:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+      tableName:
+        type: string
+    type: object
+  models.Delete:
+    properties:
+      conditionalExpression:
+        type: string
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      dynamoObjectAttrVal:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      expressionAttributeValues:
+        additionalProperties: true
+        type: object
+      primaryKeyMap:
+        additionalProperties: true
+        type: object
+      tableName:
+        type: string
+    type: object
+  models.GetMeta:
+    properties:
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      primaryKeyMap:
+        additionalProperties: true
+        type: object
+      tableName:
+        type: string
+    type: object
+  models.GetWithProjectionMeta:
+    properties:
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      expressionAttributeNames:
+        additionalProperties:
+          type: string
+        type: object
+      primaryKeyMap:
+        additionalProperties: true
+        type: object
+      projectionExpression:
+        type: string
+      tableName:
+        type: string
+    type: object
+  models.Meta:
+    properties:
+      attrMap:
+        additionalProperties: true
+        type: object
+      conditionalExp:
+        type: string
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      dynamoObjectAttrVal:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      expressionAttributeValues:
+        additionalProperties: true
+        type: object
+      tableName:
+        type: string
+    type: object
+  models.Query:
+    properties:
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      expressionAttributeNames:
+        additionalProperties:
+          type: string
+        type: object
+      filterExp:
+        type: string
+      filterVal:
+        type: object
+      filterValDDB:
+        type: string
+      hasVal:
+        type: object
+      hasValDDB:
+        type: string
+      hashExp:
+        type: string
+      indexName:
+        type: string
+      limit:
+        type: integer
+      onlyCount:
+        type: boolean
+      projectionExpression:
+        type: string
+      rangeExp:
+        type: string
+      rangeVal:
+        type: object
+      rangeValDDB:
+        type: string
+      rangeValMap:
+        additionalProperties: true
+        type: object
+      rangeValMapDDB:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      sortAscending:
+        type: boolean
+      startFrom:
+        additionalProperties: true
+        type: object
+      tableName:
+        type: string
+    type: object
+  models.ScanMeta:
+    properties:
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      limit:
+        type: integer
+      startFrom:
+        additionalProperties: true
+        type: object
+      tableName:
+        type: string
+    type: object
+  models.UpdateAttr:
+    properties:
+      attrNames:
+        additionalProperties:
+          type: string
+        type: object
+      attrVals:
+        additionalProperties: true
+        type: object
+      conditionalExp:
+        type: string
+      dynamoObject:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      dynamoObjectAttrVal:
+        additionalProperties:
+          $ref: '#/definitions/dynamodb.AttributeValue'
+        type: object
+      primaryKeyMap:
+        additionalProperties: true
+        type: object
+      returnValues:
+        type: string
+      tableName:
+        type: string
+      updateExpression:
+        type: string
+    type: object
+host: localhost:9050
+info:
+  contact: {}
+  description: This is a API collection for dynamodb-adapter
+  license: {}
+  title: dynamodb-adapter APIs
+  version: "1.0"
+paths:
+  /batchDelete/:
+    post:
+      description: Batch Delete Item from table
+      operationId: batch-delete-rows
+      parameters:
+      - description: Please add request body of type models.BulkDelete
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.BulkDelete'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Batch Delete Items from table
+  /batchGet/:
+    post:
+      description: Request items in a batch.
+      operationId: query-table
+      parameters:
+      - description: Please add request body of type models.BatchMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.BatchMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Query a table
+  /batchGetWithProjection/:
+    post:
+      description: Request items in a batch with projections.
+      operationId: batch-get-with-projection
+      parameters:
+      - description: Please add request body of type models.BatchGetWithProjectionMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.BatchGetWithProjectionMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Request items in a batch with projections.
+  /batchPut/:
+    post:
+      description: Writes a record
+      operationId: batch-put
+      parameters:
+      - description: Please add request body of type models.BatchMetaUpdate
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.BatchMetaUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Writes record
+  /deleteItem/:
+    post:
+      description: Delete Item from table
+      operationId: delete-row
+      parameters:
+      - description: Please add request body of type models.Delete
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.Delete'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Delete Item from table
+  /get/:
+    post:
+      description: Get record from table
+      operationId: get
+      parameters:
+      - description: Please add request body of type models.GetMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.GetMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get record from table
+  /getWithProjection/:
+    post:
+      description: Get a record with projections
+      operationId: get-with-projection
+      parameters:
+      - description: Please add request body of type models.GetWithProjectionMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.GetWithProjectionMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get a record with projections
+  /put/:
+    post:
+      description: Writes a record
+      operationId: put
+      parameters:
+      - description: Please add request body of type models.Meta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.Meta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Writes record
+  /query/:
+    post:
+      description: Query a table
+      operationId: query-table
+      parameters:
+      - description: Please add request body of type models.Query
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.Query'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Query a table
+  /scan/:
+    post:
+      description: Scan records from table
+      operationId: scan
+      parameters:
+      - description: Please add request body of type models.ScanMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScanMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Scan records from table
+  /scanTable/:
+    post:
+      description: Scan Table
+      operationId: scan-table
+      parameters:
+      - description: Please add request body of type models.ScanMeta
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScanMeta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Scan Table
+  /update/:
+    post:
+      description: updates a record in Spanner
+      operationId: update
+      parameters:
+      - description: Please add request body of type models.UpdateAttr
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateAttr'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: updates a record in Spanner
+  /updateAttribute:
+    post:
+      description: update attribute a record in Spanner
+      operationId: update
+      parameters:
+      - description: Please add request body of type models.UpdateAttr
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateAttr'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: updates a record in Spanner
+swagger: "2.0"
