@@ -22,9 +22,8 @@ func InitDBAPI(g *gin.RouterGroup) {
 
 	r := g.Group("/")
 	r.POST("/batchGet", BatchGetMeta)
-	r.POST("/getWithProjection", GetMetaWithProjection)
+	r.POST("/GetItem", GetItemMeta)
 	r.POST("/batchGetWithProjection", BatchGetMetaWithProjection)
-	r.POST("/get", Get)
 
 	r.POST("/query", QueryTable)
 	r.POST("/queryWithProjection", QueryTable)
@@ -342,7 +341,7 @@ func BatchGetMeta(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /getWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func GetMetaWithProjection(c *gin.Context) {
+func GetItemMeta(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -354,27 +353,27 @@ func GetMetaWithProjection(c *gin.Context) {
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
 	span = addParentSpanID(c, span)
-	var getWithProjectionMeta models.GetWithProjectionMeta
-	if err := c.ShouldBindJSON(&getWithProjectionMeta); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(getWithProjectionMeta))
+	var getItemMeta models.GetItemMeta
+	if err := c.ShouldBindJSON(&getItemMeta); err != nil {
+		c.JSON(errors.New("ValidationException", err).HTTPResponse(getItemMeta))
 	} else {
-		span.SetTag("table", getWithProjectionMeta.TableName)
-		logger.LogDebug(getWithProjectionMeta)
-		if allow := services.MayIReadOrWrite(getWithProjectionMeta.TableName, false, ""); !allow {
+		span.SetTag("table", getItemMeta.TableName)
+		logger.LogDebug(getItemMeta)
+		if allow := services.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		getWithProjectionMeta.PrimaryKeyMap, err = ConvertDynamoToMap(getWithProjectionMeta.TableName, getWithProjectionMeta.DynamoObject)
+		getItemMeta.PrimaryKeyMap, err = ConvertDynamoToMap(getItemMeta.TableName, getItemMeta.Key)
 		if err != nil {
-			c.JSON(errors.New("ValidationException", err).HTTPResponse(getWithProjectionMeta))
+			c.JSON(errors.New("ValidationException", err).HTTPResponse(getItemMeta))
 			return
 		}
-		getWithProjectionMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getWithProjectionMeta.TableName, getWithProjectionMeta.ExpressionAttributeNames)
-		res, rowErr := services.GetWithProjection(c.Request.Context(), getWithProjectionMeta.TableName, getWithProjectionMeta.PrimaryKeyMap, getWithProjectionMeta.ProjectionExpression, getWithProjectionMeta.ExpressionAttributeNames)
+		getItemMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getItemMeta.TableName, getItemMeta.ExpressionAttributeNames)
+		res, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
 		if rowErr == nil {
-			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(getWithProjectionMeta.TableName, res))
+			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(getItemMeta.TableName, res))
 		} else {
-			c.JSON(errors.HTTPResponse(rowErr, getWithProjectionMeta))
+			c.JSON(errors.HTTPResponse(rowErr, getItemMeta))
 		}
 	}
 }
@@ -545,51 +544,6 @@ func BatchDelete(c *gin.Context) {
 			c.JSON(http.StatusOK, []gin.H{})
 		} else {
 			c.JSON(errors.HTTPResponse(err2, bulkDelete))
-		}
-	}
-}
-
-// Get record from table
-// @Description Get record from table
-// @Summary Get record from table
-// @ID get
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.GetMeta true "Please add request body of type models.GetMeta"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /get/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func Get(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var meta models.GetMeta
-	if err := c.ShouldBindJSON(&meta); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
-	} else {
-		if allow := services.MayIReadOrWrite(meta.TableName, false, ""); !allow {
-			c.JSON(http.StatusOK, gin.H{})
-			return
-		}
-		meta.PrimaryKeyMap, err = ConvertDynamoToMap(meta.TableName, meta.DynamoObject)
-		if err != nil {
-			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
-			return
-		}
-		logger.LogDebug(meta)
-		resp, rowErr := services.GetWithProjection(c.Request.Context(), meta.TableName, meta.PrimaryKeyMap, "", nil)
-		if rowErr == nil {
-			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(meta.TableName, resp))
-		} else {
-			c.JSON(errors.HTTPResponse(rowErr, meta))
 		}
 	}
 }

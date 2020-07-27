@@ -30,8 +30,6 @@ func ParseDDL(updateDB bool) error {
 	dataAvailable := len(ms) > 0
 
 	if dataAvailable {
-		currentTable := ""
-		tmpCols := []string{}
 		for i := 0; i < len(ms); i++ {
 			tableName := ms[i]["tableName"].(string)
 			column := ms[i]["column"].(string)
@@ -46,21 +44,15 @@ func ParseDDL(updateDB bool) error {
 					models.OriginalColResponse[column] = originalColumn
 				}
 			}
-			if currentTable != tableName {
-				if currentTable != "" {
-					models.TableColumnMap[currentTable] = tmpCols
-				}
+			_, found := models.TableColumnMap[tableName]
+			if !found {
 				models.TableDDL[tableName] = make(map[string]string)
 				models.TableColumnMap[tableName] = []string{}
-				tmpCols = []string{}
-				currentTable = tableName
 			}
-			tmpCols = append(tmpCols, column)
+			models.TableColumnMap[tableName] = append(models.TableColumnMap[tableName], column)
 			models.TableDDL[tableName][column] = dataType
 		}
-		models.TableColumnMap[currentTable] = tmpCols
 	}
-
 	return nil
 }
 
