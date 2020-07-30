@@ -8,8 +8,6 @@ import (
 	"sync"
 	"syscall"
 
-	spannerAdmin "cloud.google.com/go/spanner/apiv1"
-
 	"cloud.google.com/go/spanner"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
@@ -55,15 +53,9 @@ func initSpannerDriver(instance string, m map[string]*gjson.Result) *spanner.Cli
 	return Client
 }
 
-var admin *spannerAdmin.Client
-
 // InitliazeDriver - this will Initliaze databases object in global map
 func InitliazeDriver() {
-	var err error
-	admin, err = spannerAdmin.NewClient(context.Background())
-	if err != nil {
-		logger.LogFatal(err)
-	}
+
 	storage = new(Storage)
 	storage.spannerClient = make(map[string]*spanner.Client)
 	config := map[string]*gjson.Result{}
