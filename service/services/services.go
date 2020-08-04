@@ -239,7 +239,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 	var pKey string
 	tPKey := tableConf.PartitionKey
 	tSKey := tableConf.SortKey
-	if query.IndexName != "" && tableConf.TableSource == "SP" {
+	if query.IndexName != "" {
 		conf := tableConf.Indices[query.IndexName]
 		query.IndexName = strings.Replace(query.IndexName, "-", "_", -1)
 
@@ -409,21 +409,6 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 	if sKey != "" {
 		whereClause += sKey + " is not null "
 	}
-	if query.HashExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		whereClause += query.HashExp + "@hash "
-		params["hash"] = query.HashVal
-	}
-
-	if query.FilterExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		whereClause += query.FilterExp + "@filter "
-		params["filter"] = query.FilterVal
-	}
 
 	if query.RangeExp != "" {
 		if whereClause != "WHERE " {
@@ -431,12 +416,10 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 		}
 		_, _, query.RangeExp = utils.ParseBeginsWith(query.RangeExp)
 		query.RangeExp = strings.ReplaceAll(query.RangeExp, "begins_with", "STARTS_WITH")
-		if query.RangeValMap == nil {
-			query.RangeExp = query.RangeExp + " @rangeExp"
-			params["rangeExp"] = query.RangeVal
-		} else {
-			count := 1
-			for k, v := range query.RangeValMap {
+
+		count := 1
+		for k, v := range query.RangeValMap {
+			if strings.Contains(query.RangeExp, k) {
 				str := "rangeExp" + strconv.Itoa(count)
 				query.RangeExp = strings.ReplaceAll(query.RangeExp, k, "@"+str)
 				params[str] = v
@@ -444,6 +427,24 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 			}
 		}
 		whereClause += query.RangeExp
+	}
+
+	if query.FilterExp != "" {
+		if whereClause != "WHERE " {
+			whereClause += " AND "
+		}
+		_, _, query.FilterExp = utils.ParseBeginsWith(query.FilterExp)
+		query.FilterExp = strings.ReplaceAll(query.FilterExp, "begins_with", "STARTS_WITH")
+		count := 1
+		for k, v := range query.RangeValMap {
+			if strings.Contains(query.FilterExp, k) {
+				str := "filter" + strconv.Itoa(count)
+				query.FilterExp = strings.ReplaceAll(query.FilterExp, k, "@"+str)
+				params[str] = v
+				count++
+			}
+		}
+		whereClause += query.FilterExp
 	}
 
 	if whereClause == "WHERE " {
