@@ -14,11 +14,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 )
 
 var operations = []string{" SET ", " DELETE ", " ADD ", " REMOVE "}
+var byteSliceType = reflect.TypeOf([]byte(nil))
 
 func between(value string, a string, b string) string {
 	// Get substring between two strings.
@@ -599,4 +601,122 @@ func ChangeQueryResponseColumn(tableName string, obj map[string]interface{}) map
 		}
 	}
 	return obj
+}
+
+//ChangeMaptoDynamoMap converts simple map into dynamo map
+func ChangeMaptoDynamoMap(in interface{}) (map[string]interface{}, error) {
+	outputObject := make(map[string]interface{})
+	err := convertMapToDynamoObject(outputObject, reflect.ValueOf(in))
+	return outputObject, err
+}
+
+func convertMapToDynamoObject(output map[string]interface{}, v reflect.Value) error {
+	v = valueElem(v)
+	switch v.Kind() {
+	case reflect.Map:
+		return convertMap(output, v)
+	case reflect.Slice, reflect.Array:
+		return convertSlice(output, v)
+	case reflect.Chan, reflect.Func, reflect.UnsafePointer:
+		// unsupported
+	default:
+		return convertSingle(output, v)
+	}
+
+	return nil
+}
+
+func valueElem(v reflect.Value) reflect.Value {
+	switch v.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		for v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+	}
+
+	return v
+}
+
+func convertMap(output map[string]interface{}, v reflect.Value) error {
+	for _, key := range v.MapKeys() {
+		keyName := fmt.Sprint(key.Interface())
+		if keyName == "" {
+			return errors.New("Key name cannot be empty")
+		}
+
+		elemVal := v.MapIndex(key)
+		elem := make(map[string]interface{})
+		_ = convertMapToDynamoObject(elem, elemVal)
+
+		output[keyName] = elem
+	}
+	return nil
+}
+
+func convertSlice(output map[string]interface{}, v reflect.Value) error {
+	if v.Kind() == reflect.Array && v.Len() == 0 {
+		return nil
+	}
+
+	switch v.Type().Elem().Kind() {
+	case reflect.Uint8:
+		slice := reflect.MakeSlice(byteSliceType, v.Len(), v.Len())
+		reflect.Copy(slice, v)
+
+		b := slice.Bytes()
+		if (v.Kind() == reflect.Slice && v.IsNil()) || (len(b) == 0) {
+			return nil
+		}
+		output["B"] = append([]byte{}, b...)
+	default:
+		listVal := make([]map[string]interface{}, 0, v.Len())
+
+		count := 0
+		for i := 0; i < v.Len(); i++ {
+			elem := make(map[string]interface{})
+			err := convertMapToDynamoObject(elem, v.Index(i))
+			if err != nil {
+				return err
+			}
+			listVal = append(listVal, elem)
+			count++
+		}
+		output["L"] = listVal
+	}
+
+	return nil
+}
+
+func convertSingle(output map[string]interface{}, v reflect.Value) error {
+
+	switch v.Kind() {
+	case reflect.Bool:
+		output["BOOL"] = new(bool)
+		output["BOOL"] = v.Bool()
+	case reflect.String:
+		s := v.String()
+		output["S"] = s
+	default:
+		if err := convertNumber(output, v); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func convertNumber(output map[string]interface{}, v reflect.Value) error {
+	var outVal string
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		outVal = strconv.FormatInt(v.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		outVal = strconv.FormatUint(v.Uint(), 10)
+	case reflect.Float32:
+		outVal = strconv.FormatFloat(v.Float(), 'f', -1, 32)
+	case reflect.Float64:
+		outVal = strconv.FormatFloat(v.Float(), 'f', -1, 64)
+	}
+	output["N"] = outVal
+	return nil
 }
