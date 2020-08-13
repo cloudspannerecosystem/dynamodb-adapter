@@ -209,7 +209,21 @@ func queryResponse(query models.Query, c *gin.Context) {
 	query = ReplaceHashRangeExpr(query)
 	res, hash, err := services.QueryAttributes(c.Request.Context(), query)
 	if err == nil {
-		c.JSON(http.StatusOK, ChangeQueryResponseColumn(query.TableName, res))
+		changedOutput := ChangeQueryResponseColumn(query.TableName, res)
+		if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+			changedOutput["Items"], err = ChangeMaptoDynamoMap(changedOutput["Items"])
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+			}
+		}
+		if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+			changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+			}
+		}
+
+		c.JSON(http.StatusOK, changedOutput)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
