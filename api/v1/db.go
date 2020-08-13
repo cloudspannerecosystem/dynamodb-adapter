@@ -371,7 +371,15 @@ func GetItemMeta(c *gin.Context) {
 		getItemMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getItemMeta.TableName, getItemMeta.ExpressionAttributeNames)
 		res, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
 		if rowErr == nil {
-			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(getItemMeta.TableName, res))
+			changedColumns := ChangeResponseToOriginalColumns(getItemMeta.TableName, res)
+			output, err := ChangeMaptoDynamoMap(changedColumns)
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, "OutputChangedError"))
+			}
+			output = map[string]interface{}{
+				"Item": output,
+			}
+			c.JSON(http.StatusOK, output)
 		} else {
 			c.JSON(errors.HTTPResponse(rowErr, getItemMeta))
 		}
