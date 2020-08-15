@@ -21,9 +21,8 @@ import (
 func InitDBAPI(g *gin.RouterGroup) {
 
 	r := g.Group("/")
-	r.POST("/batchGet", BatchGetMeta)
 	r.POST("/GetItem", GetItemMeta)
-	r.POST("/batchGetWithProjection", BatchGetMetaWithProjection)
+	r.POST("/BatchGet", BatchGetData)
 
 	r.POST("/query", QueryTable)
 	r.POST("/queryWithProjection", QueryTable)
@@ -279,58 +278,6 @@ func QueryTable(c *gin.Context) {
 	}
 }
 
-//BatchGetMeta Get Batch meta
-// @Description Request items in a batch.
-// @Summary Query a table
-// @ID query-table
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.BatchMeta true "Please add request body of type models.BatchMeta"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /batchGet/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchGetMeta(c *gin.Context) {
-	start := time.Now()
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var batchMeta models.BatchMeta
-	if err := c.ShouldBindJSON(&batchMeta); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(batchMeta))
-	} else {
-		logger.LogDebug(batchMeta)
-		if allow := services.MayIReadOrWrite(batchMeta.TableName, false, ""); !allow {
-			c.JSON(http.StatusOK, []gin.H{})
-			return
-		}
-		batchMeta.KeyArray, err = ConvertDynamoArrayToMapArray(batchMeta.TableName, batchMeta.DynamoObject)
-		if err != nil {
-			c.JSON(errors.New("ValidationException", err).HTTPResponse(batchMeta))
-			return
-		}
-		res, err := services.BatchGet(c.Request.Context(), batchMeta.TableName, batchMeta.KeyArray)
-		span = span.SetTag("table", batchMeta.TableName)
-		span = span.SetTag("batchRequestCount", len(batchMeta.DynamoObject))
-		span = span.SetTag("batchResponseCount", len(res))
-		if err == nil {
-			c.JSON(http.StatusOK, ChangesArrayResponseToOriginalColumns(batchMeta.TableName, res))
-		} else {
-			c.JSON(errors.HTTPResponse(err, batchMeta))
-		}
-		if time.Since(start) > time.Second*1 {
-			go fmt.Println("BatchGetCall", batchMeta)
-		}
-	}
-}
-
 // GetMetaWithProjection to get with projections
 // @Description Get a record with projections
 // @Summary Get a record with projections
@@ -396,7 +343,7 @@ func GetItemMeta(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /batchGetWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchGetMetaWithProjection(c *gin.Context) {
+func BatchGetData(c *gin.Context) {
 	start := time.Now()
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
@@ -409,34 +356,59 @@ func BatchGetMetaWithProjection(c *gin.Context) {
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
 	span = addParentSpanID(c, span)
-	var batchGetWithProjectionMeta models.BatchGetWithProjectionMeta
-	if err1 := c.ShouldBindJSON(&batchGetWithProjectionMeta); err1 != nil {
-		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchGetWithProjectionMeta))
+
+	var batchGetMeta models.BatchGetMeta
+	if err1 := c.ShouldBindJSON(&batchGetMeta); err1 != nil {
+		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchGetMeta))
 	} else {
-		logger.LogDebug(batchGetWithProjectionMeta)
-		if allow := services.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
-			c.JSON(http.StatusOK, []gin.H{})
-			return
+		output := make(map[string]interface{})
+
+		for k, v := range batchGetMeta.RequestItems {
+			batchGetWithProjectionMeta := v
+			batchGetWithProjectionMeta.TableName = k
+			logger.LogDebug(batchGetWithProjectionMeta)
+			if allow := services.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
+				c.JSON(http.StatusOK, []gin.H{})
+				return
+			}
+			var singleOutput interface{}
+			singleOutput, span, err = batchGetDataSingleTable(c.Request.Context(), batchGetWithProjectionMeta, span)
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, batchGetWithProjectionMeta))
+			}
+			currOutput, err := ChangeMaptoDynamoMap(singleOutput)
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, batchGetWithProjectionMeta))
+			}
+			output[k] = currOutput["L"]
 		}
-		batchGetWithProjectionMeta.KeyArray, err1 = ConvertDynamoArrayToMapArray(batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.DynamoObject)
-		if err1 != nil {
-			c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchGetWithProjectionMeta))
-			return
-		}
-		batchGetWithProjectionMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.ExpressionAttributeNames)
-		res, err2 := services.BatchGetWithProjection(c.Request.Context(), batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.KeyArray, batchGetWithProjectionMeta.ProjectionExpression, batchGetWithProjectionMeta.ExpressionAttributeNames)
-		span = span.SetTag("table", batchGetWithProjectionMeta.TableName)
-		span = span.SetTag("batchRequestCount", len(batchGetWithProjectionMeta.DynamoObject))
-		span = span.SetTag("batchResponseCount", len(res))
-		if err2 == nil {
-			c.JSON(http.StatusOK, ChangesArrayResponseToOriginalColumns(batchGetWithProjectionMeta.TableName, res))
-		} else {
-			c.JSON(errors.HTTPResponse(err2, batchGetWithProjectionMeta))
-		}
+
+		c.JSON(http.StatusOK, map[string]interface{}{"Responses": output})
+
 		if time.Since(start) > time.Second*1 {
-			go fmt.Println("BatchGetCall", batchGetWithProjectionMeta)
+			go fmt.Println("BatchGetCall", batchGetMeta)
 		}
 	}
+}
+
+func batchGetDataSingleTable(ctx context.Context, batchGetWithProjectionMeta models.BatchGetWithProjectionMeta, span opentracing.Span) (interface{}, opentracing.Span, error) {
+
+	var err1 error
+	batchGetWithProjectionMeta.KeyArray, err1 = ConvertDynamoArrayToMapArray(batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.Keys)
+	if err1 != nil {
+		return nil, nil, errors.New("ValidationException", err1.Error())
+	}
+	batchGetWithProjectionMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.ExpressionAttributeNames)
+	res, err2 := services.BatchGetWithProjection(ctx, batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.KeyArray, batchGetWithProjectionMeta.ProjectionExpression, batchGetWithProjectionMeta.ExpressionAttributeNames)
+
+	span = span.SetTag("table", batchGetWithProjectionMeta.TableName)
+	span = span.SetTag("batchRequestCount", len(batchGetWithProjectionMeta.Keys))
+	span = span.SetTag("batchResponseCount", len(res))
+
+	if err2 != nil {
+		return nil, span, err2
+	}
+	return ChangesArrayResponseToOriginalColumns(batchGetWithProjectionMeta.TableName, res), span, nil
 }
 
 // QueryWithFilterExpression filter the data for a query.
