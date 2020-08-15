@@ -22,7 +22,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 
 	r := g.Group("/")
 	r.POST("/GetItem", GetItemMeta)
-	r.POST("/BatchGet", BatchGetData)
+	r.POST("/BatchGetItem", BatchGetItem)
 
 	r.POST("/query", QueryTable)
 	r.POST("/queryWithProjection", QueryTable)
@@ -343,7 +343,7 @@ func GetItemMeta(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /batchGetWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchGetData(c *gin.Context) {
+func BatchGetItem(c *gin.Context) {
 	start := time.Now()
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
