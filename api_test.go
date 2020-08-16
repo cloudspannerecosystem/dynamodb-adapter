@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"testing"
@@ -610,7 +609,6 @@ func createPostTestCase(name, url, outputString string, input interface{}) apite
 		},
 		ExpHTTPStatus: http.StatusOK,
 		ValidateResponse: func(ctx context.Context, t *testing.T, resp *httpexpect.Response) context.Context {
-			fmt.Println(resp.Body())
 			resp.Body().Equal(outputString)
 			return ctx
 		},

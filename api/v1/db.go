@@ -32,7 +32,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/deleteItem", DeleteItem) // return whole object
 	r.POST("/deleteWithCondExpression", DeleteItem)
 
-	r.POST("/scan", Scan)
+	r.POST("/Scan", Scan)
 
 	r.POST("/update", Update)
 	r.POST("/updateAttribute", UpdateAttribute)

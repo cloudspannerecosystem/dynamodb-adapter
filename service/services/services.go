@@ -572,6 +572,10 @@ func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}
 	query.OnlyCount = scanData.OnlyCount
 	query.ProjectionExpression = scanData.ProjectionExpression
 
+	for k, v := range query.ExpressionAttributeNames {
+		query.FilterExp = strings.ReplaceAll(query.FilterExp, k, v)
+	}
+
 	rs, _, err := QueryAttributes(ctx, query)
 	return rs, err
 }
