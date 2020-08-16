@@ -33,7 +33,6 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/deleteWithCondExpression", DeleteItem)
 
 	r.POST("/scan", Scan)
-	r.POST("/scanTable", ScanTable) // only array
 
 	r.POST("/update", Update)
 	r.POST("/updateAttribute", UpdateAttribute)
@@ -523,15 +522,40 @@ func Scan(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		meta.StartFrom, err = ConvertDynamoToMap(meta.TableName, meta.DynamoObject)
+
+		meta.StartFrom, err = ConvertDynamoToMap(meta.TableName, meta.ExclusiveStartKey)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 			return
 		}
+
+		meta.ExpressionAttributeMap, err = ConvertDynamoToMap(meta.TableName, meta.ExpressionAttributeValues)
+		if err != nil {
+			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
+			return
+		}
+		if meta.Select == "COUNT" {
+			meta.OnlyCount = true
+		}
+
 		logger.LogDebug(meta)
-		resp, err := services.Scan(c.Request.Context(), meta.TableName, meta.Limit, meta.StartFrom)
+		res, err := services.Scan(c.Request.Context(), meta)
 		if err == nil {
-			c.JSON(http.StatusOK, resp)
+			changedOutput := ChangeQueryResponseColumn(meta.TableName, res)
+			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+				}
+				changedOutput["Items"] = itemsOutput["L"]
+			}
+			if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+				changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+				}
+			}
+			c.JSON(http.StatusOK, res)
 		} else {
 			c.JSON(errors.HTTPResponse(err, meta))
 		}
@@ -640,44 +664,4 @@ func UpdateAttribute(c *gin.Context) {
 		}
 	}
 
-}
-
-// ScanTable record from table
-// @Description Scan Table
-// @Summary Scan Table
-// @ID scan-table
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.ScanMeta true "Please add request body of type models.ScanMeta"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /scanTable/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func ScanTable(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var meta models.ScanMeta
-	if err := c.ShouldBindJSON(&meta); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
-	} else {
-		logger.LogDebug(meta)
-		if allow := services.MayIReadOrWrite(meta.TableName, false, ""); !allow {
-			c.JSON(http.StatusOK, []gin.H{})
-			return
-		}
-		resp, err := services.ScanTable(c.Request.Context(), meta.TableName)
-		if err != nil {
-			c.JSON(errors.HTTPResponse(err, meta))
-		} else {
-			c.JSON(http.StatusOK, resp)
-		}
-	}
 }

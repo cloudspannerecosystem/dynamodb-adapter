@@ -557,55 +557,23 @@ func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string
 }
 
 //Scan service
-func Scan(ctx context.Context, tableName string, limit int64, startFrom map[string]interface{}) (map[string]interface{}, error) {
+func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}, error) {
 	query := models.Query{}
-	query.TableName = tableName
-	query.Limit = limit
-	if limit == 0 {
+	query.TableName = scanData.TableName
+	query.Limit = scanData.Limit
+	if query.Limit == 0 {
 		query.Limit = 5000
 	}
-	query.StartFrom = startFrom
+	query.StartFrom = scanData.StartFrom
+	query.RangeValMap = scanData.ExpressionAttributeMap
+	query.IndexName = scanData.IndexName
+	query.FilterExp = scanData.FilterExpression
+	query.ExpressionAttributeNames = scanData.ExpressionAttributeNames
+	query.OnlyCount = scanData.OnlyCount
+	query.ProjectionExpression = scanData.ProjectionExpression
+
 	rs, _, err := QueryAttributes(ctx, query)
 	return rs, err
-}
-
-// ScanTable - this will scan full table
-func ScanTable(ctx context.Context, tableName string) ([]map[string]interface{}, error) {
-	tableConf, err := config.GetTableConf(tableName)
-	if err != nil {
-		return nil, err
-	}
-
-	tableName = tableConf.ActualTable
-	var resp []map[string]interface{}
-	var startFrom map[string]interface{}
-	for {
-		res, err := Scan(ctx, tableName, 5000, startFrom)
-		if err != nil {
-			return nil, err
-		}
-		items, _ := res["Items"].([]map[string]interface{})
-		resp = append(resp, items...)
-		lastEvaluatedMap, ok := res["LastEvaluatedKey"].(map[string]interface{})
-		if !ok || len(lastEvaluatedMap) <= 0 {
-			break
-		} else {
-			if startFrom == nil {
-				startFrom = make(map[string]interface{})
-			}
-			startFrom = res["LastEvaluatedKey"].(map[string]interface{})
-			val, ok := startFrom["offset"].(int64)
-			var offset float64
-			if ok {
-				offset = float64(val)
-				startFrom["offset"] = offset
-			}
-
-		}
-
-	}
-	return resp, nil
-
 }
 
 func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[string]interface{}, error) {

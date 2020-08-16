@@ -121,10 +121,18 @@ type UpdateAttr struct {
 
 //ScanMeta for Scan request
 type ScanMeta struct {
-	TableName    string                              `json:"tableName"`
-	Limit        int64                               `json:"limit"`
-	StartFrom    map[string]interface{}              `json:"startFrom"`
-	DynamoObject map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName                 string                              `json:"tableName"`
+	IndexName                 string                              `json:"indexName"`
+	OnlyCount                 bool                                `json:"onlyCount"`
+	Select                    string                              `json:"Select"`
+	Limit                     int64                               `json:"limit"`
+	StartFrom                 map[string]interface{}              `json:"startFrom"`
+	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
+	FilterExpression          string                              `json:"FilterExpression"`
+	ProjectionExpression      string                              `json:"ProjectionExpression"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 }
 
 type TableConfig struct {
