@@ -34,8 +34,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 
 	r.POST("/Scan", Scan)
 
-	r.POST("/update", Update)
-	r.POST("/updateAttribute", UpdateAttribute)
+	r.POST("/UpdateItem", Update)
 
 }
 
@@ -592,12 +591,12 @@ func Update(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		updateAttr.PrimaryKeyMap, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.DynamoObject)
+		updateAttr.PrimaryKeyMap, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.Key)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
 			return
 		}
-		updateAttr.ExpressionAttributeValues, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.DynamoObjectAttr)
+		updateAttr.ExpressionAttributeMap, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.ExpressionAttributeValues)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
 			return
@@ -609,59 +608,4 @@ func Update(c *gin.Context) {
 			c.JSON(http.StatusOK, resp)
 		}
 	}
-}
-
-// UpdateAttribute update attribute a record in Spanner
-// @Description update attribute a record in Spanner
-// @Summary updates a record in Spanner
-// @ID update
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.UpdateAttr true "Please add request body of type models.UpdateAttr"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /updateAttribute [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func UpdateAttribute(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var updateAtrr models.UpdateAttr
-	if err := c.ShouldBindJSON(&updateAtrr); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAtrr))
-
-	} else {
-		if allow := services.MayIReadOrWrite(updateAtrr.TableName, true, "UpdateAttribute"); !allow {
-			c.JSON(http.StatusOK, gin.H{})
-			return
-		}
-		updateAtrr.PrimaryKeyMap, err = ConvertDynamoToMap(updateAtrr.TableName, updateAtrr.DynamoObject)
-		if err != nil {
-			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAtrr))
-			return
-		}
-		updateAtrr.ExpressionAttributeValues, err = ConvertDynamoToMap(updateAtrr.TableName, updateAtrr.DynamoObjectAttr)
-		if err != nil {
-			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAtrr))
-			return
-		}
-		if updateAtrr.ReturnValues == "" {
-			updateAtrr.ReturnValues = "ALL_NEW"
-		}
-		logger.LogDebug(updateAtrr)
-		resp, err := UpdateExpression(c.Request.Context(), updateAtrr)
-		if err == nil {
-			c.JSON(http.StatusOK, resp)
-		} else {
-			c.JSON(errors.HTTPResponse(err, updateAtrr))
-		}
-	}
-
 }

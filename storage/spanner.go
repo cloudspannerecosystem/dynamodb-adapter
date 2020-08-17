@@ -352,7 +352,7 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 			tmpMap[k] = v
 		}
 		if len(eval.Attributes) > 0 || expr != nil {
-			status, err := evaluteConditionalExpression(ctx, t, table, tmpMap, eval, expr)
+			status, err := evaluateConditionalExpression(ctx, t, table, tmpMap, eval, expr)
 			if err != nil {
 				return err
 			}
@@ -370,7 +370,7 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 	return update, err
 }
 
-func evaluteConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
+func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
 	colDDL, ok := models.TableDDL[changeTableNameForSP(table)]
 	if !ok {
 		return false, errors.New("ResourceNotFoundException", table)
@@ -420,7 +420,7 @@ func evaluteConditionalExpression(ctx context.Context, t *spanner.ReadWriteTrans
 	}
 	if expr != nil {
 		for index := 0; index < len(expr.Field); index++ {
-			status := evaluteStatementFromRowMap(expr.Condition[index], expr.Field[index], rowMap)
+			status := evaluateStatementFromRowMap(expr.Condition[index], expr.Field[index], rowMap)
 			tmp, ok := status.(bool)
 			if !ok || !tmp {
 				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
@@ -465,17 +465,17 @@ func evaluteConditionalExpression(ctx context.Context, t *spanner.ReadWriteTrans
 		}
 	}
 	for i := 0; i < len(e.Attributes); i++ {
-		e.ValueMap[e.Tokens[i]] = evaluteStatementFromRowMap(e.Attributes[i], e.Cols[i], rowMap)
+		e.ValueMap[e.Tokens[i]] = evaluateStatementFromRowMap(e.Attributes[i], e.Cols[i], rowMap)
 	}
 
-	status, err := utils.EvaluteExpression(e)
+	status, err := utils.EvaluateExpression(e)
 	if err != nil {
 		return false, err
 	}
 	return status, nil
 }
 
-func evaluteStatementFromRowMap(conditionalExpression, colName string, rowMap map[string]interface{}) interface{} {
+func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap map[string]interface{}) interface{} {
 	if strings.HasPrefix(conditionalExpression, "attribute_not_exists") || strings.HasPrefix(conditionalExpression, "if_not_exists") {
 		if len(rowMap) == 0 {
 			return true
@@ -554,7 +554,7 @@ func (s Storage) SpannerDelete(ctx context.Context, table string, m map[string]i
 			tmpMap[k] = v
 		}
 		if len(eval.Attributes) > 0 || expr != nil {
-			status, err := evaluteConditionalExpression(ctx, t, table, tmpMap, eval, expr)
+			status, err := evaluateConditionalExpression(ctx, t, table, tmpMap, eval, expr)
 			if err != nil {
 				return err
 			}
@@ -678,7 +678,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 			tmpMap[k] = v
 		}
 		if len(eval.Attributes) > 0 || expr != nil {
-			status, _ := evaluteConditionalExpression(ctx, t, table, tmpMap, eval, expr)
+			status, _ := evaluateConditionalExpression(ctx, t, table, tmpMap, eval, expr)
 			if !status {
 				return errors.New("ConditionalCheckFailedException")
 			}
@@ -837,7 +837,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 			tmpMap[k] = v
 		}
 		if len(eval.Attributes) > 0 || expr != nil {
-			status, _ := evaluteConditionalExpression(ctx, t, table, m1, eval, expr)
+			status, _ := evaluateConditionalExpression(ctx, t, table, m1, eval, expr)
 			if !status {
 				return errors.New("ConditionalCheckFailedException")
 			}
@@ -919,7 +919,7 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 			tmpMap[k] = v
 		}
 		if len(eval.Attributes) > 0 || expr != nil {
-			status, _ := evaluteConditionalExpression(ctx, t, table, m, eval, expr)
+			status, _ := evaluateConditionalExpression(ctx, t, table, m, eval, expr)
 			if !status {
 				return errors.New("ConditionalCheckFailedException")
 			}

@@ -87,7 +87,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			tokens := strings.Split(p, "+")
 			tokens[1] = strings.TrimSpace(tokens[1])
 			p = tokens[0]
-			v1, ok := updateAtrr.ExpressionAttributeValues[(tokens[1])]
+			v1, ok := updateAtrr.ExpressionAttributeMap[(tokens[1])]
 			if ok {
 				v2, ok := v1.(float64)
 				if ok {
@@ -105,7 +105,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 		if strings.Contains(p, "-") {
 			tokens := strings.Split(p, "-")
 			tokens[1] = strings.TrimSpace(tokens[1])
-			v1, ok := updateAtrr.ExpressionAttributeValues[(tokens[1])]
+			v1, ok := updateAtrr.ExpressionAttributeMap[(tokens[1])]
 			if ok {
 				v2, ok := v1.(float64)
 				if ok {
@@ -134,7 +134,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			expr.AddValues[v[0]] = addValue
 		}
 		if updateAtrr.ExpressionAttributeNames[v[0]] != "" {
-			tmp, ok := updateAtrr.ExpressionAttributeValues[v[1]]
+			tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
 			if ok {
 				resp[updateAtrr.ExpressionAttributeNames[v[0]]] = tmp
 			}
@@ -142,14 +142,14 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			if strings.Contains(v[1], "%") {
 				for j := 0; j < len(expr.Field); j++ {
 					if strings.Contains(v[1], "%"+expr.Value[j]+"%") {
-						tmp, ok := updateAtrr.ExpressionAttributeValues[expr.Value[j]]
+						tmp, ok := updateAtrr.ExpressionAttributeMap[expr.Value[j]]
 						if ok {
 							resp[v[0]] = tmp
 						}
 					}
 				}
 			} else {
-				tmp, ok := updateAtrr.ExpressionAttributeValues[v[1]]
+				tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
 				if ok {
 					resp[v[0]] = tmp
 				}
@@ -209,17 +209,17 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 	case action == "DELETE":
 		// perform delete
 		m, expr := parseActionValue(actionValue, updateAtrr, true)
-		res, err := services.Del(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionalExpression, m, expr)
+		res, err := services.Del(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, expr)
 		return res, m, err
 	case action == "SET":
 		// Update data in table
 		m, expr := parseActionValue(actionValue, updateAtrr, false)
-		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionalExpression, updateAtrr.ExpressionAttributeValues, oldRes)
+		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
 		return res, m, err
 	case action == "ADD":
 		// Add data in table
 		m, expr := parseActionValue(actionValue, updateAtrr, true)
-		res, err := services.Add(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionalExpression, m, updateAtrr.ExpressionAttributeValues, expr, oldRes)
+		res, err := services.Add(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, updateAtrr.ExpressionAttributeMap, expr, oldRes)
 		return res, m, err
 
 	case action == "REMOVE":
@@ -242,7 +242,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 	var er error
 	for k, v := range updateAtrr.ExpressionAttributeNames {
 		updateAtrr.UpdateExpression = strings.ReplaceAll(updateAtrr.UpdateExpression, k, v)
-		updateAtrr.ConditionalExpression = strings.ReplaceAll(updateAtrr.ConditionalExpression, k, v)
+		updateAtrr.ConditionExpression = strings.ReplaceAll(updateAtrr.ConditionExpression, k, v)
 	}
 	m := extractOperations(updateAtrr.UpdateExpression)
 	for k, v := range m {
@@ -257,22 +257,24 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 		go services.StreamDataToThirdParty(oldRes, resp, updateAtrr.TableName)
 	}
 	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes)
+
+	var output map[string]interface{}
 	switch updateAtrr.ReturnValues {
 	case "NONE":
 		return nil, er
 	case "ALL_NEW":
-		return ChangeResponseToOriginalColumns(updateAtrr.TableName, resp), er
+		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	case "ALL_OLD":
 		if oldRes == nil || len(oldRes) == 0 {
 			return nil, er
 		}
-		return ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes), er
+		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
 	case "UPDATED_NEW":
 		var resVal = make(map[string]interface{})
 		for k := range actVal {
 			resVal[k] = resp[k]
 		}
-		return ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal), er
+		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
 	case "UPDATED_OLD":
 		if oldRes == nil || len(oldRes) == 0 {
 			return nil, er
@@ -281,10 +283,11 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 		for k := range actVal {
 			resVal[k] = oldRes[k]
 		}
-		return ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal), er
+		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
 	default:
-		return ChangeResponseToOriginalColumns(updateAtrr.TableName, resp), er
+		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	}
+	return map[string]interface{}{"Attributes": output}, er
 }
 
 func extractOperations(updateExpression string) map[string]string {
