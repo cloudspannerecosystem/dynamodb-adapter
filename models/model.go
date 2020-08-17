@@ -11,12 +11,14 @@ import (
 
 // Meta struct
 type Meta struct {
-	TableName                 string                              `json:"tableName"`
+	TableName                 string                              `json:"TableName"`
 	AttrMap                   map[string]interface{}              `json:"attrMap"`
-	ConditionalExp            string                              `json:"conditionalExp"`
-	ExpressionAttributeValues map[string]interface{}              `json:"expressionAttributeValues"`
-	DynamoObjectAttr          map[string]*dynamodb.AttributeValue `json:"dynamoObjectAttrVal"`
-	DynamoObject              map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	ReturnValues              string                              `json:"ReturnValues"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	Item                      map[string]*dynamodb.AttributeValue `json:"Item"`
 }
 
 // GetKeyMeta struct

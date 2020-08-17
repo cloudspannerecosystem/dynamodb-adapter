@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
@@ -25,7 +26,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 
 	r.POST("/Query", QueryTable)
 
-	r.POST("/put", UpdateMeta)
+	r.POST("/PutItem", UpdateMeta)
 	r.POST("/batchPut", BatchUpdateMeta)
 
 	r.POST("/batchDelete", BatchDelete)
@@ -85,22 +86,34 @@ func UpdateMeta(c *gin.Context) {
 			return
 		}
 		logger.LogDebug(meta)
-		meta.AttrMap, err = ConvertDynamoToMap(meta.TableName, meta.DynamoObject)
+		meta.AttrMap, err = ConvertDynamoToMap(meta.TableName, meta.Item)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 			return
 		}
-		meta.ExpressionAttributeValues, err = ConvertDynamoToMap(meta.TableName, meta.DynamoObjectAttr)
+		meta.ExpressionAttributeMap, err = ConvertDynamoToMap(meta.TableName, meta.ExpressionAttributeValues)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 			return
 		}
 
-		res, err := put(c.Request.Context(), meta.TableName, meta.AttrMap, nil, meta.ConditionalExp, meta.ExpressionAttributeValues)
+		for k, v := range meta.ExpressionAttributeNames {
+			meta.ConditionExpression = strings.ReplaceAll(meta.ConditionExpression, k, v)
+		}
+
+		res, err := put(c.Request.Context(), meta.TableName, meta.AttrMap, nil, meta.ConditionExpression, meta.ExpressionAttributeMap)
 		if err != nil {
 			c.JSON(errors.HTTPResponse(err, meta))
 		} else {
-			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(meta.TableName, res))
+			var output map[string]interface{}
+			if meta.ReturnValues == "NONE" {
+				output = nil
+			} else {
+				output, _ = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(meta.TableName, res))
+				output = map[string]interface{}{"Attributes": output}
+			}
+
+			c.JSON(http.StatusOK, output)
 		}
 	}
 }
