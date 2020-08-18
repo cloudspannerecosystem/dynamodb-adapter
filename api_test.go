@@ -70,6 +70,172 @@ var (
 	getItemTest5Output = `{"Item":{"address":{"S":"Ney York"}}}`
 )
 
+// params for TestGetBatchAPI
+var (
+	TestGetBatch1Name = "1: wrong url"
+	TestGetBatch1     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {},
+		},
+	}
+
+	TestGetBatch2Name = "2: only table name"
+	TestGetBatch2     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {},
+		},
+	}
+	TestGetBatch2Output = `{"Responses":{"employee":[]}}`
+
+	TestGetBatch3Name = "3: Keys present for 1 table"
+	TestGetBatch3     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+			},
+		},
+	}
+	TestGetBatch3Output = `{"Responses":{"employee":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch4Name = "4: Keys present for 2 table"
+	TestGetBatch4     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+			},
+			"department": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"d_id": {N: aws.String("100")}},
+					{"d_id": {N: aws.String("300")}},
+				},
+			},
+		},
+	}
+	TestGetBatch4Output = `{"Responses":{"department":[{"d_id":{"N":"100"},"d_name":{"S":"Engineering"},"d_specialization":{"S":"CSE, ECE, Civil"}},{"d_id":{"N":"300"},"d_name":{"S":"Culture"},"d_specialization":{"S":"History"}}],"employee":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch5Name = "5: ProjectionExpression without ExpressionAttributeNames for 1 table"
+	TestGetBatch5     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+				ProjectionExpression: "emp_id, address, first_name, last_name",
+			},
+		},
+	}
+	TestGetBatch5Output = `{"Responses":{"employee":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch6Name = "6: ProjectionExpression without ExpressionAttributeNames for 2 table"
+	TestGetBatch6     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+				ProjectionExpression: "emp_id, address, first_name, last_name",
+			},
+			"department": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"d_id": {N: aws.String("100")}},
+					{"d_id": {N: aws.String("300")}},
+				},
+				ProjectionExpression: "d_id, d_name, d_specialization",
+			},
+		},
+	}
+	TestGetBatch6Output = `{"Responses":{"department":[{"d_id":{"N":"100"},"d_name":{"S":"Engineering"},"d_specialization":{"S":"CSE, ECE, Civil"}},{"d_id":{"N":"300"},"d_name":{"S":"Culture"},"d_specialization":{"S":"History"}}],"employee":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch7Name = "7: ProjectionExpression with ExpressionAttributeNames for 1 table"
+	TestGetBatch7     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+				ProjectionExpression: "#emp, #add, first_name, last_name",
+				ExpressionAttributeNames: map[string]string{
+					"#emp": "emp_id",
+					"#add": "address",
+				},
+			},
+		},
+	}
+	TestGetBatch7Output = `{"Responses":{"employee":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch8Name = "8: ProjectionExpression with ExpressionAttributeNames for 2 table"
+	TestGetBatch8     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+				ProjectionExpression: "#emp, #add, first_name, last_name",
+				ExpressionAttributeNames: map[string]string{
+					"#emp": "emp_id",
+					"#add": "address",
+				},
+			},
+			"department": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"d_id": {N: aws.String("100")}},
+					{"d_id": {N: aws.String("300")}},
+				},
+				ProjectionExpression: "d_id, #dn, #ds",
+				ExpressionAttributeNames: map[string]string{
+					"#ds": "d_specialization",
+					"#dn": "d_name",
+				},
+			},
+		},
+	}
+	TestGetBatch8Output = `{"Responses":{"department":[{"d_id":{"N":"100"},"d_name":{"S":"Engineering"},"d_specialization":{"S":"CSE, ECE, Civil"}},{"d_id":{"N":"300"},"d_name":{"S":"Culture"},"d_specialization":{"S":"History"}}],"employee":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch9Name = "9: ProjectionExpression but ExpressionAttributeNames not present"
+	TestGetBatch9     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {N: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+				ProjectionExpression: "#emp, #add, first_name, last_name",
+			},
+		},
+	}
+	TestGetBatch9Output = `{"Responses":{"employee":[{"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}}`
+
+	TestGetBatch10Name = "10: Wrong Keys"
+	TestGetBatch10     = models.BatchGetMeta{
+		RequestItems: map[string]models.BatchGetWithProjectionMeta{
+			"employee": {
+				Keys: []map[string]*dynamodb.AttributeValue{
+					{"emp_id": {S: aws.String("1")}},
+					{"emp_id": {N: aws.String("5")}},
+					{"emp_id": {N: aws.String("3")}},
+				},
+			},
+		},
+	}
+)
+
 func initFunc() *gin.Engine {
 	box := rice.MustFindBox("config-files")
 
@@ -88,6 +254,28 @@ func initFunc() *gin.Engine {
 	})
 	api.InitAPI(r)
 	return r
+}
+
+func createPostTestCase(name, url, outputString string, input interface{}) apitesting.APITestCase {
+	return apitesting.APITestCase{
+		Name:    name,
+		ReqType: "POST",
+		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+			return map[string]string{
+				"Content-Type": "application/json",
+			}
+		},
+		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
+		PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+			return input
+		},
+		ExpHTTPStatus: http.StatusOK,
+		ValidateResponse: func(ctx context.Context, t *testing.T, resp *httpexpect.Response) context.Context {
+			fmt.Println(resp.Body())
+			resp.Body().Equal(outputString)
+			return ctx
+		},
+	}
 }
 
 func TestGetItemAPI(t *testing.T) {
@@ -148,24 +336,51 @@ func TestGetItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func createPostTestCase(name, url, outputString string, input interface{}) apitesting.APITestCase {
-	return apitesting.APITestCase{
-		Name:    name,
-		ReqType: "POST",
-		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-			return map[string]string{
-				"Content-Type": "application/json",
-			}
-		},
-		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
-		PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-			return input
-		},
-		ExpHTTPStatus: http.StatusOK,
-		ValidateResponse: func(ctx context.Context, t *testing.T, resp *httpexpect.Response) context.Context {
-			fmt.Println(resp.Body())
-			resp.Body().Equal(outputString)
-			return ctx
+func TestGetBatchAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		// APIEndpointURL: apiURL + "/" + version,
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
 		},
 	}
+	tests := []apitesting.APITestCase{
+		{
+			Name:    TestGetBatch1Name,
+			ReqType: "POST",
+			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+				return map[string]string{
+					"Content-Type": "application/json",
+				}
+			},
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetIt" },
+			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+				return TestGetBatch1
+			},
+			ExpHTTPStatus: http.StatusNotFound,
+		},
+		{
+			Name:    TestGetBatch10Name,
+			ReqType: "POST",
+			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+				return map[string]string{
+					"Content-Type": "application/json",
+				}
+			},
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetItem" },
+			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+				return TestGetBatch10
+			},
+			ExpHTTPStatus: http.StatusBadRequest,
+		},
+		createPostTestCase(TestGetBatch2Name, "/v1/BatchGetItem", TestGetBatch2Output, TestGetBatch2),
+		createPostTestCase(TestGetBatch3Name, "/v1/BatchGetItem", TestGetBatch3Output, TestGetBatch3),
+		createPostTestCase(TestGetBatch4Name, "/v1/BatchGetItem", TestGetBatch4Output, TestGetBatch4),
+		createPostTestCase(TestGetBatch5Name, "/v1/BatchGetItem", TestGetBatch5Output, TestGetBatch5),
+		createPostTestCase(TestGetBatch6Name, "/v1/BatchGetItem", TestGetBatch6Output, TestGetBatch6),
+		createPostTestCase(TestGetBatch7Name, "/v1/BatchGetItem", TestGetBatch7Output, TestGetBatch7),
+		createPostTestCase(TestGetBatch8Name, "/v1/BatchGetItem", TestGetBatch8Output, TestGetBatch8),
+		createPostTestCase(TestGetBatch9Name, "/v1/BatchGetItem", TestGetBatch9Output, TestGetBatch9),
+	}
+
+	apitest.RunTests(t, tests)
 }
