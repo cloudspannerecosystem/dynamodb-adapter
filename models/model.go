@@ -19,13 +19,6 @@ type Meta struct {
 	DynamoObject              map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
 }
 
-// GetMeta struct
-type GetMeta struct {
-	TableName     string                              `json:"tableName"`
-	PrimaryKeyMap map[string]interface{}              `json:"primaryKeyMap"`
-	DynamoObject  map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
-}
-
 // GetKeyMeta struct
 type GetKeyMeta struct {
 	Key          string                              `json:"key"`
@@ -55,13 +48,13 @@ type BatchMeta struct {
 	DynamoObject []map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
 }
 
-// GetWithProjectionMeta struct
-type GetWithProjectionMeta struct {
-	TableName                string                              `json:"tableName"`
-	PrimaryKeyMap            map[string]interface{}              `json:"primaryKeyMap"`
-	ProjectionExpression     string                              `json:"projectionExpression"`
-	ExpressionAttributeNames map[string]string                   `json:"expressionAttributeNames"`
-	DynamoObject             map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+// GetItemMeta struct
+type GetItemMeta struct {
+	TableName                string                              `json:"TableName"`
+	PrimaryKeyMap            map[string]interface{}              `json:"PrimaryKeyMap"`
+	ProjectionExpression     string                              `json:"ProjectionExpression"`
+	ExpressionAttributeNames map[string]string                   `json:"ExpressionAttributeNames"`
+	Key                      map[string]*dynamodb.AttributeValue `json:"Key"`
 }
 
 // BatchGetWithProjectionMeta struct
