@@ -239,7 +239,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 	var pKey string
 	tPKey := tableConf.PartitionKey
 	tSKey := tableConf.SortKey
-	if query.IndexName != "" && tableConf.TableSource == "SP" {
+	if query.IndexName != "" {
 		conf := tableConf.Indices[query.IndexName]
 		query.IndexName = strings.Replace(query.IndexName, "-", "_", -1)
 
@@ -409,21 +409,6 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 	if sKey != "" {
 		whereClause += sKey + " is not null "
 	}
-	if query.HashExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		whereClause += query.HashExp + "@hash "
-		params["hash"] = query.HashVal
-	}
-
-	if query.FilterExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		whereClause += query.FilterExp + "@filter "
-		params["filter"] = query.FilterVal
-	}
 
 	if query.RangeExp != "" {
 		if whereClause != "WHERE " {
@@ -431,12 +416,10 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 		}
 		_, _, query.RangeExp = utils.ParseBeginsWith(query.RangeExp)
 		query.RangeExp = strings.ReplaceAll(query.RangeExp, "begins_with", "STARTS_WITH")
-		if query.RangeValMap == nil {
-			query.RangeExp = query.RangeExp + " @rangeExp"
-			params["rangeExp"] = query.RangeVal
-		} else {
-			count := 1
-			for k, v := range query.RangeValMap {
+
+		count := 1
+		for k, v := range query.RangeValMap {
+			if strings.Contains(query.RangeExp, k) {
 				str := "rangeExp" + strconv.Itoa(count)
 				query.RangeExp = strings.ReplaceAll(query.RangeExp, k, "@"+str)
 				params[str] = v
@@ -444,6 +427,24 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 			}
 		}
 		whereClause += query.RangeExp
+	}
+
+	if query.FilterExp != "" {
+		if whereClause != "WHERE " {
+			whereClause += " AND "
+		}
+		_, _, query.FilterExp = utils.ParseBeginsWith(query.FilterExp)
+		query.FilterExp = strings.ReplaceAll(query.FilterExp, "begins_with", "STARTS_WITH")
+		count := 1
+		for k, v := range query.RangeValMap {
+			if strings.Contains(query.FilterExp, k) {
+				str := "filter" + strconv.Itoa(count)
+				query.FilterExp = strings.ReplaceAll(query.FilterExp, k, "@"+str)
+				params[str] = v
+				count++
+			}
+		}
+		whereClause += query.FilterExp
 	}
 
 	if whereClause == "WHERE " {
@@ -556,55 +557,27 @@ func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string
 }
 
 //Scan service
-func Scan(ctx context.Context, tableName string, limit int64, startFrom map[string]interface{}) (map[string]interface{}, error) {
+func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}, error) {
 	query := models.Query{}
-	query.TableName = tableName
-	query.Limit = limit
-	if limit == 0 {
+	query.TableName = scanData.TableName
+	query.Limit = scanData.Limit
+	if query.Limit == 0 {
 		query.Limit = 5000
 	}
-	query.StartFrom = startFrom
+	query.StartFrom = scanData.StartFrom
+	query.RangeValMap = scanData.ExpressionAttributeMap
+	query.IndexName = scanData.IndexName
+	query.FilterExp = scanData.FilterExpression
+	query.ExpressionAttributeNames = scanData.ExpressionAttributeNames
+	query.OnlyCount = scanData.OnlyCount
+	query.ProjectionExpression = scanData.ProjectionExpression
+
+	for k, v := range query.ExpressionAttributeNames {
+		query.FilterExp = strings.ReplaceAll(query.FilterExp, k, v)
+	}
+
 	rs, _, err := QueryAttributes(ctx, query)
 	return rs, err
-}
-
-// ScanTable - this will scan full table
-func ScanTable(ctx context.Context, tableName string) ([]map[string]interface{}, error) {
-	tableConf, err := config.GetTableConf(tableName)
-	if err != nil {
-		return nil, err
-	}
-
-	tableName = tableConf.ActualTable
-	var resp []map[string]interface{}
-	var startFrom map[string]interface{}
-	for {
-		res, err := Scan(ctx, tableName, 5000, startFrom)
-		if err != nil {
-			return nil, err
-		}
-		items, _ := res["Items"].([]map[string]interface{})
-		resp = append(resp, items...)
-		lastEvaluatedMap, ok := res["LastEvaluatedKey"].(map[string]interface{})
-		if !ok || len(lastEvaluatedMap) <= 0 {
-			break
-		} else {
-			if startFrom == nil {
-				startFrom = make(map[string]interface{})
-			}
-			startFrom = res["LastEvaluatedKey"].(map[string]interface{})
-			val, ok := startFrom["offset"].(int64)
-			var offset float64
-			if ok {
-				offset = float64(val)
-				startFrom["offset"] = offset
-			}
-
-		}
-
-	}
-	return resp, nil
-
 }
 
 func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[string]interface{}, error) {

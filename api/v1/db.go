@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
@@ -24,9 +23,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/GetItem", GetItemMeta)
 	r.POST("/BatchGetItem", BatchGetItem)
 
-	r.POST("/query", QueryTable)
-	r.POST("/queryWithProjection", QueryTable)
-	r.POST("/queryWithFilterExpression", QueryTable)
+	r.POST("/Query", QueryTable)
 
 	r.POST("/put", UpdateMeta)
 	r.POST("/batchPut", BatchUpdateMeta)
@@ -35,8 +32,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/deleteItem", DeleteItem) // return whole object
 	r.POST("/deleteWithCondExpression", DeleteItem)
 
-	r.POST("/scan", Scan)
-	r.POST("/scanTable", ScanTable) // only array
+	r.POST("/Scan", Scan)
 
 	r.POST("/update", Update)
 	r.POST("/updateAttribute", UpdateAttribute)
@@ -189,43 +185,17 @@ func queryResponse(query models.Query, c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{})
 		return
 	}
-	filters := make(map[string]*dynamodb.AttributeValue)
-	if query.HashValDDB != nil {
-		filters["hasVal"] = query.HashValDDB
-	}
-	if query.FilterValDDB != nil {
-		filters["filterVal"] = query.FilterValDDB
-	}
-	if query.RangeValDDB != nil {
-		filters["rangeVal"] = query.RangeValDDB
-	}
-	tmpFilters, err := ConvertDynamoToMap(query.TableName, filters)
-	if err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
-		return
+
+	if query.Select == "COUNT" {
+		query.OnlyCount = true
 	}
 
-	val, ok := tmpFilters["hasVal"]
-	if ok {
-		query.HashVal = val
-	}
-
-	val, ok = tmpFilters["filterVal"]
-	if ok {
-		query.FilterVal = val
-	}
-
-	val, ok = tmpFilters["rangeVal"]
-	if ok {
-		query.RangeVal = val
-	}
-
-	query.StartFrom, err1 = ConvertDynamoToMap(query.TableName, query.DynamoObject)
+	query.StartFrom, err1 = ConvertDynamoToMap(query.TableName, query.ExclusiveStartKey)
 	if err1 != nil {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(query))
 		return
 	}
-	query.RangeValMap, err1 = ConvertDynamoToMap(query.TableName, query.RangeValMapDDB)
+	query.RangeValMap, err1 = ConvertDynamoToMap(query.TableName, query.ExpressionAttributeValues)
 	if err1 != nil {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(query))
 		return
@@ -238,7 +208,21 @@ func queryResponse(query models.Query, c *gin.Context) {
 	query = ReplaceHashRangeExpr(query)
 	res, hash, err := services.QueryAttributes(c.Request.Context(), query)
 	if err == nil {
-		c.JSON(http.StatusOK, ChangeQueryResponseColumn(query.TableName, res))
+		changedOutput := ChangeQueryResponseColumn(query.TableName, res)
+		if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+			changedOutput["Items"], err = ChangeMaptoDynamoMap(changedOutput["Items"])
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+			}
+		}
+		if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+			changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+			}
+		}
+
+		c.JSON(http.StatusOK, changedOutput)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
@@ -411,26 +395,6 @@ func batchGetDataSingleTable(ctx context.Context, batchGetWithProjectionMeta mod
 	return ChangesArrayResponseToOriginalColumns(batchGetWithProjectionMeta.TableName, res), span, nil
 }
 
-// QueryWithFilterExpression filter the data for a query.
-func QueryWithFilterExpression(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	var query models.Query
-	if err := c.ShouldBindJSON(&query); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
-	} else if query.HashVal != "" {
-		logger.LogDebug(query)
-		if query.HashExp == "" {
-			c.JSON(errors.New("ValidationException").HTTPResponse(query))
-		} else {
-			queryResponse(query, c)
-		}
-	} else {
-		logger.LogDebug(query)
-		queryResponse(query, c)
-	}
-}
-
 // DeleteItem  ...
 // @Description Delete Item from table
 // @Summary Delete Item from table
@@ -558,15 +522,40 @@ func Scan(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		meta.StartFrom, err = ConvertDynamoToMap(meta.TableName, meta.DynamoObject)
+
+		meta.StartFrom, err = ConvertDynamoToMap(meta.TableName, meta.ExclusiveStartKey)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 			return
 		}
+
+		meta.ExpressionAttributeMap, err = ConvertDynamoToMap(meta.TableName, meta.ExpressionAttributeValues)
+		if err != nil {
+			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
+			return
+		}
+		if meta.Select == "COUNT" {
+			meta.OnlyCount = true
+		}
+
 		logger.LogDebug(meta)
-		resp, err := services.Scan(c.Request.Context(), meta.TableName, meta.Limit, meta.StartFrom)
+		res, err := services.Scan(c.Request.Context(), meta)
 		if err == nil {
-			c.JSON(http.StatusOK, resp)
+			changedOutput := ChangeQueryResponseColumn(meta.TableName, res)
+			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+				}
+				changedOutput["Items"] = itemsOutput["L"]
+			}
+			if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+				changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+				}
+			}
+			c.JSON(http.StatusOK, res)
 		} else {
 			c.JSON(errors.HTTPResponse(err, meta))
 		}
@@ -675,44 +664,4 @@ func UpdateAttribute(c *gin.Context) {
 		}
 	}
 
-}
-
-// ScanTable record from table
-// @Description Scan Table
-// @Summary Scan Table
-// @ID scan-table
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.ScanMeta true "Please add request body of type models.ScanMeta"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /scanTable/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func ScanTable(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var meta models.ScanMeta
-	if err := c.ShouldBindJSON(&meta); err != nil {
-		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
-	} else {
-		logger.LogDebug(meta)
-		if allow := services.MayIReadOrWrite(meta.TableName, false, ""); !allow {
-			c.JSON(http.StatusOK, []gin.H{})
-			return
-		}
-		resp, err := services.ScanTable(c.Request.Context(), meta.TableName)
-		if err != nil {
-			c.JSON(errors.HTTPResponse(err, meta))
-		} else {
-			c.JSON(http.StatusOK, resp)
-		}
-	}
 }

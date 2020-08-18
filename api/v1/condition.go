@@ -314,8 +314,6 @@ func extractOperations(updateExpression string) map[string]string {
 
 func ReplaceHashRangeExpr(query models.Query) models.Query {
 	for k, v := range query.ExpressionAttributeNames {
-		query.HashExp = strings.ReplaceAll(query.HashExp, k, v)
-		query.FilterExp = strings.ReplaceAll(query.FilterExp, k, v)
 		query.FilterExp = strings.ReplaceAll(query.FilterExp, k, v)
 		query.RangeExp = strings.ReplaceAll(query.RangeExp, k, v)
 	}

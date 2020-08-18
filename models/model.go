@@ -90,26 +90,20 @@ type BulkDelete struct {
 
 // Query struct
 type Query struct {
-	TableName                string                              `json:"tableName"`
-	IndexName                string                              `json:"indexName"`
-	OnlyCount                bool                                `json:"onlyCount"`
-	Limit                    int64                               `json:"limit"`
-	SortAscending            bool                                `json:"sortAscending"`
-	StartFrom                map[string]interface{}              `json:"startFrom"`
-	HashExp                  string                              `json:"hashExp"`
-	HashVal                  interface{}                         `json:"hasVal"`
-	HashValDDB               *dynamodb.AttributeValue            `json:"hasValDDB"`
-	ProjectionExpression     string                              `json:"projectionExpression"`
-	ExpressionAttributeNames map[string]string                   `json:"expressionAttributeNames"`
-	FilterExp                string                              `json:"filterExp"`
-	FilterVal                interface{}                         `json:"filterVal"`
-	FilterValDDB             *dynamodb.AttributeValue            `json:"filterValDDB"`
-	RangeExp                 string                              `json:"rangeExp"`
-	RangeVal                 interface{}                         `json:"rangeVal"`
-	RangeValDDB              *dynamodb.AttributeValue            `json:"rangeValDDB"`
-	RangeValMap              map[string]interface{}              `json:"rangeValMap"`
-	RangeValMapDDB           map[string]*dynamodb.AttributeValue `json:"rangeValMapDDB"`
-	DynamoObject             map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName                 string                              `json:"tableName"`
+	IndexName                 string                              `json:"indexName"`
+	OnlyCount                 bool                                `json:"onlyCount"`
+	Limit                     int64                               `json:"limit"`
+	SortAscending             bool                                `json:"ScanIndexForward"`
+	StartFrom                 map[string]interface{}              `json:"startFrom"`
+	ProjectionExpression      string                              `json:"ProjectionExpression"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	FilterExp                 string                              `json:"FilterExpression"`
+	RangeExp                  string                              `json:"KeyConditionExpression"`
+	RangeValMap               map[string]interface{}              `json:"rangeValMap"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
+	Select                    string                              `json:"Select"`
 }
 
 // UpdateAttr struct
@@ -127,10 +121,18 @@ type UpdateAttr struct {
 
 //ScanMeta for Scan request
 type ScanMeta struct {
-	TableName    string                              `json:"tableName"`
-	Limit        int64                               `json:"limit"`
-	StartFrom    map[string]interface{}              `json:"startFrom"`
-	DynamoObject map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName                 string                              `json:"tableName"`
+	IndexName                 string                              `json:"indexName"`
+	OnlyCount                 bool                                `json:"onlyCount"`
+	Select                    string                              `json:"Select"`
+	Limit                     int64                               `json:"limit"`
+	StartFrom                 map[string]interface{}              `json:"startFrom"`
+	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
+	FilterExpression          string                              `json:"FilterExpression"`
+	ProjectionExpression      string                              `json:"ProjectionExpression"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 }
 
 type TableConfig struct {
