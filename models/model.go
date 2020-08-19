@@ -77,10 +77,11 @@ type BatchGetWithProjectionMeta struct {
 type Delete struct {
 	TableName                 string                              `json:"tableName"`
 	PrimaryKeyMap             map[string]interface{}              `json:"primaryKeyMap"`
-	ConditionalExpression     string                              `json:"conditionalExpression"`
-	ExpressionAttributeValues map[string]interface{}              `json:"expressionAttributeValues"`
-	DynamoObject              map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
-	DynamoObjectAttrVal       map[string]*dynamodb.AttributeValue `json:"dynamoObjectAttrVal"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
 }
 
 // BulkDelete struct

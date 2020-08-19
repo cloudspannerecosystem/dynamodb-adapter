@@ -30,8 +30,7 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/batchPut", BatchUpdateMeta)
 
 	r.POST("/batchDelete", BatchDelete)
-	r.POST("/deleteItem", DeleteItem) // return whole object
-	r.POST("/deleteWithCondExpression", DeleteItem)
+	r.POST("/DeleteItem", DeleteItem)
 
 	r.POST("/Scan", Scan)
 
@@ -438,20 +437,26 @@ func DeleteItem(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		deleteItem.PrimaryKeyMap, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.DynamoObject)
+		deleteItem.PrimaryKeyMap, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.Key)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 			return
 		}
-		deleteItem.ExpressionAttributeValues, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.DynamoObjectAttrVal)
+		deleteItem.ExpressionAttributeMap, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.ExpressionAttributeValues)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 			return
 		}
+
+		for k, v := range deleteItem.ExpressionAttributeNames {
+			deleteItem.ConditionExpression = strings.ReplaceAll(deleteItem.ConditionExpression, k, v)
+		}
+
 		oldRes, _ := services.GetWithProjection(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
-		err := services.Delete(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionalExpression, deleteItem.ExpressionAttributeValues, nil)
+		err := services.Delete(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionExpression, deleteItem.ExpressionAttributeMap, nil)
 		if err == nil {
-			c.JSON(http.StatusOK, ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
+			output, _ := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
+			c.JSON(http.StatusOK, map[string]interface{}{"Attributes": output})
 			go services.StreamDataToThirdParty(oldRes, nil, deleteItem.TableName)
 		} else {
 			c.JSON(errors.HTTPResponse(err, deleteItem))
