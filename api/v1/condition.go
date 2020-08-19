@@ -255,26 +255,29 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 	}
 	if er == nil {
 		go services.StreamDataToThirdParty(oldRes, resp, updateAtrr.TableName)
+	} else {
+		return nil, er
 	}
 	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes)
 
 	var output map[string]interface{}
+	var errOutput error
 	switch updateAtrr.ReturnValues {
 	case "NONE":
 		return nil, er
 	case "ALL_NEW":
-		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
+		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	case "ALL_OLD":
 		if oldRes == nil || len(oldRes) == 0 {
 			return nil, er
 		}
-		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
+		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
 	case "UPDATED_NEW":
 		var resVal = make(map[string]interface{})
 		for k := range actVal {
 			resVal[k] = resp[k]
 		}
-		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
+		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
 	case "UPDATED_OLD":
 		if oldRes == nil || len(oldRes) == 0 {
 			return nil, er
@@ -283,11 +286,12 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 		for k := range actVal {
 			resVal[k] = oldRes[k]
 		}
-		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
+		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
+
 	default:
-		output, er = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
+		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	}
-	return map[string]interface{}{"Attributes": output}, er
+	return map[string]interface{}{"Attributes": output}, errOutput
 }
 
 func extractOperations(updateExpression string) map[string]string {

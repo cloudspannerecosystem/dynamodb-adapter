@@ -574,6 +574,273 @@ var (
 	ScanTestCase13Output = `{"Count":5,"Items":{"L":[]},"LastEvaluatedKey":null}`
 )
 
+//Test Data for UpdateItem API
+var (
+
+	//200 Status check
+	UpdateItemTestCase1Name = "1: Only TableName passed"
+	UpdateItemTestCase1     = models.UpdateAttr{
+		TableName: "employee",
+	}
+
+	UpdateItemTestCase2Name = "2: Update Expression with ExpressionAttributeValues"
+	UpdateItemTestCase2     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ReturnValues: "ALL_NEW",
+	}
+	UpdateItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	UpdateItemTestCase3Name = "2: UpdateExpression, ExpressionAttributeValues with ExpressionAttributeNames"
+	UpdateItemTestCase3     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET #ag = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	UpdateItemTestCase3Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	UpdateItemTestCase4Name = "4: Update Expression without ExpressionAttributeValues"
+	UpdateItemTestCase4     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET age = :age",
+	}
+
+	//400 bad request
+	UpdateItemTestCase5Name = "5: UpdateExpression,ExpressionAttributeValues without Key"
+	UpdateItemTestCase5     = models.UpdateAttr{
+		TableName:        "employee",
+		UpdateExpression: "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+	}
+
+	//400 Bad request
+	UpdateItemTestCase6Name = "6: UpdateExpression,ExpressionAttributeValues without ExpressionAttributeNames"
+	UpdateItemTestCase6     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET #ag = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+	}
+
+	UpdateItemTestCase7Name = "7: Correct ConditionExpression "
+	UpdateItemTestCase7     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag > :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	UpdateItemTestCase7Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	//400 bad request
+	UpdateItemTestCase8Name = "8: Wrong ConditionExpression"
+	UpdateItemTestCase8     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 Bad request
+	UpdateItemTestCase9Name = "9: ConditionExpression without ExpressionAttributeValues value"
+	UpdateItemTestCase9     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 bad request
+	UpdateItemTestCase10Name = "10: ConditionExpression without ExpressionAttributeNames value"
+	UpdateItemTestCase10     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+	}
+)
+
+//Test Data for PutItem API
+var (
+	PutItemTestCase = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//200 status check
+	PutItemTestCase1Name = "1: only tablename passed"
+	PutItemTestCase1     = models.Meta{
+		TableName: "employee",
+	}
+	PutItemTestCase1Output = ``
+
+	PutItemTestCase2Name = "2: Item Value to be updated"
+	PutItemTestCase2     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("11")},
+		},
+	}
+	PutItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	PutItemTestCase3Name = "3: ConditionExpression with ExpressionAttributeValues & ExpressionAttributeNames"
+	PutItemTestCase3     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	PutItemTestCase3Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"11"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	PutItemTestCase4Name = "4: ConditionExpression with ExpressionAttributeValues"
+	PutItemTestCase4     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("11")},
+		},
+		ConditionExpression: "age > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("9")},
+		},
+	}
+	PutItemTestCase4Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	//400 bad request
+	PutItemTestCase5Name = "5: ConditionExpression without ExpressionAttributeValues"
+	PutItemTestCase5     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 bad request
+	PutItemTestCase6Name = "6: ConditionExpression without ExpressionAttributeNames"
+	PutItemTestCase6     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("9")},
+		},
+	}
+
+	//400 bad request
+	PutItemTestCase7Name = "7: ConditionExpression without ExpressionAttributeValues & ExpressionAttributeNames "
+	PutItemTestCase7     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "age > 9",
+	}
+
+	//400 bad request
+	PutItemTestCase8Name = "Item is not present"
+	PutItemTestCase8     = models.Meta{
+		TableName:           "employee",
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	PutItemTestCase9Name = "9: Changing the values to initial state"
+	PutItemTestCase9     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+	}
+)
+
 func initFunc() *gin.Engine {
 	box := rice.MustFindBox("config-files")
 
@@ -615,7 +882,277 @@ func createPostTestCase(name, url, outputString string, input interface{}) apite
 	}
 }
 
-func TestGetItemAPI(t *testing.T) {
+func createStatusCheckPostTestCase(name, url string, httpStatus int, input interface{}) apitesting.APITestCase {
+	return apitesting.APITestCase{
+		Name:    name,
+		ReqType: "POST",
+		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+			return map[string]string{
+				"Content-Type": "application/json",
+			}
+		},
+		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
+		PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+			return input
+		},
+		ExpHTTPStatus: httpStatus,
+	}
+}
+
+// func TestGetItemAPI(t *testing.T) {
+// 	apitest := apitesting.APITest{
+// 		// APIEndpointURL: apiURL + "/" + version,
+// 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+// 			return initFunc()
+// 		},
+// 	}
+// 	tests := []apitesting.APITestCase{
+// 		{
+// 			Name:    "Wrong URL (404 Error)",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetIte" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return getItemTest2
+// 			},
+// 			ExpHTTPStatus: http.StatusNotFound,
+// 		},
+// 		{
+// 			Name:    "Wrong Pramamerter(Bad Request)",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return getItemTest1
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		{
+// 			Name:    "Wrong Pramamerter(Key value is not passed)",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return getItemTest1
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		createPostTestCase("Crorect Data TestCase", "/v1/GetItem", getItemTest2Output, getItemTest2),
+// 		createPostTestCase("Crorect data with Projection param Testcase", "/v1/GetItem", getItemTest3Output, getItemTest3),
+// 		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1/GetItem", getItemTest3Output, getItemTest4),
+// 		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1/GetItem", getItemTest5Output, getItemTest5),
+// 	}
+// 	apitest.RunTests(t, tests)
+// }
+
+// func TestGetBatchAPI(t *testing.T) {
+// 	apitest := apitesting.APITest{
+// 		// APIEndpointURL: apiURL + "/" + version,
+// 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+// 			return initFunc()
+// 		},
+// 	}
+// 	tests := []apitesting.APITestCase{
+// 		{
+// 			Name:    TestGetBatch1Name,
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetIt" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return TestGetBatch1
+// 			},
+// 			ExpHTTPStatus: http.StatusNotFound,
+// 		},
+// 		{
+// 			Name:    TestGetBatch10Name,
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetItem" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return TestGetBatch10
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		createPostTestCase(TestGetBatch2Name, "/v1/BatchGetItem", TestGetBatch2Output, TestGetBatch2),
+// 		createPostTestCase(TestGetBatch3Name, "/v1/BatchGetItem", TestGetBatch3Output, TestGetBatch3),
+// 		createPostTestCase(TestGetBatch4Name, "/v1/BatchGetItem", TestGetBatch4Output, TestGetBatch4),
+// 		createPostTestCase(TestGetBatch5Name, "/v1/BatchGetItem", TestGetBatch5Output, TestGetBatch5),
+// 		createPostTestCase(TestGetBatch6Name, "/v1/BatchGetItem", TestGetBatch6Output, TestGetBatch6),
+// 		createPostTestCase(TestGetBatch7Name, "/v1/BatchGetItem", TestGetBatch7Output, TestGetBatch7),
+// 		createPostTestCase(TestGetBatch8Name, "/v1/BatchGetItem", TestGetBatch8Output, TestGetBatch8),
+// 		createPostTestCase(TestGetBatch9Name, "/v1/BatchGetItem", TestGetBatch9Output, TestGetBatch9),
+// 	}
+
+// 	apitest.RunTests(t, tests)
+// }
+
+// func TestQueryAPI(t *testing.T) {
+// 	apitest := apitesting.APITest{
+// 		// APIEndpointURL: apiURL + "/" + version,
+// 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+// 			return initFunc()
+// 		},
+// 	}
+// 	tests := []apitesting.APITestCase{
+// 		{
+// 			Name:    "Wrong URL (404 Error)",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Quer" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return queryTestCase0
+// 			},
+// 			ExpHTTPStatus: http.StatusNotFound,
+// 		},
+// 		{
+// 			Name:    "Wrong Pramamerter(Bad Request)",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return queryTestCase0
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		{
+// 			Name:    "KeyconditionExpression without ExpressionAttributeValues",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return queryTestCase5
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		{
+// 			Name:    "filter expression but value not present",
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return queryTestCase7
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		createPostTestCase("Only table name passed", "/v1/Query", queryTestCaseOutput1, queryTestCase1),
+// 		createPostTestCase("table & projection Expression", "/v1/Query", queryTestCaseOutput2, queryTestCase2),
+// 		createPostTestCase("projection expression with ExpressionAttributeNames", "/v1/Query", queryTestCaseOutput3, queryTestCase3),
+// 		createPostTestCase("KeyconditionExpression ", "/v1/Query", queryTestCaseOutput4, queryTestCase4),
+// 		createPostTestCase("KeyconditionExpression & filterExperssion", "/v1/Query", queryTestCaseOutput6, queryTestCase6),
+// 		createPostTestCase("only filter expression", "/v1/Query", queryTestCaseOutput8, queryTestCase8),
+// 		createPostTestCase("with ScanIndexForward and other attributes", "/v1/Query", queryTestCaseOutput9, queryTestCase9),
+// 		createPostTestCase("with only ScanIndexForward ", "/v1/Query", queryTestCaseOutput10, queryTestCase10),
+// 		createPostTestCase("with Limit", "/v1/Query", queryTestCaseOutput11, queryTestCase11),
+// 		createPostTestCase("with Limit & ScanIndexForward", "/v1/Query", queryTestCaseOutput12, queryTestCase12),
+// 		createPostTestCase("only count", "/v1/Query", queryTestCaseOutput13, queryTestCase13),
+// 		createPostTestCase("count with other attributes present", "/v1/Query", queryTestCaseOutput14, queryTestCase14),
+// 		createPostTestCase("Select with other than count", "/v1/Query", queryTestCaseOutput15, queryTestCase15),
+// 		createPostTestCase("all attributes", "/v1/Query", queryTestCaseOutput16, queryTestCase16),
+// 	}
+// 	apitest.RunTests(t, tests)
+// }
+
+// func TestScanAPI(t *testing.T) {
+// 	apitest := apitesting.APITest{
+// 		// APIEndpointURL: apiURL + "/" + version,
+// 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+// 			return initFunc()
+// 		},
+// 	}
+// 	tests := []apitesting.APITestCase{
+// 		{
+// 			Name:    ScanTestCase1Name,
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Sca" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return ScanTestCase1
+// 			},
+// 			ExpHTTPStatus: http.StatusNotFound,
+// 		},
+// 		{
+// 			Name:    ScanTestCase8Name,
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return ScanTestCase8
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		{
+// 			Name:    ScanTestCase10Name,
+// 			ReqType: "POST",
+// 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+// 				return map[string]string{
+// 					"Content-Type": "application/json",
+// 				}
+// 			},
+// 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
+// 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+// 				return ScanTestCase10
+// 			},
+// 			ExpHTTPStatus: http.StatusBadRequest,
+// 		},
+// 		createPostTestCase(ScanTestCase2Name, "/v1/Query", ScanTestCase2Output, ScanTestCase2),
+// 		createPostTestCase(ScanTestCase3Name, "/v1/Query", ScanTestCase3Output, ScanTestCase3),
+// 		createPostTestCase(ScanTestCase4Name, "/v1/Query", ScanTestCase4Output, ScanTestCase4),
+// 		createPostTestCase(ScanTestCase5Name, "/v1/Query", ScanTestCase5Output, ScanTestCase5),
+// 		createPostTestCase(ScanTestCase6Name, "/v1/Query", ScanTestCase6Output, ScanTestCase6),
+// 		createPostTestCase(ScanTestCase7Name, "/v1/Query", ScanTestCase7Output, ScanTestCase7),
+// 		createPostTestCase(ScanTestCase9Name, "/v1/Query", ScanTestCase9Output, ScanTestCase9),
+// 		createPostTestCase(ScanTestCase11Name, "/v1/Query", ScanTestCase11Output, ScanTestCase11),
+// 		createPostTestCase(ScanTestCase12Name, "/v1/Query", ScanTestCase12Output, ScanTestCase12),
+// 		createPostTestCase(ScanTestCase13Name, "/v1/Query", ScanTestCase13Output, ScanTestCase13),
+// 	}
+// 	apitest.RunTests(t, tests)
+// }
+
+func TestUpdateItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
@@ -623,57 +1160,20 @@ func TestGetItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		{
-			Name:    "Wrong URL (404 Error)",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetIte" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return getItemTest2
-			},
-			ExpHTTPStatus: http.StatusNotFound,
-		},
-		{
-			Name:    "Wrong Pramamerter(Bad Request)",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return getItemTest1
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		{
-			Name:    "Wrong Pramamerter(Key value is not passed)",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return getItemTest1
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		createPostTestCase("Crorect Data TestCase", "/v1/GetItem", getItemTest2Output, getItemTest2),
-		createPostTestCase("Crorect data with Projection param Testcase", "/v1/GetItem", getItemTest3Output, getItemTest3),
-		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1/GetItem", getItemTest3Output, getItemTest4),
-		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1/GetItem", getItemTest5Output, getItemTest5),
+		createStatusCheckPostTestCase(UpdateItemTestCase1Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase1),
+		createStatusCheckPostTestCase(UpdateItemTestCase4Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase4),
+		createStatusCheckPostTestCase(UpdateItemTestCase5Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase5),
+		createStatusCheckPostTestCase(UpdateItemTestCase8Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase8),
+		createStatusCheckPostTestCase(UpdateItemTestCase9Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase9),
+		createStatusCheckPostTestCase(UpdateItemTestCase10Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase10),
+		createPostTestCase(UpdateItemTestCase2Name, "/v1/UpdateItem", UpdateItemTestCase2Output, UpdateItemTestCase2),
+		createPostTestCase(UpdateItemTestCase3Name, "/v1/UpdateItem", UpdateItemTestCase3Output, UpdateItemTestCase3),
+		createPostTestCase(UpdateItemTestCase7Name, "/v1/UpdateItem", UpdateItemTestCase7Output, UpdateItemTestCase7),
 	}
 	apitest.RunTests(t, tests)
 }
 
-func TestGetBatchAPI(t *testing.T) {
+func TestPutItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
@@ -681,189 +1181,15 @@ func TestGetBatchAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		{
-			Name:    TestGetBatch1Name,
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetIt" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return TestGetBatch1
-			},
-			ExpHTTPStatus: http.StatusNotFound,
-		},
-		{
-			Name:    TestGetBatch10Name,
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetItem" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return TestGetBatch10
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		createPostTestCase(TestGetBatch2Name, "/v1/BatchGetItem", TestGetBatch2Output, TestGetBatch2),
-		createPostTestCase(TestGetBatch3Name, "/v1/BatchGetItem", TestGetBatch3Output, TestGetBatch3),
-		createPostTestCase(TestGetBatch4Name, "/v1/BatchGetItem", TestGetBatch4Output, TestGetBatch4),
-		createPostTestCase(TestGetBatch5Name, "/v1/BatchGetItem", TestGetBatch5Output, TestGetBatch5),
-		createPostTestCase(TestGetBatch6Name, "/v1/BatchGetItem", TestGetBatch6Output, TestGetBatch6),
-		createPostTestCase(TestGetBatch7Name, "/v1/BatchGetItem", TestGetBatch7Output, TestGetBatch7),
-		createPostTestCase(TestGetBatch8Name, "/v1/BatchGetItem", TestGetBatch8Output, TestGetBatch8),
-		createPostTestCase(TestGetBatch9Name, "/v1/BatchGetItem", TestGetBatch9Output, TestGetBatch9),
-	}
-
-	apitest.RunTests(t, tests)
-}
-
-func TestQueryAPI(t *testing.T) {
-	apitest := apitesting.APITest{
-		// APIEndpointURL: apiURL + "/" + version,
-		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
-		},
-	}
-	tests := []apitesting.APITestCase{
-		{
-			Name:    "Wrong URL (404 Error)",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Quer" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return queryTestCase0
-			},
-			ExpHTTPStatus: http.StatusNotFound,
-		},
-		{
-			Name:    "Wrong Pramamerter(Bad Request)",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return queryTestCase0
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		{
-			Name:    "KeyconditionExpression without ExpressionAttributeValues",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return queryTestCase5
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		{
-			Name:    "filter expression but value not present",
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return queryTestCase7
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		createPostTestCase("Only table name passed", "/v1/Query", queryTestCaseOutput1, queryTestCase1),
-		createPostTestCase("table & projection Expression", "/v1/Query", queryTestCaseOutput2, queryTestCase2),
-		createPostTestCase("projection expression with ExpressionAttributeNames", "/v1/Query", queryTestCaseOutput3, queryTestCase3),
-		createPostTestCase("KeyconditionExpression ", "/v1/Query", queryTestCaseOutput4, queryTestCase4),
-		createPostTestCase("KeyconditionExpression & filterExperssion", "/v1/Query", queryTestCaseOutput6, queryTestCase6),
-		createPostTestCase("only filter expression", "/v1/Query", queryTestCaseOutput8, queryTestCase8),
-		createPostTestCase("with ScanIndexForward and other attributes", "/v1/Query", queryTestCaseOutput9, queryTestCase9),
-		createPostTestCase("with only ScanIndexForward ", "/v1/Query", queryTestCaseOutput10, queryTestCase10),
-		createPostTestCase("with Limit", "/v1/Query", queryTestCaseOutput11, queryTestCase11),
-		createPostTestCase("with Limit & ScanIndexForward", "/v1/Query", queryTestCaseOutput12, queryTestCase12),
-		createPostTestCase("only count", "/v1/Query", queryTestCaseOutput13, queryTestCase13),
-		createPostTestCase("count with other attributes present", "/v1/Query", queryTestCaseOutput14, queryTestCase14),
-		createPostTestCase("Select with other than count", "/v1/Query", queryTestCaseOutput15, queryTestCase15),
-		createPostTestCase("all attributes", "/v1/Query", queryTestCaseOutput16, queryTestCase16),
-	}
-	apitest.RunTests(t, tests)
-}
-
-func TestScanAPI(t *testing.T) {
-	apitest := apitesting.APITest{
-		// APIEndpointURL: apiURL + "/" + version,
-		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
-		},
-	}
-	tests := []apitesting.APITestCase{
-		{
-			Name:    ScanTestCase1Name,
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Sca" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return ScanTestCase1
-			},
-			ExpHTTPStatus: http.StatusNotFound,
-		},
-		{
-			Name:    ScanTestCase8Name,
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return ScanTestCase8
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		{
-			Name:    ScanTestCase10Name,
-			ReqType: "POST",
-			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
-				return map[string]string{
-					"Content-Type": "application/json",
-				}
-			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
-			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return ScanTestCase10
-			},
-			ExpHTTPStatus: http.StatusBadRequest,
-		},
-		createPostTestCase(ScanTestCase2Name, "/v1/Query", ScanTestCase2Output, ScanTestCase2),
-		createPostTestCase(ScanTestCase3Name, "/v1/Query", ScanTestCase3Output, ScanTestCase3),
-		createPostTestCase(ScanTestCase4Name, "/v1/Query", ScanTestCase4Output, ScanTestCase4),
-		createPostTestCase(ScanTestCase5Name, "/v1/Query", ScanTestCase5Output, ScanTestCase5),
-		createPostTestCase(ScanTestCase6Name, "/v1/Query", ScanTestCase6Output, ScanTestCase6),
-		createPostTestCase(ScanTestCase7Name, "/v1/Query", ScanTestCase7Output, ScanTestCase7),
-		createPostTestCase(ScanTestCase9Name, "/v1/Query", ScanTestCase9Output, ScanTestCase9),
-		createPostTestCase(ScanTestCase11Name, "/v1/Query", ScanTestCase11Output, ScanTestCase11),
-		createPostTestCase(ScanTestCase12Name, "/v1/Query", ScanTestCase12Output, ScanTestCase12),
-		createPostTestCase(ScanTestCase13Name, "/v1/Query", ScanTestCase13Output, ScanTestCase13),
+		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1/PutItem", http.StatusOK, PutItemTestCase1),
+		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase5),
+		createStatusCheckPostTestCase(PutItemTestCase6Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase6),
+		createStatusCheckPostTestCase(PutItemTestCase7Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase7),
+		createStatusCheckPostTestCase(PutItemTestCase8Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase8),
+		createPostTestCase(PutItemTestCase2Name, "/v1/PutItem", PutItemTestCase2Output, PutItemTestCase2),
+		createPostTestCase(PutItemTestCase3Name, "/v1/PutItem", PutItemTestCase3Output, PutItemTestCase3),
+		createPostTestCase(PutItemTestCase4Name, "/v1/PutItem", PutItemTestCase4Output, PutItemTestCase4),
+		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1/PutItem", http.StatusOK, PutItemTestCase9),
 	}
 	apitest.RunTests(t, tests)
 }
