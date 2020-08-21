@@ -151,6 +151,27 @@ type TableConfig struct {
 	ActualTable      string                 `json:"actualTable,omitempty"`
 }
 
+//BatchWriteItem for Batch Operation
+type BatchWriteItem struct {
+	RequestItems map[string][]BatchWriteSubItems `json:"RequestItems"`
+}
+
+//BatchWriteSubItems is for BatchWriteItem
+type BatchWriteSubItems struct {
+	DeleteRequest BatchDeleteItem `json:"DeleteRequest"`
+	PutRequest    BatchPutItem    `json:"PutRequest"`
+}
+
+//BatchDeleteItem is for BatchWriteSubItems
+type BatchDeleteItem struct {
+	Key map[string]*dynamodb.AttributeValue `json:"Key"`
+}
+
+//BatchPutItem is for BatchWriteSubItems
+type BatchPutItem struct {
+	Item map[string]*dynamodb.AttributeValue `json:"Item"`
+}
+
 // TableDDL - This contains the DDL
 var TableDDL map[string]map[string]string
 

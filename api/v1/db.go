@@ -27,14 +27,13 @@ func InitDBAPI(g *gin.RouterGroup) {
 	r.POST("/Query", QueryTable)
 
 	r.POST("/PutItem", UpdateMeta)
-	r.POST("/batchPut", BatchUpdateMeta)
-
-	r.POST("/batchDelete", BatchDelete)
 	r.POST("/DeleteItem", DeleteItem)
 
 	r.POST("/Scan", Scan)
 
 	r.POST("/UpdateItem", Update)
+
+	r.POST("/BatchWriteItem", BatchWriteItem)
 
 }
 
@@ -136,53 +135,6 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	}
 	go services.StreamDataToThirdParty(oldResp, res, tableName)
 	return oldResp, nil
-}
-
-// UpdateMeta Writes a record
-// @Description Writes a record
-// @Summary Writes record
-// @ID batch-put
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.BatchMetaUpdate true "Please add request body of type models.BatchMetaUpdate"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /batchPut/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchUpdateMeta(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var batchMetaUpdate models.BatchMetaUpdate
-	if err1 := c.ShouldBindJSON(&batchMetaUpdate); err1 != nil {
-		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchMetaUpdate))
-	} else {
-		logger.LogDebug(batchMetaUpdate)
-		if allow := services.MayIReadOrWrite(batchMetaUpdate.TableName, true, "BatchUpdateMeta"); !allow {
-			c.JSON(http.StatusOK, gin.H{})
-			return
-		}
-		batchMetaUpdate.ArrAttrMap, err1 = ConvertDynamoArrayToMapArray(batchMetaUpdate.TableName, batchMetaUpdate.DynamoObject)
-		if err1 != nil {
-			c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchMetaUpdate))
-			return
-		}
-		err2 := services.BatchPut(c.Request.Context(), batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap)
-		if err2 == nil {
-			c.JSON(http.StatusOK, gin.H{})
-		} else {
-			c.JSON(errors.HTTPResponse(err2, batchMetaUpdate))
-		}
-		// for i := 0; i < len(batchMetaUpdate.ArrAttrMap); i++ {
-		// }
-	}
 }
 
 func queryResponse(query models.Query, c *gin.Context) {
@@ -464,51 +416,6 @@ func DeleteItem(c *gin.Context) {
 	}
 }
 
-// BatchDelete ...
-// @Description Batch Delete Item from table
-// @Summary Batch Delete Items from table
-// @ID batch-delete-rows
-// @Produce  json
-// @Success 200 {object} gin.H
-// @Param requestBody body models.BulkDelete true "Please add request body of type models.BulkDelete"
-// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
-// @Router /batchDelete/ [post]
-// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchDelete(c *gin.Context) {
-	defer PanicHandler(c)
-	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
-	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-	var bulkDelete models.BulkDelete
-	if err1 := c.ShouldBindJSON(&bulkDelete); err1 != nil {
-		c.JSON(errors.New("ValidationException", err1).HTTPResponse(bulkDelete))
-	} else {
-		logger.LogDebug(bulkDelete)
-		if allow := services.MayIReadOrWrite(bulkDelete.TableName, true, "BatchDelete"); !allow {
-			c.JSON(http.StatusOK, gin.H{})
-			return
-		}
-		bulkDelete.PrimaryKeyMapArray, err1 = ConvertDynamoArrayToMapArray(bulkDelete.TableName, bulkDelete.DynamoObject)
-		if err1 != nil {
-			c.JSON(errors.New("ValidationException", err1).HTTPResponse(bulkDelete))
-			return
-		}
-		err2 := services.BatchDelete(c.Request.Context(), bulkDelete.TableName, bulkDelete.PrimaryKeyMapArray)
-		if err2 == nil {
-			c.JSON(http.StatusOK, []gin.H{})
-		} else {
-			c.JSON(errors.HTTPResponse(err2, bulkDelete))
-		}
-	}
-}
-
 // Scan record from table
 // @Description Scan records from table
 // @Summary Scan records from table
@@ -626,4 +533,97 @@ func Update(c *gin.Context) {
 			c.JSON(http.StatusOK, resp)
 		}
 	}
+}
+
+// BatchWriteItem put & delte items in/from table
+// @Description Batch Write Item for putting and deleting data in/from table
+// @Summary Batch Write Items from table
+// @ID batch-write-rows
+// @Produce  json
+// @Success 200 {object} gin.H
+// @Param requestBody body models.BatchWriteItem true "Please add request body of type models.BatchWriteItem"
+// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
+// @Router /BatchWriteItem/ [post]
+// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
+func BatchWriteItem(c *gin.Context) {
+	defer PanicHandler(c)
+	defer c.Request.Body.Close()
+	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
+	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
+	if err != nil || spanContext == nil {
+		logger.LogDebug(err)
+	}
+	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(ctx)
+	defer span.Finish()
+	span = addParentSpanID(c, span)
+	var batchWriteItem models.BatchWriteItem
+	if err1 := c.ShouldBindJSON(&batchWriteItem); err1 != nil {
+		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
+	} else {
+		for key, value := range batchWriteItem.RequestItems {
+			if allow := services.MayIReadOrWrite(key, true, "BatchWriteItem"); !allow {
+				c.JSON(http.StatusOK, gin.H{})
+				return
+			}
+			var putData models.BatchMetaUpdate
+			putData.TableName = key
+
+			var deleteData models.BulkDelete
+			deleteData.TableName = key
+
+			for _, v := range value {
+				if v.PutRequest.Item != nil {
+					putData.DynamoObject = append(putData.DynamoObject, v.PutRequest.Item)
+				}
+
+				if v.DeleteRequest.Key != nil {
+					deleteData.DynamoObject = append(deleteData.DynamoObject, v.DeleteRequest.Key)
+				}
+			}
+
+			if putData.DynamoObject != nil {
+				err = batchUpdateItems(c.Request.Context(), putData)
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, batchWriteItem))
+					return
+				}
+			}
+
+			if deleteData.DynamoObject != nil {
+				err = batchDeleteItems(c.Request.Context(), deleteData)
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, batchWriteItem))
+					return
+				}
+			}
+		}
+		c.JSON(http.StatusOK, []gin.H{})
+	}
+}
+
+func batchDeleteItems(con context.Context, bulkDelete models.BulkDelete) error {
+	var err error
+	bulkDelete.PrimaryKeyMapArray, err = ConvertDynamoArrayToMapArray(bulkDelete.TableName, bulkDelete.DynamoObject)
+	if err != nil {
+		return err
+	}
+	err = services.BatchDelete(con, bulkDelete.TableName, bulkDelete.PrimaryKeyMapArray)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdate) error {
+	var err error
+	batchMetaUpdate.ArrAttrMap, err = ConvertDynamoArrayToMapArray(batchMetaUpdate.TableName, batchMetaUpdate.DynamoObject)
+	if err != nil {
+		return err
+	}
+	err = services.BatchPut(con, batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap)
+	if err != nil {
+		return err
+	}
+	return nil
 }
