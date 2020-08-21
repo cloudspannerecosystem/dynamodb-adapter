@@ -841,6 +841,386 @@ var (
 	}
 )
 
+//test Data for BatchWriteItem API
+var (
+	BatchWriteItemTestCase1Name = "1: Only Table name passed"
+	BatchWriteItemTestCase1     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {},
+		},
+	}
+
+	BatchWriteItemTestCase2Name = "2: Batch Put Request for one table"
+	BatchWriteItemTestCase2     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase3Name = "3: Batch Delete Request for one Table"
+	BatchWriteItemTestCase3     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase4Name = "4: Batch Delete Request for one table for those keys which are not present"
+	BatchWriteItemTestCase4     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase5Name = "5: Batch Put Request for 2 tables"
+	BatchWriteItemTestCase5     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase6Name = "6: Batch Delete Request for 2 tables"
+	BatchWriteItemTestCase6     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase7Name = "7: Batch Put & Delete Request for 1 table"
+	BatchWriteItemTestCase7     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase8Name = "8: Batch Put & Delete Request for 2 table"
+	BatchWriteItemTestCase8     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase9Name = "9: Batch Put Request for wrong Table"
+	BatchWriteItemTestCase9     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee1": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase10Name = "10: Batch Delete Request for wrong table"
+	BatchWriteItemTestCase10     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee1": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+)
+
 func initFunc() *gin.Engine {
 	box := rice.MustFindBox("config-files")
 
@@ -1189,6 +1569,27 @@ func TestPutItemAPI(t *testing.T) {
 		createPostTestCase(PutItemTestCase3Name, "/v1/PutItem", PutItemTestCase3Output, PutItemTestCase3),
 		createPostTestCase(PutItemTestCase4Name, "/v1/PutItem", PutItemTestCase4Output, PutItemTestCase4),
 		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1/PutItem", http.StatusOK, PutItemTestCase9),
+	}
+	apitest.RunTests(t, tests)
+}
+
+func TestBatchWriteItemAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase1),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase2Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase2),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase3Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase3),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase4Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase4),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase5Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase5),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase6Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase6),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase7Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase7),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase8Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase8),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase9),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
 	}
 	apitest.RunTests(t, tests)
 }

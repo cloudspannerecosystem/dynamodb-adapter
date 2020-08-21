@@ -158,8 +158,8 @@ type BatchWriteItem struct {
 
 //BatchWriteSubItems is for BatchWriteItem
 type BatchWriteSubItems struct {
-	DeleteRequest BatchDeleteItem `json:"DeleteRequest"`
-	PutRequest    BatchPutItem    `json:"PutRequest"`
+	DelReq BatchDeleteItem `json:"DeleteRequest"`
+	PutReq BatchPutItem    `json:"PutRequest"`
 }
 
 //BatchDeleteItem is for BatchWriteSubItems

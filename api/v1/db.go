@@ -573,12 +573,12 @@ func BatchWriteItem(c *gin.Context) {
 			deleteData.TableName = key
 
 			for _, v := range value {
-				if v.PutRequest.Item != nil {
-					putData.DynamoObject = append(putData.DynamoObject, v.PutRequest.Item)
+				if v.PutReq.Item != nil {
+					putData.DynamoObject = append(putData.DynamoObject, v.PutReq.Item)
 				}
 
-				if v.DeleteRequest.Key != nil {
-					deleteData.DynamoObject = append(deleteData.DynamoObject, v.DeleteRequest.Key)
+				if v.DelReq.Key != nil {
+					deleteData.DynamoObject = append(deleteData.DynamoObject, v.DelReq.Key)
 				}
 			}
 
