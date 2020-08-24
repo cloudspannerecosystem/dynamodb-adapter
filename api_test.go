@@ -734,7 +734,7 @@ var (
 	//200 status check
 	PutItemTestCase1Name = "1: only tablename passed"
 	PutItemTestCase1     = models.Meta{
-		TableName: "employee",
+		TableName: "employe",
 	}
 	PutItemTestCase1Output = ``
 
@@ -1643,7 +1643,7 @@ func TestPutItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1/PutItem", http.StatusOK, PutItemTestCase1),
+		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase1),
 		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase5),
 		createStatusCheckPostTestCase(PutItemTestCase6Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase6),
 		createStatusCheckPostTestCase(PutItemTestCase7Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase7),
