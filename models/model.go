@@ -77,10 +77,11 @@ type BatchGetWithProjectionMeta struct {
 type Delete struct {
 	TableName                 string                              `json:"tableName"`
 	PrimaryKeyMap             map[string]interface{}              `json:"primaryKeyMap"`
-	ConditionalExpression     string                              `json:"conditionalExpression"`
-	ExpressionAttributeValues map[string]interface{}              `json:"expressionAttributeValues"`
-	DynamoObject              map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
-	DynamoObjectAttrVal       map[string]*dynamodb.AttributeValue `json:"dynamoObjectAttrVal"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
 }
 
 // BulkDelete struct
@@ -148,6 +149,27 @@ type TableConfig struct {
 	IsComplement     bool                   `json:"isComplement,omitempty"`
 	TableSource      string                 `json:"tableSource,omitempty"`
 	ActualTable      string                 `json:"actualTable,omitempty"`
+}
+
+//BatchWriteItem for Batch Operation
+type BatchWriteItem struct {
+	RequestItems map[string][]BatchWriteSubItems `json:"RequestItems"`
+}
+
+//BatchWriteSubItems is for BatchWriteItem
+type BatchWriteSubItems struct {
+	DelReq BatchDeleteItem `json:"DeleteRequest"`
+	PutReq BatchPutItem    `json:"PutRequest"`
+}
+
+//BatchDeleteItem is for BatchWriteSubItems
+type BatchDeleteItem struct {
+	Key map[string]*dynamodb.AttributeValue `json:"Key"`
+}
+
+//BatchPutItem is for BatchWriteSubItems
+type BatchPutItem struct {
+	Item map[string]*dynamodb.AttributeValue `json:"Item"`
 }
 
 // TableDDL - This contains the DDL

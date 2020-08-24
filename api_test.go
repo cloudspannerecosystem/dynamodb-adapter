@@ -427,11 +427,11 @@ var (
 		Limit:         4,
 	}
 
-	queryTestCaseOutput1 = `{"Count":5,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput1 = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
-	queryTestCaseOutput2 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput2 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
 
-	queryTestCaseOutput3 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput3 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	queryTestCaseOutput4 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":null}`
 
@@ -441,11 +441,11 @@ var (
 
 	queryTestCaseOutput9 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
 
-	queryTestCaseOutput10 = `{"Count":5,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput10 = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
-	queryTestCaseOutput11 = `{"Count":4,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}]},"LastEvaluatedKey":{"emp_id":{"N":"1"},"offset":{"N":"4"}}}`
+	queryTestCaseOutput11 = `{"Count":4,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}]},"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
 
-	queryTestCaseOutput12 = `{"Count":4,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}]},"LastEvaluatedKey":{"emp_id":{"N":"1"},"offset":{"N":"4"}}}`
+	queryTestCaseOutput12 = `{"Count":4,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}]},"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
 
 	queryTestCaseOutput13 = `{"Count":5,"Items":{"L":[]},"LastEvaluatedKey":null}`
 
@@ -467,21 +467,21 @@ var (
 	ScanTestCase2     = models.ScanMeta{
 		TableName: "employee",
 	}
-	ScanTestCase2Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase2Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	ScanTestCase3Name = "3: With Limit Attribute"
 	ScanTestCase3     = models.ScanMeta{
 		TableName: "employee",
 		Limit:     3,
 	}
-	ScanTestCase3Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":{"emp_id":{"N":"2"},"offset":{"N":"3"}}}`
+	ScanTestCase3Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	ScanTestCase4Name = "4: With Projection Expression"
 	ScanTestCase4     = models.ScanMeta{
 		TableName:            "employee",
 		ProjectionExpression: "address, emp_id, first_name",
 	}
-	ScanTestCase4Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase4Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
 
 	ScanTestCase5Name = "5: With Projection Expression & limit"
 	ScanTestCase5     = models.ScanMeta{
@@ -489,7 +489,7 @@ var (
 		Limit:                3,
 		ProjectionExpression: "address, emp_id, first_name",
 	}
-	ScanTestCase5Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}}]},"LastEvaluatedKey":{"emp_id":{"N":"2"},"offset":{"N":"3"}}}`
+	ScanTestCase5Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	ScanTestCase6Name = "6: Projection Expression without ExpressionAttributeNames"
 	ScanTestCase6     = models.ScanMeta{
@@ -501,7 +501,7 @@ var (
 		},
 		ProjectionExpression: "address, #ag, emp_id, first_name, last_name",
 	}
-	ScanTestCase6Output = `{"Count":2,"Items":{"L":[{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase6Output = `{"Count":2,"Items":{"L":[{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	ScanTestCase7Name = "7: Projection Expression with ExpressionAttributeNames"
 	ScanTestCase7     = models.ScanMeta{
@@ -510,7 +510,7 @@ var (
 		Limit:                    3,
 		ProjectionExpression:     "address, #ag, emp_id, first_name, last_name",
 	}
-	ScanTestCase7Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":{"emp_id":{"N":"2"},"offset":{"N":"3"}}}`
+	ScanTestCase7Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	//400 Bad request
 	ScanTestCase8Name = "8: Filter Expression without ExpressionAttributeValues"
@@ -531,7 +531,7 @@ var (
 		},
 		FilterExpression: "age > :val1",
 	}
-	ScanTestCase9Output = `{"Count":4,"Items":{"L":[{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase9Output = `{"Count":4,"Items":{"L":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	//400 bad request
 	ScanTestCase10Name = "10: FilterExpression & ExpressionAttributeValues without ExpressionAttributeNames"
@@ -552,7 +552,7 @@ var (
 		},
 		FilterExpression: "age > :val1",
 	}
-	ScanTestCase11Output = `{"Count":4,"Items":{"L":[{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase11Output = `{"Count":4,"Items":{"L":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	ScanTestCase12Name = "12: With ExclusiveStartKey"
 	ScanTestCase12     = models.ScanMeta{
@@ -563,7 +563,7 @@ var (
 		},
 		Limit: 3,
 	}
-	ScanTestCase12Output = `{"Count":2,"Items":{"L":[{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase12Output = `{"Count":2,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
 
 	ScanTestCase13Name = "13: With Count"
 	ScanTestCase13     = models.ScanMeta{
@@ -841,6 +841,473 @@ var (
 	}
 )
 
+//Test Data DeleteItem API
+var (
+	DeleteItemTestCase1Name = "1: Only TableName passed"
+	DeleteItemTestCase1     = models.Delete{
+		TableName: "employee",
+	}
+
+	DeleteItemTestCase2Name = "2: Correct Key passed"
+	DeleteItemTestCase2     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("2")},
+		},
+	}
+	DeleteItemTestCase2Output = `{"Attributes":{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}}`
+
+	DeleteItemTestCase3Name = "3: Icorrect Key passed"
+	DeleteItemTestCase3     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("2")},
+		},
+	}
+
+	DeleteItemTestCase4Name = "4: ConditionExpression with ExpressionAttributeValues"
+	DeleteItemTestCase4     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("3")},
+		},
+		ConditionExpression: "age > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("9")},
+		},
+	}
+	DeleteItemTestCase4Output = `{"Attributes":{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}}`
+
+	DeleteItemTestCase5Name = "5: ConditionExpressionNames with ExpressionAttributeNames & ExpressionAttributeValues"
+	DeleteItemTestCase5     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("4")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("19")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	DeleteItemTestCase5Output = `{"Attributes":{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}}`
+
+	DeleteItemTestCase6Name = "6: ConditionExpressionNames without ExpressionAttributeValues"
+	DeleteItemTestCase6     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("2")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	DeleteItemTestCase7Name = "7: ConditionExpressionNames without ExpressionAttributeNames"
+	DeleteItemTestCase7     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("2")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	DeleteItemTestCase8Name = "8: ConditionExpressionNames with ExpressionAttributeNames & ExpressionAttributeValue"
+	DeleteItemTestCase8     = models.Delete{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("2")},
+		},
+		ConditionExpression: "#ag > :val2",
+	}
+)
+
+//test Data for BatchWriteItem API
+var (
+	BatchWriteItemTestCase1Name = "1: Only Table name passed"
+	BatchWriteItemTestCase1     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {},
+		},
+	}
+
+	BatchWriteItemTestCase2Name = "2: Batch Put Request for one table"
+	BatchWriteItemTestCase2     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase3Name = "3: Batch Delete Request for one Table"
+	BatchWriteItemTestCase3     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase4Name = "4: Batch Delete Request for one table for those keys which are not present"
+	BatchWriteItemTestCase4     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase5Name = "5: Batch Put Request for 2 tables"
+	BatchWriteItemTestCase5     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase6Name = "6: Batch Delete Request for 2 tables"
+	BatchWriteItemTestCase6     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase7Name = "7: Batch Put & Delete Request for 1 table"
+	BatchWriteItemTestCase7     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase8Name = "8: Batch Put & Delete Request for 2 table"
+	BatchWriteItemTestCase8     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("400")},
+							"d_name":           {S: aws.String("Sports")},
+							"d_specialization": {S: aws.String("Cricket")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("500")},
+							"d_name":           {S: aws.String("Welfare")},
+							"d_specialization": {S: aws.String("Students")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("400")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"d_id": {N: aws.String("500")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase9Name = "9: Batch Put Request for wrong Table"
+	BatchWriteItemTestCase9     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee1": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("6")},
+							"age":        {N: aws.String("60")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Root")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("7")},
+							"age":        {N: aws.String("70")},
+							"address":    {S: aws.String("Paris")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Ponting")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	BatchWriteItemTestCase10Name = "10: Batch Delete Request for wrong table"
+	BatchWriteItemTestCase10     = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee1": {
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("6")},
+						},
+					},
+				},
+				{
+					DelReq: models.BatchDeleteItem{
+						Key: map[string]*dynamodb.AttributeValue{
+							"emp_id": {N: aws.String("7")},
+						},
+					},
+				},
+			},
+		},
+	}
+)
+
 func initFunc() *gin.Engine {
 	box := rice.MustFindBox("config-files")
 
@@ -959,7 +1426,6 @@ func TestGetItemAPI(t *testing.T) {
 
 func TestGetBatchAPI(t *testing.T) {
 	apitest := apitesting.APITest{
-		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
 			return initFunc()
 		},
@@ -1002,13 +1468,11 @@ func TestGetBatchAPI(t *testing.T) {
 		createPostTestCase(TestGetBatch8Name, "/v1/BatchGetItem", TestGetBatch8Output, TestGetBatch8),
 		createPostTestCase(TestGetBatch9Name, "/v1/BatchGetItem", TestGetBatch9Output, TestGetBatch9),
 	}
-
 	apitest.RunTests(t, tests)
 }
 
 func TestQueryAPI(t *testing.T) {
 	apitest := apitesting.APITest{
-		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
 			return initFunc()
 		},
@@ -1090,7 +1554,6 @@ func TestQueryAPI(t *testing.T) {
 
 func TestScanAPI(t *testing.T) {
 	apitest := apitesting.APITest{
-		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
 			return initFunc()
 		},
@@ -1189,6 +1652,47 @@ func TestPutItemAPI(t *testing.T) {
 		createPostTestCase(PutItemTestCase3Name, "/v1/PutItem", PutItemTestCase3Output, PutItemTestCase3),
 		createPostTestCase(PutItemTestCase4Name, "/v1/PutItem", PutItemTestCase4Output, PutItemTestCase4),
 		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1/PutItem", http.StatusOK, PutItemTestCase9),
+	}
+	apitest.RunTests(t, tests)
+}
+
+func TestDeleteItemAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		// APIEndpointURL: apiURL + "/" + version,
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(DeleteItemTestCase1Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase1),
+		createStatusCheckPostTestCase(DeleteItemTestCase6Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase6),
+		createStatusCheckPostTestCase(DeleteItemTestCase7Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase7),
+		createStatusCheckPostTestCase(DeleteItemTestCase8Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase8),
+		createPostTestCase(DeleteItemTestCase2Name, "/v1/DeleteItem", DeleteItemTestCase2Output, DeleteItemTestCase2),
+		createStatusCheckPostTestCase(DeleteItemTestCase3Name, "/v1/DeleteItem", http.StatusOK, DeleteItemTestCase3),
+		createPostTestCase(DeleteItemTestCase4Name, "/v1/DeleteItem", DeleteItemTestCase4Output, DeleteItemTestCase4),
+		createPostTestCase(DeleteItemTestCase5Name, "/v1/DeleteItem", DeleteItemTestCase5Output, DeleteItemTestCase5),
+	}
+	apitest.RunTests(t, tests)
+}
+
+func TestBatchWriteItemAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase1),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase2Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase2),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase3Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase3),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase4Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase4),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase5Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase5),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase6Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase6),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase7Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase7),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase8Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase8),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase9),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
 	}
 	apitest.RunTests(t, tests)
 }
