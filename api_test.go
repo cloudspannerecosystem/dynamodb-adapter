@@ -574,6 +574,273 @@ var (
 	ScanTestCase13Output = `{"Count":5,"Items":{"L":[]},"LastEvaluatedKey":null}`
 )
 
+//Test Data for UpdateItem API
+var (
+
+	//200 Status check
+	UpdateItemTestCase1Name = "1: Only TableName passed"
+	UpdateItemTestCase1     = models.UpdateAttr{
+		TableName: "employee",
+	}
+
+	UpdateItemTestCase2Name = "2: Update Expression with ExpressionAttributeValues"
+	UpdateItemTestCase2     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ReturnValues: "ALL_NEW",
+	}
+	UpdateItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	UpdateItemTestCase3Name = "2: UpdateExpression, ExpressionAttributeValues with ExpressionAttributeNames"
+	UpdateItemTestCase3     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET #ag = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	UpdateItemTestCase3Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	UpdateItemTestCase4Name = "4: Update Expression without ExpressionAttributeValues"
+	UpdateItemTestCase4     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET age = :age",
+	}
+
+	//400 bad request
+	UpdateItemTestCase5Name = "5: UpdateExpression,ExpressionAttributeValues without Key"
+	UpdateItemTestCase5     = models.UpdateAttr{
+		TableName:        "employee",
+		UpdateExpression: "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+	}
+
+	//400 Bad request
+	UpdateItemTestCase6Name = "6: UpdateExpression,ExpressionAttributeValues without ExpressionAttributeNames"
+	UpdateItemTestCase6     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		UpdateExpression: "SET #ag = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+	}
+
+	UpdateItemTestCase7Name = "7: Correct ConditionExpression "
+	UpdateItemTestCase7     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag > :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	UpdateItemTestCase7Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	//400 bad request
+	UpdateItemTestCase8Name = "8: Wrong ConditionExpression"
+	UpdateItemTestCase8     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 Bad request
+	UpdateItemTestCase9Name = "9: ConditionExpression without ExpressionAttributeValues value"
+	UpdateItemTestCase9     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 bad request
+	UpdateItemTestCase10Name = "10: ConditionExpression without ExpressionAttributeNames value"
+	UpdateItemTestCase10     = models.UpdateAttr{
+		TableName: "employee",
+		Key: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag < :val2",
+		UpdateExpression:    "SET age = :age",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+	}
+)
+
+//Test Data for PutItem API
+var (
+	PutItemTestCase = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//200 status check
+	PutItemTestCase1Name = "1: only tablename passed"
+	PutItemTestCase1     = models.Meta{
+		TableName: "employee",
+	}
+	PutItemTestCase1Output = ``
+
+	PutItemTestCase2Name = "2: Item Value to be updated"
+	PutItemTestCase2     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("11")},
+		},
+	}
+	PutItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	PutItemTestCase3Name = "3: ConditionExpression with ExpressionAttributeValues & ExpressionAttributeNames"
+	PutItemTestCase3     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("10")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+	PutItemTestCase3Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"11"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	PutItemTestCase4Name = "4: ConditionExpression with ExpressionAttributeValues"
+	PutItemTestCase4     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("11")},
+		},
+		ConditionExpression: "age > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("9")},
+		},
+	}
+	PutItemTestCase4Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}}`
+
+	//400 bad request
+	PutItemTestCase5Name = "5: ConditionExpression without ExpressionAttributeValues"
+	PutItemTestCase5     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	//400 bad request
+	PutItemTestCase6Name = "6: ConditionExpression without ExpressionAttributeNames"
+	PutItemTestCase6     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val2": {N: aws.String("9")},
+		},
+	}
+
+	//400 bad request
+	PutItemTestCase7Name = "7: ConditionExpression without ExpressionAttributeValues & ExpressionAttributeNames "
+	PutItemTestCase7     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+		},
+		ConditionExpression: "age > 9",
+	}
+
+	//400 bad request
+	PutItemTestCase8Name = "Item is not present"
+	PutItemTestCase8     = models.Meta{
+		TableName:           "employee",
+		ConditionExpression: "#ag > :val2",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":age":  {N: aws.String("10")},
+			":val2": {N: aws.String("9")},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#ag": "age",
+		},
+	}
+
+	PutItemTestCase9Name = "9: Changing the values to initial state"
+	PutItemTestCase9     = models.Meta{
+		TableName: "employee",
+		Item: map[string]*dynamodb.AttributeValue{
+			"emp_id": {N: aws.String("1")},
+			"age":    {N: aws.String("10")},
+		},
+	}
+)
+
 func initFunc() *gin.Engine {
 	box := rice.MustFindBox("config-files")
 
@@ -612,6 +879,23 @@ func createPostTestCase(name, url, outputString string, input interface{}) apite
 			resp.Body().Equal(outputString)
 			return ctx
 		},
+	}
+}
+
+func createStatusCheckPostTestCase(name, url string, httpStatus int, input interface{}) apitesting.APITestCase {
+	return apitesting.APITestCase{
+		Name:    name,
+		ReqType: "POST",
+		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+			return map[string]string{
+				"Content-Type": "application/json",
+			}
+		},
+		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
+		PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+			return input
+		},
+		ExpHTTPStatus: httpStatus,
 	}
 }
 
@@ -864,6 +1148,47 @@ func TestScanAPI(t *testing.T) {
 		createPostTestCase(ScanTestCase11Name, "/v1/Query", ScanTestCase11Output, ScanTestCase11),
 		createPostTestCase(ScanTestCase12Name, "/v1/Query", ScanTestCase12Output, ScanTestCase12),
 		createPostTestCase(ScanTestCase13Name, "/v1/Query", ScanTestCase13Output, ScanTestCase13),
+	}
+	apitest.RunTests(t, tests)
+}
+
+func TestUpdateItemAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(UpdateItemTestCase1Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase1),
+		createStatusCheckPostTestCase(UpdateItemTestCase4Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase4),
+		createStatusCheckPostTestCase(UpdateItemTestCase5Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase5),
+		createStatusCheckPostTestCase(UpdateItemTestCase8Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase8),
+		createStatusCheckPostTestCase(UpdateItemTestCase9Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase9),
+		createStatusCheckPostTestCase(UpdateItemTestCase10Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase10),
+		createPostTestCase(UpdateItemTestCase2Name, "/v1/UpdateItem", UpdateItemTestCase2Output, UpdateItemTestCase2),
+		createPostTestCase(UpdateItemTestCase3Name, "/v1/UpdateItem", UpdateItemTestCase3Output, UpdateItemTestCase3),
+		createPostTestCase(UpdateItemTestCase7Name, "/v1/UpdateItem", UpdateItemTestCase7Output, UpdateItemTestCase7),
+	}
+	apitest.RunTests(t, tests)
+}
+
+func TestPutItemAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		// APIEndpointURL: apiURL + "/" + version,
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1/PutItem", http.StatusOK, PutItemTestCase1),
+		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase5),
+		createStatusCheckPostTestCase(PutItemTestCase6Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase6),
+		createStatusCheckPostTestCase(PutItemTestCase7Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase7),
+		createStatusCheckPostTestCase(PutItemTestCase8Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase8),
+		createPostTestCase(PutItemTestCase2Name, "/v1/PutItem", PutItemTestCase2Output, PutItemTestCase2),
+		createPostTestCase(PutItemTestCase3Name, "/v1/PutItem", PutItemTestCase3Output, PutItemTestCase3),
+		createPostTestCase(PutItemTestCase4Name, "/v1/PutItem", PutItemTestCase4Output, PutItemTestCase4),
+		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1/PutItem", http.StatusOK, PutItemTestCase9),
 	}
 	apitest.RunTests(t, tests)
 }

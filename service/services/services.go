@@ -620,7 +620,7 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		return nil, err
 	}
 	tableName = tableConf.ActualTable
-	e, err := utils.CreateConditionExpression(updateAttr.ConditionalExpression, updateAttr.ExpressionAttributeValues)
+	e, err := utils.CreateConditionExpression(updateAttr.ConditionExpression, updateAttr.ExpressionAttributeMap)
 	if err != nil {
 		return nil, err
 	}

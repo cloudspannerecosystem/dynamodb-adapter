@@ -104,7 +104,7 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 }
 
 // EvaluteExpression - evalute expression
-func EvaluteExpression(expression *models.Eval) (bool, error) {
+func EvaluateExpression(expression *models.Eval) (bool, error) {
 	if expression == nil || expression.Cond == nil {
 		return true, nil
 	}
