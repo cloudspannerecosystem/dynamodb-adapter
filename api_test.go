@@ -22,6 +22,99 @@ const (
 	version = "v1"
 )
 
+var (
+	InitialSetupParams = models.BatchWriteItem{
+		RequestItems: map[string][]models.BatchWriteSubItems{
+			"employee": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("1")},
+							"age":        {N: aws.String("10")},
+							"address":    {S: aws.String("Shamli")},
+							"first_name": {S: aws.String("Marc")},
+							"last_name":  {S: aws.String("Richards")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("2")},
+							"age":        {N: aws.String("20")},
+							"address":    {S: aws.String("Ney York")},
+							"first_name": {S: aws.String("Catalina")},
+							"last_name":  {S: aws.String("Smith")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("3")},
+							"age":        {N: aws.String("30")},
+							"address":    {S: aws.String("Pune")},
+							"first_name": {S: aws.String("Alice")},
+							"last_name":  {S: aws.String("Trentor")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("4")},
+							"age":        {N: aws.String("40")},
+							"address":    {S: aws.String("Silicon Valley")},
+							"first_name": {S: aws.String("Lea")},
+							"last_name":  {S: aws.String("Martin")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"emp_id":     {N: aws.String("5")},
+							"age":        {N: aws.String("50")},
+							"address":    {S: aws.String("London")},
+							"first_name": {S: aws.String("David")},
+							"last_name":  {S: aws.String("Lomond")},
+						},
+					},
+				},
+			},
+			"department": {
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("100")},
+							"d_name":           {S: aws.String("Engineering")},
+							"d_specialization": {S: aws.String("CSE, ECE, Civil")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("200")},
+							"d_name":           {S: aws.String("Arts")},
+							"d_specialization": {S: aws.String("BA")},
+						},
+					},
+				},
+				{
+					PutReq: models.BatchPutItem{
+						Item: map[string]*dynamodb.AttributeValue{
+							"d_id":             {N: aws.String("300")},
+							"d_name":           {S: aws.String("Culture")},
+							"d_specialization": {S: aws.String("History")},
+						},
+					},
+				},
+			},
+		},
+	}
+)
+
 // params for TestGetItemAPI
 var (
 	getItemTest1 = models.GetItemMeta{
@@ -1364,6 +1457,18 @@ func createStatusCheckPostTestCase(name, url string, httpStatus int, input inter
 		},
 		ExpHTTPStatus: httpStatus,
 	}
+}
+
+func TestInitialDataInsert(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return initFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1/BatchWriteItem", http.StatusOK, InitialSetupParams),
+	}
+	apitest.RunTests(t, tests)
 }
 
 func TestGetItemAPI(t *testing.T) {
