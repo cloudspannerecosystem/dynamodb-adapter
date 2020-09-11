@@ -31,6 +31,9 @@ func GetStringInBetween(str string, start string, end string) (result string) {
 	}
 	s += len(start)
 	e := strings.Index(str, end)
+	if s >= e {
+		return ""
+	}
 	return str[s:e]
 }
 
@@ -103,7 +106,7 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	return e, nil
 }
 
-// EvaluteExpression - evalute expression
+// EvaluateExpression - evalute expression
 func EvaluateExpression(expression *models.Eval) (bool, error) {
 	if expression == nil || expression.Cond == nil {
 		return true, nil
