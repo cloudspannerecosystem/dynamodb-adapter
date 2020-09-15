@@ -194,6 +194,11 @@ func parseUpdateExpresstion(actionValue string) *models.UpdateExpressionConditio
 				break
 			}
 		}
+
+		if start == -1 || end == -1 {
+			return nil
+		}
+
 		bracketValue := expr.ActionVal[start+1 : end]
 		tokens := strings.Split(bracketValue, ",")
 		expr.Field = append(expr.Field, strings.TrimSpace(tokens[0]))
@@ -610,6 +615,9 @@ func ChangeQueryResponseColumn(tableName string, obj map[string]interface{}) map
 
 //ChangeMaptoDynamoMap converts simple map into dynamo map
 func ChangeMaptoDynamoMap(in interface{}) (map[string]interface{}, error) {
+	if in == nil {
+		return nil, nil
+	}
 	outputObject := make(map[string]interface{})
 	err := convertMapToDynamoObject(outputObject, reflect.ValueOf(in))
 	return outputObject, err
