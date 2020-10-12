@@ -333,6 +333,9 @@ func createSpannerQuery(query *models.Query, tPkey, pKey, sKey string) (spanner.
 }
 
 func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]string, string, bool, error) {
+	if query == nil {
+		return []string{}, "", false, errors.New("Query is not present")
+	}
 	colStr := ""
 	if query.OnlyCount {
 		return []string{"count"}, "COUNT(" + pKey + ") AS count", true, nil

@@ -57,13 +57,25 @@ func ParseDDL(updateDB bool) error {
 }
 
 func getColNameAndType(stmt string) (string, string) {
+	if stmt == "" {
+		return "", ""
+	}
 	stmt = strings.TrimSpace(stmt)
 	tokens := strings.Split(stmt, " ")
+	if len(tokens) < 2 {
+		return "", ""
+	}
 	tokens[0] = strings.Trim(tokens[0], "`")
 	return tokens[0], tokens[1]
 }
 
 func getTableName(stmt string) string {
+	if stmt == "" {
+		return ""
+	}
 	tokens := strings.Split(stmt, " ")
+	if len(tokens) < 3 {
+		return ""
+	}
 	return tokens[2]
 }
