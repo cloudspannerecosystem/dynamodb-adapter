@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package apitesting contains integration testing framework functions
 package apitesting
 
 import (

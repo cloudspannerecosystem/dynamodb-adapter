@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package initializer initialize the project by initalizing configuration
+// Creating DB connection and reading configuration tables from Spanner
 package initializer
 
 import (

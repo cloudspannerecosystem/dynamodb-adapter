@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package config implements the functions for reading
+// configuration files and saving them into Golang objects
 package config
 
 import (

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package storage provides the functions that interacts with Spanner to fetch the data
 package storage
 
 import (

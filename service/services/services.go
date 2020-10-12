@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package services implements services for getting data from Spanner
+// and streaming data into pubsub
 package services
 
 import (
