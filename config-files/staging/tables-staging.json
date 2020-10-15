@@ -1,14 +1,14 @@
 {
     "tableName":{
         "partitionKey":"primary key or Partition key",
-        "sortKey": "sorting key of dynamoDB adaptar",
+        "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
-			"ColmnnName1": "Type of like N & S for ColmnnName1",
-			"ColmnnName2": "Type of like N & S for ColmnnName2"
+			"ColumnName1": "N",
+			"ColumnName2": "S"
         },
         "indices": { 
 			"indexName1": {
-				"sortKey": "sort key indexName1",
+				"sortKey": "sort key for indexName1",
 				"partitionKey": "partition key for indexName1"
 			}
 		}

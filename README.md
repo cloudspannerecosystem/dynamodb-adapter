@@ -7,13 +7,13 @@ https://gitter.im/cloudspannerecosystem/dynamodb-adapter](https://badges.gitter.
 ## Introduction
 Dynamodb-adapter is an API tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. By running this project locally or in the cloud, this would work seamlessly.
 
-Additionally, It also support the primary index and secondary index in similar way as dynamodb supports.
+Additionally, it also supports primary and secondary indexes in a similar way as DynamoDB.
 
-It will be helpful for moving to the Spanner from dynamodb environment without changing the code of dynamodb. APIs created by this project can be directly consumed at place of dynamodb queries.
+It will be helpful for moving to Cloud Spanner from DynamoDB environment without changing the code for DynamoDB queries. The APIs created by this project can be directly consumed where DynamoDB queries are used in your application.
 
-This project require two tables to store metadata and configuation for the project.
+This project requires two tables to store metadata and configuration for the project:
 * dynamodb_adapter_table_ddl (for meta data of all tables)
-* dynamodb_adapter_config_manager (for pubsub configuation)
+* dynamodb_adapter_config_manager (for pubsub configuration)
 
 It supports two mode  - 
 * Production
@@ -22,7 +22,7 @@ It supports two mode  -
 ## Usage
 Follow the given steps to setup the project and generate the apis.
 
-### 1. Creation for the Base Tables in Spanner
+### 1. Creation of the required configuration tables in Spanner
 #### Table: dynamodb_adapter_table_ddl
 This table will be used to store the metadata for other tables. It will be used at the time of initiation of project to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because dynamoDB supports the special characters in column names while spanner does not support special characters other than underscores(_). 
 For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
@@ -81,7 +81,7 @@ For example:
 
 #### spanner.{env}.json
 It is a mapping file for table name with instance id. It will be helpful to query data on particular instance.
-All table's instance-id will be stored in this file in this format: 
+The instance-id of all tables should be stored in this file in the following format:
 "TableName" : "instance-id"
 
 For example:
@@ -92,18 +92,20 @@ For example:
     "dynamodb_adapter_config_manager": "spanner-2",
     "tableName1": "spanner-1",
     "tableName2": "spanner-1"
+    ...
+    ...
 }
 ```
 
-#### tabels.{env}.json
+#### tables.{env}.json
 All table's primary key, columns, index information will be stored here.
 
 | Key | Used For |
 | ------ | ------ |
-| tableName | table name present in dbynamo db |
-| paritionKey | Primary key |
+| tableName | table name present in dynamoDb |
+| partitionKey | Primary key |
 | sortKey| Sorting key |
-| attributeTypes | Coulmn names and type present |
+| attributeTypes | Column names and type present |
 | indices | indexes present in the table |
 
 
@@ -113,18 +115,20 @@ For example:
 {
     "tableName":{
         "partitionKey":"primary key or Partition key",
-        "sortKey": "sorting key of dynamoDB adaptar",
+        "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
-			"ColmnnName1": "Type of like N & S for ColmnnName1",
-			"ColmnnName2": "Type of like N & S for ColmnnName2"
+			"ColumnName1": "N",
+			"ColumnName2": "S"
         },
         "indices": { 
 			"indexName1": {
-				"sortKey": "sort key indexName1",
+				"sortKey": "sort key for indexName1",
 				"partitionKey": "partition key for indexName1"
 			}
 		}
-    }
+    },
+    .....
+    .....
 }
 ```
 
@@ -146,6 +150,17 @@ rice embed-go
 
 ### 4. Run 
 * Setup GCP project on **gcloud cli** 
+
+    If **gcloud cli** is not installed then firstly install **gcloud cli** [reference](https://cloud.google.com/sdk/docs/install)
+    Then run the following commands for setting up the project which has Cloud Spanner Database.
+    ```
+    gcloud auth login 
+    gcloud projects list
+    gcloud config set project `PROJECT NAME`
+    ```
+    [Reference](https://cloud.google.com/sdk/gcloud/reference/auth/login) for `gcloud auth login` 
+    [Reference](https://cloud.google.com/sdk/gcloud/reference/projects/list) for `gcloud auth login` 
+    [Reference](https://cloud.google.com/sdk/gcloud/reference/config/set) for `gcloud auth login`
 
 * Run for **staging**
     ```
