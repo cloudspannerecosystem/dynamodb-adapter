@@ -159,7 +159,9 @@ rice embed-go
     gcloud config set project `PROJECT NAME`
     ```
     [Reference](https://cloud.google.com/sdk/gcloud/reference/auth/login) for `gcloud auth login` 
+
     [Reference](https://cloud.google.com/sdk/gcloud/reference/projects/list) for `gcloud auth login` 
+    
     [Reference](https://cloud.google.com/sdk/gcloud/reference/config/set) for `gcloud auth login`
 
 * Run for **staging**
