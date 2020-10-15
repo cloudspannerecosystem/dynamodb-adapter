@@ -5,7 +5,7 @@ https://gitter.im/cloudspannerecosystem/dynamodb-adapter](https://badges.gitter.
 
 
 ## Introduction
-Dynamodb-adapter is an API tool which translates the AWS Dynamodb queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. By running this project locally or on cloud, this would work seemlessly.
+Dynamodb-adapter is an API tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. By running this project locally or in the cloud, this would work seamlessly.
 
 Additionally, It also support the primary index and secondary index in similar way as dynamodb supports.
 
@@ -168,4 +168,3 @@ rice embed-go
 ## API Documentation
 This is can be imported in Postman or can be used for Swagger UI.
 You can get open-api-spec file here [here](https://github.com/cldcvr/dynamodb-adapter/wiki/Open-API-Spec)
-
