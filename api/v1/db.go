@@ -32,7 +32,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
-// InitVPC - Init VPC routes
+// InitDBAPI - routes for apis
 func InitDBAPI(g *gin.RouterGroup) {
 
 	r := g.Group("/")
@@ -240,7 +240,7 @@ func QueryTable(c *gin.Context) {
 	}
 }
 
-// GetMetaWithProjection to get with projections
+// GetItemMeta to get with projections
 // @Description Get a record with projections
 // @Summary Get a record with projections
 // @ID get-with-projection
@@ -295,7 +295,7 @@ func GetItemMeta(c *gin.Context) {
 	}
 }
 
-// BatchGetMetaWithProjection to get with projections
+// BatchGetItem to get with projections
 // @Description Request items in a batch with projections.
 // @Summary Request items in a batch with projections.
 // @ID batch-get-with-projection

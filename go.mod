@@ -28,6 +28,7 @@ require (
 	github.com/valyala/fasthttp v1.15.1 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.uber.org/zap v1.15.0
+	golang.org/x/tools v0.0.0-20201117021029-3c3a81204b10 // indirect
 	google.golang.org/api v0.29.0
 	google.golang.org/genproto v0.0.0-20200711021454-869866162049
 	gopkg.in/go-playground/assert.v1 v1.2.1

@@ -31,14 +31,16 @@ var pubsubClient *pubsub.Client
 var mClients = map[string]*pubsub.Topic{}
 var mux = &sync.Mutex{}
 
+// InitStream for initializing the stream
 func InitStream() {
 	var err error
-	pubsubClient, err = pubsub.NewClient(context.Background(), config.ConfigurationMap.GOOGLE_PROJECT_ID)
+	pubsubClient, err = pubsub.NewClient(context.Background(), config.ConfigurationMap.GoogleProjectID)
 	if err != nil {
 		logger.LogFatal(err)
 	}
 }
 
+// StreamDataToThirdParty for streaming data to any third party source
 func StreamDataToThirdParty(oldImage, newImage map[string]interface{}, tableName string) {
 	if !IsMyStreamEnabled(tableName) {
 		return
@@ -93,7 +95,7 @@ func pubsubPublish(streamObj *models.StreamDataModel) {
 	topic, ok := mClients[topicName]
 	if !ok {
 		topic = pubsubClient.
-			TopicInProject(topicName, config.ConfigurationMap.GOOGLE_PROJECT_ID)
+			TopicInProject(topicName, config.ConfigurationMap.GoogleProjectID)
 		mClients[topicName] = topic
 	}
 	message := &pubsub.Message{}

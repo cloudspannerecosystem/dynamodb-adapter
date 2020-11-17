@@ -153,6 +153,7 @@ type ScanMeta struct {
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 }
 
+// TableConfig for Configuration table
 type TableConfig struct {
 	PartitionKey     string                 `json:"partitionKey,omitempty"`
 	SortKey          string                 `json:"sortKey,omitempty"`
@@ -193,9 +194,13 @@ var TableDDL map[string]map[string]string
 // TableColumnMap - this contains the list of columns for the tables
 var TableColumnMap map[string][]string
 
+// TableColChangeMap for changed columns map
 var TableColChangeMap map[string]struct{}
 
+// ColumnToOriginalCol for Original column map
 var ColumnToOriginalCol map[string]string
+
+// OriginalColResponse for Original Column Response
 var OriginalColResponse map[string]string
 
 func init() {
@@ -210,8 +215,8 @@ func init() {
 	OriginalColResponse = make(map[string]string)
 }
 
+// Eval for Evaluation expression
 type Eval struct {
-	// Cond       conditions.Expr
 	Cond       *vm.Program
 	Attributes []string
 	Cols       []string
@@ -219,6 +224,7 @@ type Eval struct {
 	ValueMap   map[string]interface{}
 }
 
+// UpdateExpressionCondition for Update Condition
 type UpdateExpressionCondition struct {
 	Field     []string
 	Value     []string
@@ -227,12 +233,13 @@ type UpdateExpressionCondition struct {
 	AddValues map[string]float64
 }
 
-type dynamodb_adapter_table_ddl struct {
+type dynamodbAdapterTableDdl struct {
 	Table    string
 	Column   string
 	DataType string
 }
 
+// DBAudit for db auditing data
 type DBAudit struct {
 	ID           string                 `json:"id,omitempty"`
 	Timestamp    int64                  `json:"timestamp,omitempty"`
@@ -247,6 +254,7 @@ type DBAudit struct {
 	Payload      string                 `json:"payload"`
 }
 
+// ConfigControllerModel for Config controller
 type ConfigControllerModel struct {
 	Mux               sync.RWMutex
 	UniqueVal         string
@@ -258,8 +266,10 @@ type ConfigControllerModel struct {
 	PubSubTopic       map[string]string
 }
 
+// ConfigController object for ConfigControllerModel
 var ConfigController *ConfigControllerModel
 
+// SpannerTableMap for spanner column map
 var SpannerTableMap = make(map[string]string)
 
 func init() {
@@ -272,6 +282,7 @@ func init() {
 	ConfigController.PubSubTopic = make(map[string]string)
 }
 
+// StreamDataModel for streaming data
 type StreamDataModel struct {
 	OldImage       map[string]interface{} `json:"oldImage"`
 	NewImage       map[string]interface{} `json:"newImage"`
