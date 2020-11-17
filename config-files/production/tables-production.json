@@ -3,8 +3,12 @@
         "partitionKey":"primary key or Partition key",
         "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
-			"ColumnName1": "N",
-			"ColumnName2": "S"
+			"ColInt64": "N",
+            "ColString": "S",
+            "ColBytes": "B",
+            "ColBool": "BOOL",
+            "ColDate": "S",
+            "ColTimestamp": "S"
         },
         "indices": { 
 			"indexName1": {

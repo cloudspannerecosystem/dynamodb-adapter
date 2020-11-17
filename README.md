@@ -68,14 +68,14 @@ Add the configuration in the given files:
 #### config.{env}.json 
 | Key | Used For |
 | ------ | ------ |
-| GOOGLE_PROJECT_ID | Your Google Project ID |
-| SPANNER_DB | Your Spanner Database Name |
+| GoogleProjectID | Your Google Project ID |
+| SpannerDb | Your Spanner Database Name |
 
 For example:
 ```
 {
-    "GOOGLE_PROJECT_ID" : "first-project",
-    "SPANNER_DB"        : "test-db"
+    "GoogleProjectID" : "first-project",
+    "SpannerDb"        : "test-db"
 }
 ```
 
@@ -99,6 +99,10 @@ For example:
 
 #### tables.{env}.json
 All table's primary key, columns, index information will be stored here.
+It will be required for query and update both type of operation to get primary key, sort or any other index present.
+It helps to query data on primary key or sort key.
+It helps to update data based on primary key or sort key.
+It will be similar to dynamodb table's architecture.
 
 | Key | Used For |
 | ------ | ------ |
@@ -117,8 +121,12 @@ For example:
         "partitionKey":"primary key or Partition key",
         "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
-			"ColumnName1": "N",
-			"ColumnName2": "S"
+			"ColInt64": "N",
+            "ColString": "S",
+            "ColBytes": "B",
+            "ColBool": "BOOL",
+            "ColDate": "S",
+            "ColTimestamp": "S"
         },
         "indices": { 
 			"indexName1": {
@@ -138,10 +146,8 @@ For example:
 ##### install rice package
 This package is required to load the config files. This is required in the first step of the running dynamoDB-adapter.
 
-```
-go get github.com/GeertJohan/go.rice
-go get github.com/GeertJohan/go.rice/rice
-```
+Follow the [link](https://github.com/GeertJohan/go.rice#installation).
+
 ##### run command for creating the file.
 This is required to increase the performance when any config file is changed so that configuration files can be loaded directly from go file.
 ```

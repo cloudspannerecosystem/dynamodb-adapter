@@ -17,7 +17,6 @@ package logger
 import (
 	"fmt"
 	"log"
-
 	"os"
 
 	"go.uber.org/zap"
@@ -32,7 +31,7 @@ var errorLogger *zap.SugaredLogger
 func init() {
 	devConfig := zap.NewDevelopmentConfig()
 	devConfig.DisableStacktrace = true
-	w := MyWriter{}
+	w := LogWriter{}
 	tmp, err := devConfig.Build(zap.AddCallerSkip(1), zap.WrapCore(func(zapcore.Core) zapcore.Core {
 		return zapcore.NewCore(zapcore.NewJSONEncoder(devConfig.EncoderConfig), zapcore.AddSync(w), devConfig.Level)
 	}))
@@ -102,10 +101,10 @@ func ErrorLogging(message ...interface{}) {
 	errorLogger.Error(message)
 }
 
-// MyWriter - MyWriter
-type MyWriter struct{}
+// LogWriter - Log Writer
+type LogWriter struct{}
 
-func (m MyWriter) Write(ba []byte) (int, error) {
+func (m LogWriter) Write(ba []byte) (int, error) {
 	if env == "PRODUCTION" {
 		go fmt.Println(string(ba))
 	} else {

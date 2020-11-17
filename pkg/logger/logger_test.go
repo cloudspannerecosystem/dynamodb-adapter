@@ -44,7 +44,6 @@ func TestLogDebug(t *testing.T) {
 	LogDebug(info)
 }
 
-// 20000	     70479 ns/op	    1379 B/op	      12 allocs/op
 // above shows the Benchmark for using LogError in Project
 func BenchmarkLogError(b *testing.B) {
 	err := struct {
