@@ -50,6 +50,7 @@ func init() {
 	}
 }
 
+// Storage object for intracting with storage package
 type Storage struct {
 	spannerClient map[string]*spanner.Client
 }
@@ -60,7 +61,7 @@ var storage *Storage
 func initSpannerDriver(instance string, m map[string]*gjson.Result) *spanner.Client {
 	conf := spanner.ClientConfig{}
 
-	str := "projects/" + config.ConfigurationMap.GOOGLE_PROJECT_ID + "/instances/" + instance + "/databases/" + config.ConfigurationMap.SPANNER_DB
+	str := "projects/" + config.ConfigurationMap.GoogleProjectID + "/instances/" + instance + "/databases/" + config.ConfigurationMap.SpannerDb
 	Client, err := spanner.NewClientWithConfig(context.Background(), str, conf)
 	if err != nil {
 		logger.LogFatal(err)

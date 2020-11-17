@@ -111,6 +111,7 @@ func Put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	return updateResp, nil
 }
 
+//Add checks the expression for converting the data
 func Add(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, m, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}) (map[string]interface{}, error) {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
@@ -141,6 +142,7 @@ func Add(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 	return updateResp, nil
 }
 
+//Del checks the expression for saving the data
 func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition) (map[string]interface{}, error) {
 	logger.LogDebug(expressionAttr)
 	tableConf, err := config.GetTableConf(tableName)
@@ -168,7 +170,7 @@ func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 	return res, nil
 }
 
-// BatchGet get table data
+// BatchGet for batch operation for getting data
 func BatchGet(ctx context.Context, tableName string, keyMapArray []map[string]interface{}) ([]map[string]interface{}, error) {
 	if len(keyMapArray) == 0 {
 		var resp = make([]map[string]interface{}, 0)
@@ -631,6 +633,7 @@ func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[s
 	return result, nil
 }
 
+// Remove for remove operation in update
 func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr, actionValue string, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}) (map[string]interface{}, error) {
 	actionValue = strings.ReplaceAll(actionValue, " ", "")
 	colsToRemove := strings.Split(actionValue, ",")
@@ -659,6 +662,4 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		delete(updateResp, colsToRemove[i])
 	}
 	return updateResp, nil
-
-	return nil, errors.New("ResourceNotFoundException")
 }

@@ -30,8 +30,8 @@ import (
 
 // Configuration struct
 type Configuration struct {
-	GOOGLE_PROJECT_ID string
-	SPANNER_DB        string
+	GoogleProjectID string
+	SpannerDb       string
 }
 
 var once sync.Once

@@ -338,6 +338,7 @@ func extractOperations(updateExpression string) map[string]string {
 	return ops
 }
 
+// ReplaceHashRangeExpr replaces the attribute names from Filter Expression and Range Expression
 func ReplaceHashRangeExpr(query models.Query) models.Query {
 	for k, v := range query.ExpressionAttributeNames {
 		query.FilterExp = strings.ReplaceAll(query.FilterExp, k, v)
@@ -346,6 +347,7 @@ func ReplaceHashRangeExpr(query models.Query) models.Query {
 	return query
 }
 
+// ConvertDynamoToMap converts the Dynamodb Object to Map
 func ConvertDynamoToMap(tableName string, dynamoMap map[string]*dynamodb.AttributeValue) (map[string]interface{}, error) {
 	if dynamoMap == nil || len(dynamoMap) == 0 {
 		return nil, nil
@@ -362,6 +364,7 @@ func ConvertDynamoToMap(tableName string, dynamoMap map[string]*dynamodb.Attribu
 	return rs, nil
 }
 
+// ConvertDynamoArrayToMapArray this converts Dynamodb Object Array into Map Array
 func ConvertDynamoArrayToMapArray(tableName string, dynamoMap []map[string]*dynamodb.AttributeValue) ([]map[string]interface{}, error) {
 	if dynamoMap == nil || len(dynamoMap) == 0 {
 		return nil, nil
@@ -380,6 +383,7 @@ func ConvertDynamoArrayToMapArray(tableName string, dynamoMap []map[string]*dyna
 	return rs, nil
 }
 
+// ChangeColumnToSpannerExpressionName converts the Column Name into Spanner equivalent
 func ChangeColumnToSpannerExpressionName(tableName string, expressNameMap map[string]string) map[string]string {
 	_, ok := models.TableColChangeMap[tableName]
 	if !ok {
@@ -400,6 +404,7 @@ func ChangeColumnToSpannerExpressionName(tableName string, expressNameMap map[st
 	return rs
 }
 
+// ChangesArrayResponseToOriginalColumns changes the spanner column names to original column names
 func ChangesArrayResponseToOriginalColumns(tableName string, obj []map[string]interface{}) []map[string]interface{} {
 	_, ok := models.TableColChangeMap[tableName]
 	if !ok {
@@ -411,6 +416,7 @@ func ChangesArrayResponseToOriginalColumns(tableName string, obj []map[string]in
 	return obj
 }
 
+// ChangeResponseToOriginalColumns converts the map of spanner column into original column names
 func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{}) map[string]interface{} {
 	_, ok := models.TableColChangeMap[tableName]
 	if !ok {
@@ -432,6 +438,7 @@ func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{
 	return rs
 }
 
+// ChangeResponseColumn changes the spanner column name into original column if those exists
 func ChangeResponseColumn(obj map[string]interface{}) map[string]interface{} {
 	rs := make(map[string]interface{})
 
@@ -448,6 +455,8 @@ func ChangeResponseColumn(obj map[string]interface{}) map[string]interface{} {
 
 	return rs
 }
+
+// ChangeColumnToSpanner converts original column name to  spanner supported column names
 func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	rs := make(map[string]interface{})
 
@@ -533,6 +542,7 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 	panic(fmt.Sprintf("%#v is not a supported dynamodb.AttributeValue", a))
 }
 
+// ConvertFromMap converts dynamodb AttributeValue into interface
 func ConvertFromMap(item map[string]*dynamodb.AttributeValue, v interface{}, tableName string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -605,6 +615,7 @@ func isTyped(v reflect.Type) bool {
 	return false
 }
 
+// ChangeQueryResponseColumn changes the response into dynamodb response for Query api
 func ChangeQueryResponseColumn(tableName string, obj map[string]interface{}) map[string]interface{} {
 	_, ok := models.TableColChangeMap[tableName]
 	if !ok {

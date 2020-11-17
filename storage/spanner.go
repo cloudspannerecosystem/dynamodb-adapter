@@ -56,7 +56,7 @@ func ReadDatabaseSchema() ([]string, error) {
 	var statments []string
 	for k := range m {
 		req := &databasepb.GetDatabaseDdlRequest{}
-		req.Database = "projects/" + config.ConfigurationMap.GOOGLE_PROJECT_ID + "/instances/" + k + "/databases/" + config.ConfigurationMap.SPANNER_DB
+		req.Database = "projects/" + config.ConfigurationMap.GoogleProjectID + "/instances/" + k + "/databases/" + config.ConfigurationMap.SpannerDb
 		ddlResp, err := cli.GetDatabaseDdl(ctx, req)
 		if err != nil {
 			return nil, errors.New(err.Error())
@@ -808,6 +808,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 	return updatedObj, err
 }
 
+// SpannerDel for delete operation on Spanner
 func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition) error {
 	tableConf, err := config.GetTableConf(table)
 	if err != nil {

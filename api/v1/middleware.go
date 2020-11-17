@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// PanicHandler is global handler for all type of panic
 func PanicHandler(c *gin.Context) {
 	if e := recover(); e != nil {
 		stack := string(debug.Stack())

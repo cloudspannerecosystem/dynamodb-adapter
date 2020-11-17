@@ -47,6 +47,7 @@ var ctx = context.Background()
 
 var c *cron.Cron
 
+// StartConfigManager starts config mangager for fetching the config manager data after certain time
 func StartConfigManager() {
 	c = cron.New()
 	c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
@@ -54,6 +55,7 @@ func StartConfigManager() {
 	fetchConfigData()
 }
 
+// MayIReadOrWrite for checking the operation is allowed or not
 func MayIReadOrWrite(table string, IsMutation bool, operation string) bool {
 	return true
 }
@@ -156,6 +158,7 @@ func parseConfig(table string, config string, count int) {
 	}
 }
 
+// IsMyStreamEnabled checks if a table is enabaled for streaming or not
 func IsMyStreamEnabled(tableName string) bool {
 	models.ConfigController.Mux.RLock()
 	defer models.ConfigController.Mux.RUnlock()
@@ -163,6 +166,7 @@ func IsMyStreamEnabled(tableName string) bool {
 	return ok
 }
 
+// IsPubSubAllowed to check if PubSub is allowed or not for a table
 func IsPubSubAllowed(tableName string) (string, bool) {
 	models.ConfigController.Mux.RLock()
 	defer models.ConfigController.Mux.RUnlock()
