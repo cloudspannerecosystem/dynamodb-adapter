@@ -33,7 +33,7 @@ func init() {
 	}
 }
 
-func TestIsMyStreamEnabled(t *testing.T) {
+func TestIsStreamEnabled(t *testing.T) {
 	tests := []struct {
 		testName  string
 		tableName string
@@ -62,7 +62,7 @@ func TestIsMyStreamEnabled(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := IsMyStreamEnabled(tc.tableName)
+		got := IsStreamEnabled(tc.tableName)
 		assert.Equal(t, got, tc.want)
 	}
 }

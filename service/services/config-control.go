@@ -139,10 +139,10 @@ func fetchConfigData() {
 
 func parseConfig(table string, config string, count int) {
 	tokens := strings.Split(config, ",")
-	if tokens[0] == "1" {
+	if len(tokens) >= 1 && tokens[0] == "1" {
 		models.ConfigController.ReadMap[table] = struct{}{}
 	}
-	if tokens[1] == "1" {
+	if len(tokens) >= 2 && tokens[1] == "1" {
 		models.ConfigController.WriteMap[table] = struct{}{}
 	}
 	if len(tokens) > 2 {
@@ -158,8 +158,8 @@ func parseConfig(table string, config string, count int) {
 	}
 }
 
-// IsMyStreamEnabled checks if a table is enabaled for streaming or not
-func IsMyStreamEnabled(tableName string) bool {
+// IsStreamEnabled checks if a table is enabled for streaming or not
+func IsStreamEnabled(tableName string) bool {
 	models.ConfigController.Mux.RLock()
 	defer models.ConfigController.Mux.RUnlock()
 	_, ok := models.ConfigController.StreamEnable[tableName]
