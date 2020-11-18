@@ -16,18 +16,16 @@
 package models
 
 import (
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	// "github.com/zhouzhuojie/conditions"
+	"sync"
 
 	"github.com/antonmedv/expr/vm"
-
-	"sync"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 // Meta struct
 type Meta struct {
 	TableName                 string                              `json:"TableName"`
-	AttrMap                   map[string]interface{}              `json:"attrMap"`
+	AttrMap                   map[string]interface{}              `json:"AttrMap"`
 	ReturnValues              string                              `json:"ReturnValues"`
 	ConditionExpression       string                              `json:"ConditionExpression"`
 	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
@@ -38,31 +36,31 @@ type Meta struct {
 
 // GetKeyMeta struct
 type GetKeyMeta struct {
-	Key          string                              `json:"key"`
-	Type         string                              `json:"type"`
-	DynamoObject map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	Key          string                              `json:"Key"`
+	Type         string                              `json:"Type"`
+	DynamoObject map[string]*dynamodb.AttributeValue `json:"DynamoObject"`
 }
 
 // SetKeyMeta struct
 type SetKeyMeta struct {
-	Key          string                              `json:"key"`
-	Type         string                              `json:"type"`
-	Value        string                              `json:"value"`
-	DynamoObject map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	Key          string                              `json:"Key"`
+	Type         string                              `json:"Type"`
+	Value        string                              `json:"Value"`
+	DynamoObject map[string]*dynamodb.AttributeValue `json:"DynamoObject"`
 }
 
 // BatchMetaUpdate struct
 type BatchMetaUpdate struct {
-	TableName    string                                `json:"tableName"`
-	ArrAttrMap   []map[string]interface{}              `json:"arrAttrMap"`
-	DynamoObject []map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName    string                                `json:"TableName"`
+	ArrAttrMap   []map[string]interface{}              `json:"ArrAttrMap"`
+	DynamoObject []map[string]*dynamodb.AttributeValue `json:"DynamoObject"`
 }
 
 // BatchMeta struct
 type BatchMeta struct {
-	TableName    string                                `json:"tableName"`
-	KeyArray     []map[string]interface{}              `json:"keyArray"`
-	DynamoObject []map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName    string                                `json:"TableName"`
+	KeyArray     []map[string]interface{}              `json:"KeyArray"`
+	DynamoObject []map[string]*dynamodb.AttributeValue `json:"DynamoObject"`
 }
 
 // GetItemMeta struct
@@ -81,17 +79,17 @@ type BatchGetMeta struct {
 
 // BatchGetWithProjectionMeta struct
 type BatchGetWithProjectionMeta struct {
-	TableName                string                                `json:"tableName"`
-	KeyArray                 []map[string]interface{}              `json:"keyArray"`
-	ProjectionExpression     string                                `json:"projectionExpression"`
-	ExpressionAttributeNames map[string]string                     `json:"expressionAttributeNames"`
+	TableName                string                                `json:"TableName"`
+	KeyArray                 []map[string]interface{}              `json:"KeyArray"`
+	ProjectionExpression     string                                `json:"ProjectionExpression"`
+	ExpressionAttributeNames map[string]string                     `json:"ExpressionAttributeNames"`
 	Keys                     []map[string]*dynamodb.AttributeValue `json:"Keys"`
 }
 
 // Delete struct
 type Delete struct {
-	TableName                 string                              `json:"tableName"`
-	PrimaryKeyMap             map[string]interface{}              `json:"primaryKeyMap"`
+	TableName                 string                              `json:"TableName"`
+	PrimaryKeyMap             map[string]interface{}              `json:"PrimaryKeyMap"`
 	ConditionExpression       string                              `json:"ConditionExpression"`
 	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
 	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
@@ -101,24 +99,24 @@ type Delete struct {
 
 // BulkDelete struct
 type BulkDelete struct {
-	TableName          string                                `json:"tableName"`
-	PrimaryKeyMapArray []map[string]interface{}              `json:"keyArray"`
-	DynamoObject       []map[string]*dynamodb.AttributeValue `json:"dynamoObject"`
+	TableName          string                                `json:"TableName"`
+	PrimaryKeyMapArray []map[string]interface{}              `json:"KeyArray"`
+	DynamoObject       []map[string]*dynamodb.AttributeValue `json:"DynamoObject"`
 }
 
 // Query struct
 type Query struct {
-	TableName                 string                              `json:"tableName"`
-	IndexName                 string                              `json:"indexName"`
-	OnlyCount                 bool                                `json:"onlyCount"`
-	Limit                     int64                               `json:"limit"`
+	TableName                 string                              `json:"TableName"`
+	IndexName                 string                              `json:"IndexName"`
+	OnlyCount                 bool                                `json:"OnlyCount"`
+	Limit                     int64                               `json:"Limit"`
 	SortAscending             bool                                `json:"ScanIndexForward"`
-	StartFrom                 map[string]interface{}              `json:"startFrom"`
+	StartFrom                 map[string]interface{}              `json:"StartFrom"`
 	ProjectionExpression      string                              `json:"ProjectionExpression"`
 	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
 	FilterExp                 string                              `json:"FilterExpression"`
 	RangeExp                  string                              `json:"KeyConditionExpression"`
-	RangeValMap               map[string]interface{}              `json:"rangeValMap"`
+	RangeValMap               map[string]interface{}              `json:"RangeValMap"`
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
 	Select                    string                              `json:"Select"`
@@ -126,12 +124,12 @@ type Query struct {
 
 // UpdateAttr struct
 type UpdateAttr struct {
-	TableName                 string                              `json:"tableName"`
-	PrimaryKeyMap             map[string]interface{}              `json:"primaryKeyMap"`
-	ReturnValues              string                              `json:"returnValues"`
-	UpdateExpression          string                              `json:"updateExpression"`
+	TableName                 string                              `json:"TableName"`
+	PrimaryKeyMap             map[string]interface{}              `json:"PrimaryKeyMap"`
+	ReturnValues              string                              `json:"ReturnValues"`
+	UpdateExpression          string                              `json:"UpdateExpression"`
 	ConditionExpression       string                              `json:"ConditionExpression"`
-	ExpressionAttributeMap    map[string]interface{}              `json:"attrVals"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"AttrVals"`
 	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
 	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
@@ -139,12 +137,12 @@ type UpdateAttr struct {
 
 //ScanMeta for Scan request
 type ScanMeta struct {
-	TableName                 string                              `json:"tableName"`
-	IndexName                 string                              `json:"indexName"`
-	OnlyCount                 bool                                `json:"onlyCount"`
+	TableName                 string                              `json:"TableName"`
+	IndexName                 string                              `json:"IndexName"`
+	OnlyCount                 bool                                `json:"OnlyCount"`
 	Select                    string                              `json:"Select"`
-	Limit                     int64                               `json:"limit"`
-	StartFrom                 map[string]interface{}              `json:"startFrom"`
+	Limit                     int64                               `json:"Limit"`
+	StartFrom                 map[string]interface{}              `json:"StartFrom"`
 	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
 	FilterExpression          string                              `json:"FilterExpression"`
 	ProjectionExpression      string                              `json:"ProjectionExpression"`
@@ -155,16 +153,16 @@ type ScanMeta struct {
 
 // TableConfig for Configuration table
 type TableConfig struct {
-	PartitionKey     string                 `json:"partitionKey,omitempty"`
-	SortKey          string                 `json:"sortKey,omitempty"`
-	Indices          map[string]TableConfig `json:"indices,omitempty"`
-	GCSSourcePath    string                 `json:"gcsSourcePath,omitempty"`
-	DDBIndexName     string                 `json:"ddbIndexName,omitempty"`
-	SpannerIndexName string                 `json:"table,omitempty"`
-	IsPadded         bool                   `json:"isPadded,omitempty"`
-	IsComplement     bool                   `json:"isComplement,omitempty"`
-	TableSource      string                 `json:"tableSource,omitempty"`
-	ActualTable      string                 `json:"actualTable,omitempty"`
+	PartitionKey     string                 `json:"PartitionKey,omitempty"`
+	SortKey          string                 `json:"SortKey,omitempty"`
+	Indices          map[string]TableConfig `json:"Indices,omitempty"`
+	GCSSourcePath    string                 `json:"GcsSourcePath,omitempty"`
+	DDBIndexName     string                 `json:"DdbIndexName,omitempty"`
+	SpannerIndexName string                 `json:"Table,omitempty"`
+	IsPadded         bool                   `json:"IsPadded,omitempty"`
+	IsComplement     bool                   `json:"IsComplement,omitempty"`
+	TableSource      string                 `json:"TableSource,omitempty"`
+	ActualTable      string                 `json:"ActualTable,omitempty"`
 }
 
 //BatchWriteItem for Batch Operation
@@ -188,7 +186,7 @@ type BatchPutItem struct {
 	Item map[string]*dynamodb.AttributeValue `json:"Item"`
 }
 
-// TableDDL - This contains the DDL
+// TableDDL - this contains the DDL
 var TableDDL map[string]map[string]string
 
 // TableColumnMap - this contains the list of columns for the tables
@@ -239,21 +237,6 @@ type dynamodbAdapterTableDdl struct {
 	DataType string
 }
 
-// DBAudit for db auditing data
-type DBAudit struct {
-	ID           string                 `json:"id,omitempty"`
-	Timestamp    int64                  `json:"timestamp,omitempty"`
-	AWSResponse  map[string]interface{} `json:"awsResponse,omitempty"`
-	GCPResponse  map[string]interface{} `json:"gcpResponse,omitempty"`
-	TableName    string                 `json:"tableName,omitempty"`
-	PartitionKey string                 `json:"partitionKey,omitempty"`
-	SortKey      string                 `json:"sortKey,omitempty"`
-	Operation    string                 `json:"operation"`
-	GCPDbErr     string                 `json:"gcpDbErr"`
-	AWSDbErr     string                 `json:"awsDbErr"`
-	Payload      string                 `json:"payload"`
-}
-
 // ConfigControllerModel for Config controller
 type ConfigControllerModel struct {
 	Mux               sync.RWMutex
@@ -284,13 +267,13 @@ func init() {
 
 // StreamDataModel for streaming data
 type StreamDataModel struct {
-	OldImage       map[string]interface{} `json:"oldImage"`
-	NewImage       map[string]interface{} `json:"newImage"`
-	Keys           map[string]interface{} `json:"keys"`
-	Timestamp      int64                  `json:"timestamp"`
-	Table          string                 `json:"tableName"`
-	EventName      string                 `json:"eventName"`
-	SequenceNumber int64                  `json:"sequenceNumber"`
-	EventID        string                 `json:"eventId"`
-	EventSourceArn string                 `json:"eventSourceArn"`
+	OldImage       map[string]interface{} `json:"OldImage"`
+	NewImage       map[string]interface{} `json:"NewImage"`
+	Keys           map[string]interface{} `json:"Keys"`
+	Timestamp      int64                  `json:"Timestamp"`
+	Table          string                 `json:"TableName"`
+	EventName      string                 `json:"EventName"`
+	SequenceNumber int64                  `json:"SequenceNumber"`
+	EventID        string                 `json:"EventId"`
+	EventSourceArn string                 `json:"EventSourceArn"`
 }
