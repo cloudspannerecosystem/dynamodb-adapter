@@ -180,7 +180,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 	}
 
 	if query.Limit == 0 {
-		query.Limit = 5000
+		query.Limit = config.ConfigurationMap.QueryLimit
 	}
 	query.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(query.TableName, query.ExpressionAttributeNames)
 	query = ReplaceHashRangeExpr(query)
@@ -550,7 +550,7 @@ func Update(c *gin.Context) {
 	}
 }
 
-// BatchWriteItem put & delte items in/from table
+// BatchWriteItem put & delete items in/from table
 // @Description Batch Write Item for putting and deleting data in/from table
 // @Summary Batch Write Items from table
 // @ID batch-write-rows

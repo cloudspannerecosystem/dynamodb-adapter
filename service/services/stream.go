@@ -42,7 +42,7 @@ func InitStream() {
 
 // StreamDataToThirdParty for streaming data to any third party source
 func StreamDataToThirdParty(oldImage, newImage map[string]interface{}, tableName string) {
-	if !IsMyStreamEnabled(tableName) {
+	if !IsStreamEnabled(tableName) {
 		return
 	}
 	if (oldImage == nil || len(oldImage) == 0) && newImage == nil || len(newImage) == 0 {
@@ -86,6 +86,7 @@ func connectors(streamObj *models.StreamDataModel) {
 }
 
 func pubsubPublish(streamObj *models.StreamDataModel) {
+	var err error
 	topicName, status := IsPubSubAllowed(streamObj.Table)
 	if !status {
 		return
@@ -99,8 +100,11 @@ func pubsubPublish(streamObj *models.StreamDataModel) {
 		mClients[topicName] = topic
 	}
 	message := &pubsub.Message{}
-	message.Data, _ = json.Marshal(streamObj)
-	_, err := topic.Publish(context.Background(), message).Get(ctx)
+	message.Data, err = json.Marshal(streamObj)
+	if err != nil {
+		logger.LogError(err)
+	}
+	_, err = topic.Publish(context.Background(), message).Get(ctx)
 	if err != nil {
 		logger.LogError(err)
 	}

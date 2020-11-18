@@ -32,31 +32,6 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
 
-// getProjections makes a projection map
-func getProjections(projectionExpression string, expressionAttributeNames map[string]string, pKey string, sKey string) map[string]string {
-	expressionAttributes := expressionAttributeNames
-	if len(projectionExpression) == 0 {
-		return nil
-	}
-	projections := strings.Split(projectionExpression, ",")
-	projectionMap := make(map[string]string)
-	for _, pro := range projections {
-		pro = strings.TrimSpace(pro)
-		if val, ok := expressionAttributes[pro]; ok {
-			projectionMap[val] = val
-		} else {
-			projectionMap[pro] = pro
-		}
-	}
-	if _, ok := projectionMap[pKey]; !ok {
-		projectionMap[pKey] = pKey
-	}
-	if _, ok := projectionMap[sKey]; !ok {
-		projectionMap[sKey] = sKey
-	}
-	return projectionMap
-}
-
 // getSpannerProjections makes a projection array of columns
 func getSpannerProjections(projectionExpression, table string, expressionAttributeNames map[string]string) []string {
 	if projectionExpression == "" {
@@ -80,7 +55,7 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 	return projectionCols
 }
 
-//Put writes an object to Spanner
+// Put writes an object to Spanner
 func Put(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}) (map[string]interface{}, error) {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
@@ -111,7 +86,7 @@ func Put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	return updateResp, nil
 }
 
-//Add checks the expression for converting the data
+// Add checks the expression for converting the data
 func Add(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, m, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}) (map[string]interface{}, error) {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
@@ -142,7 +117,7 @@ func Add(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 	return updateResp, nil
 }
 
-//Del checks the expression for saving the data
+// Del checks the expression for saving the data
 func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition) (map[string]interface{}, error) {
 	logger.LogDebug(expressionAttr)
 	tableConf, err := config.GetTableConf(tableName)
@@ -195,13 +170,16 @@ func BatchGet(ctx context.Context, tableName string, keyMapArray []map[string]in
 	return storage.GetStorageInstance().SpannerBatchGet(ctx, tableName, pValues, sValues, nil)
 }
 
-//BatchPut writes bulk records to Spanner
+// BatchPut writes bulk records to Spanner
 func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]interface{}) error {
 	if len(arrAttrMap) <= 0 {
 		return errors.New("ValidationException")
 	}
 
-	oldRes, _ := BatchGet(ctx, tableName, arrAttrMap)
+	oldRes, err := BatchGet(ctx, tableName, arrAttrMap)
+	if err != nil {
+		return err
+	}
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
 		return err
@@ -307,18 +285,10 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 		} else {
 			finalResp["LastEvaluatedKey"] = map[string]interface{}{"offset": originalLimit + offset, pKey: last[pKey], tPKey: last[tPKey]}
 		}
-		if query.StartFrom != nil {
-			finalResp["Items"] = resp[:length-1]
-		} else {
-			finalResp["Items"] = resp[:length-1]
-		}
+		finalResp["Items"] = resp[:length-1]
 	} else {
-		if query.StartFrom != nil {
-			if length-1 == 1 {
-				finalResp["Items"] = resp[0]
-			} else {
-				finalResp["Items"] = resp
-			}
+		if query.StartFrom != nil && length-1 == 1 {
+			finalResp["Items"] = resp
 		} else {
 			finalResp["Items"] = resp
 		}
@@ -362,14 +332,14 @@ func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]strin
 	var cols []string
 	if query.ProjectionExpression != "" {
 		cols = getSpannerProjections(query.ProjectionExpression, query.TableName, query.ExpressionAttributeNames)
-		insertpKey := true
+		insertPKey := true
 		for i := 0; i < len(cols); i++ {
 			if cols[i] == pKey {
-				insertpKey = false
+				insertPKey = false
 				break
 			}
 		}
-		if insertpKey {
+		if insertPKey {
 			cols = append(cols, pKey)
 		}
 		if sKey != "" {
@@ -432,46 +402,37 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 	}
 
 	if query.RangeExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		_, _, query.RangeExp = utils.ParseBeginsWith(query.RangeExp)
-		query.RangeExp = strings.ReplaceAll(query.RangeExp, "begins_with", "STARTS_WITH")
-
-		count := 1
-		for k, v := range query.RangeValMap {
-			if strings.Contains(query.RangeExp, k) {
-				str := "rangeExp" + strconv.Itoa(count)
-				query.RangeExp = strings.ReplaceAll(query.RangeExp, k, "@"+str)
-				params[str] = v
-				count++
-			}
-		}
-		whereClause += query.RangeExp
+		whereClause, query.RangeExp = createWhereClause(whereClause, query.RangeExp, "rangeExp", query.RangeValMap, params)
 	}
 
 	if query.FilterExp != "" {
-		if whereClause != "WHERE " {
-			whereClause += " AND "
-		}
-		_, _, query.FilterExp = utils.ParseBeginsWith(query.FilterExp)
-		query.FilterExp = strings.ReplaceAll(query.FilterExp, "begins_with", "STARTS_WITH")
-		count := 1
-		for k, v := range query.RangeValMap {
-			if strings.Contains(query.FilterExp, k) {
-				str := "filter" + strconv.Itoa(count)
-				query.FilterExp = strings.ReplaceAll(query.FilterExp, k, "@"+str)
-				params[str] = v
-				count++
-			}
-		}
-		whereClause += query.FilterExp
+		whereClause, query.FilterExp = createWhereClause(whereClause, query.FilterExp, "filterExp", query.RangeValMap, params)
 	}
 
 	if whereClause == "WHERE " {
 		whereClause = " "
 	}
 	return whereClause, params
+}
+
+func createWhereClause(whereClause string, expression string, queryVar string, RangeValueMap map[string]interface{}, params map[string]interface{}) (string, string) {
+	_, _, expression = utils.ParseBeginsWith(expression)
+	expression = strings.ReplaceAll(expression, "begins_with", "STARTS_WITH")
+
+	if whereClause != "WHERE " {
+		whereClause += " AND "
+	}
+	count := 1
+	for k, v := range RangeValueMap {
+		if strings.Contains(expression, k) {
+			str := queryVar + strconv.Itoa(count)
+			expression = strings.ReplaceAll(expression, k, "@"+str)
+			params[str] = v
+			count++
+		}
+	}
+	whereClause += expression
+	return whereClause, expression
 }
 
 func parseOffset(query *models.Query) (string, int64) {
@@ -535,7 +496,7 @@ func BatchGetWithProjection(ctx context.Context, tableName string, keyMapArray [
 	return storage.GetStorageInstance().SpannerBatchGet(ctx, tableName, pValues, sValues, projectionCols)
 }
 
-//Delete service
+// Delete service
 func Delete(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, condExpression string, attrMap map[string]interface{}, expr *models.UpdateExpressionCondition) error {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
@@ -549,7 +510,7 @@ func Delete(ctx context.Context, tableName string, primaryKeyMap map[string]inte
 	return storage.GetStorageInstance().SpannerDelete(ctx, tableName, primaryKeyMap, e, expr)
 }
 
-//BatchDelete service
+// BatchDelete service
 func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string]interface{}) error {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
@@ -577,13 +538,13 @@ func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string
 	return nil
 }
 
-//Scan service
+// Scan service
 func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}, error) {
 	query := models.Query{}
 	query.TableName = scanData.TableName
 	query.Limit = scanData.Limit
 	if query.Limit == 0 {
-		query.Limit = 5000
+		query.Limit = config.ConfigurationMap.QueryLimit
 	}
 	query.StartFrom = scanData.StartFrom
 	query.RangeValMap = scanData.ExpressionAttributeMap
@@ -607,7 +568,7 @@ func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[s
 	var result []map[string]interface{}
 	query := models.Query{}
 	query.TableName = tableName
-	var originalLimit int64 = 5000
+	var originalLimit int64 = config.ConfigurationMap.QueryLimit
 	query.Limit = originalLimit + 1
 	for {
 		query.StartFrom = startFrom

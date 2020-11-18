@@ -286,9 +286,9 @@ func Test_createSpannerQuery(t *testing.T) {
 			"first",
 			"second",
 			spanner.Statement{
-				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND fourth > @filter1 ORDER BY second DESC  LIMIT 5000 ",
+				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND fourth > @filterExp1 ORDER BY second DESC  LIMIT 5000 ",
 				Params: map[string]interface{}{
-					"filter1": float64(5),
+					"filterExp1": float64(5),
 				},
 			},
 			[]string{"first", "second"},
@@ -312,10 +312,10 @@ func Test_createSpannerQuery(t *testing.T) {
 			"first",
 			"second",
 			spanner.Statement{
-				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND first > @rangeExp1 AND fourth > @filter1 ORDER BY second DESC  LIMIT 5000 ",
+				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND first > @rangeExp1 AND fourth > @filterExp1 ORDER BY second DESC  LIMIT 5000 ",
 				Params: map[string]interface{}{
-					"filter1":   float64(5),
-					"rangeExp1": float64(4),
+					"filterExp1": float64(5),
+					"rangeExp1":  float64(4),
 				},
 			},
 			[]string{"first", "second"},
@@ -340,10 +340,10 @@ func Test_createSpannerQuery(t *testing.T) {
 			"first",
 			"second",
 			spanner.Statement{
-				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND first > @rangeExp1 AND fourth > @filter1 ORDER BY second DESC  LIMIT 100",
+				SQL: "SELECT testTable.`first`,testTable.`second` FROM testTable WHERE second is not null  AND first > @rangeExp1 AND fourth > @filterExp1 ORDER BY second DESC  LIMIT 100",
 				Params: map[string]interface{}{
-					"filter1":   float64(5),
-					"rangeExp1": float64(4),
+					"filterExp1": float64(5),
+					"rangeExp1":  float64(4),
 				},
 			},
 			[]string{"first", "second"},
@@ -608,9 +608,9 @@ func Test_parseSpannerCondition(t *testing.T) {
 			},
 			"first",
 			"second",
-			"WHERE second is not null  AND fourth = @filter1",
+			"WHERE second is not null  AND fourth = @filterExp1",
 			map[string]interface{}{
-				"filter1": float64(61),
+				"filterExp1": float64(61),
 			},
 		},
 		{
@@ -626,10 +626,10 @@ func Test_parseSpannerCondition(t *testing.T) {
 			},
 			"first",
 			"second",
-			"WHERE second is not null  AND fourth = @rangeExp1 AND fourth = @filter1",
+			"WHERE second is not null  AND fourth = @rangeExp1 AND fourth = @filterExp1",
 			map[string]interface{}{
-				"filter1":   float64(34),
-				"rangeExp1": float64(61),
+				"filterExp1": float64(34),
+				"rangeExp1":  float64(61),
 			},
 		},
 	}

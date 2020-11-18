@@ -70,12 +70,14 @@ Add the configuration in the given files:
 | ------ | ------ |
 | GoogleProjectID | Your Google Project ID |
 | SpannerDb | Your Spanner Database Name |
+| QueryLimit | Default limit for data|
 
 For example:
 ```
 {
-    "GoogleProjectID" : "first-project",
-    "SpannerDb"        : "test-db"
+    "GoogleProjectID"   : "first-project",
+    "SpannerDb"         : "test-db",
+    "QueryLimit"        : 5000
 }
 ```
 
