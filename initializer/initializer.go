@@ -24,11 +24,11 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 )
 
-// InitAll - this will initiliaze all the project object
-// Config, storage and all other global objects are initiliaze
+// InitAll - this will initialize all the project object
+// Config, storage and all other global objects are initialize
 func InitAll(box *rice.Box) error {
 	config.InitConfig(box)
-	storage.InitliazeDriver()
+	storage.InitializeDriver()
 	err := spanner.ParseDDL(true)
 	if err != nil {
 		return err

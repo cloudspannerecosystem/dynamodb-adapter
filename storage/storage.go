@@ -69,8 +69,8 @@ func initSpannerDriver(instance string, m map[string]*gjson.Result) *spanner.Cli
 	return Client
 }
 
-// InitliazeDriver - this will Initliaze databases object in global map
-func InitliazeDriver() {
+// InitializeDriver - this will Initialize databases object in global map
+func InitializeDriver() {
 
 	storage = new(Storage)
 	storage.spannerClient = make(map[string]*spanner.Client)
@@ -100,7 +100,7 @@ var once sync.Once
 func GetStorageInstance() *Storage {
 	once.Do(func() {
 		if storage == nil {
-			InitliazeDriver()
+			InitializeDriver()
 		}
 	})
 

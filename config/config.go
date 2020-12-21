@@ -32,6 +32,7 @@ import (
 type Configuration struct {
 	GoogleProjectID string
 	SpannerDb       string
+	QueryLimit      int64
 }
 
 var once sync.Once

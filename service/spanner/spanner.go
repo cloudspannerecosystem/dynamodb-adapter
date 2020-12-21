@@ -35,15 +35,14 @@ var specialCharRg = regexp.MustCompile("[" + ss + "]+")
 // global map object which is used to read and write data into spanner tables
 func ParseDDL(updateDB bool) error {
 
-	stmt1 := spanner.Statement{}
-	stmt1.SQL = "SELECT * FROM dynamodb_adapter_table_ddl"
-	ms, err := storage.GetStorageInstance().ExecuteSpannerQuery(context.Background(), "dynamodb_adapter_table_ddl", []string{"tableName", "column", "dataType", "originalColumn"}, false, stmt1)
+	stmt := spanner.Statement{}
+	stmt.SQL = "SELECT * FROM dynamodb_adapter_table_ddl"
+	ms, err := storage.GetStorageInstance().ExecuteSpannerQuery(context.Background(), "dynamodb_adapter_table_ddl", []string{"tableName", "column", "dataType", "originalColumn"}, false, stmt)
 	if err != nil {
 		return err
 	}
-	dataAvailable := len(ms) > 0
 
-	if dataAvailable {
+	if len(ms) > 0 {
 		for i := 0; i < len(ms); i++ {
 			tableName := ms[i]["tableName"].(string)
 			column := ms[i]["column"].(string)
@@ -68,28 +67,4 @@ func ParseDDL(updateDB bool) error {
 		}
 	}
 	return nil
-}
-
-func getColNameAndType(stmt string) (string, string) {
-	if stmt == "" {
-		return "", ""
-	}
-	stmt = strings.TrimSpace(stmt)
-	tokens := strings.Split(stmt, " ")
-	if len(tokens) < 2 {
-		return "", ""
-	}
-	tokens[0] = strings.Trim(tokens[0], "`")
-	return tokens[0], tokens[1]
-}
-
-func getTableName(stmt string) string {
-	if stmt == "" {
-		return ""
-	}
-	tokens := strings.Split(stmt, " ")
-	if len(tokens) < 3 {
-		return ""
-	}
-	return tokens[2]
 }

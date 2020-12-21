@@ -26,6 +26,7 @@ func TestLogError(t *testing.T) {
 	}
 	LogError(err)
 }
+
 func TestLogInfo(t *testing.T) {
 	info := struct {
 		Info string
@@ -44,7 +45,6 @@ func TestLogDebug(t *testing.T) {
 	LogDebug(info)
 }
 
-// above shows the Benchmark for using LogError in Project
 func BenchmarkLogError(b *testing.B) {
 	err := struct {
 		Error string
