@@ -33,38 +33,11 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 
 	"cloud.google.com/go/spanner"
-	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	"github.com/ahmetb/go-linq"
 	"google.golang.org/api/iterator"
-	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
 
 var base64Regexp = regexp.MustCompile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$")
-
-// ReadDatabaseSchema returns array of statments to create table
-func ReadDatabaseSchema() ([]string, error) {
-	ctx := context.Background()
-	cli, err := database.NewDatabaseAdminClient(ctx)
-	if err != nil {
-		return nil, errors.New(err.Error())
-	}
-	defer cli.Close()
-	m := map[string]struct{}{}
-	for _, v := range models.SpannerTableMap {
-		m[v] = struct{}{}
-	}
-	var statments []string
-	for k := range m {
-		req := &databasepb.GetDatabaseDdlRequest{}
-		req.Database = "projects/" + config.ConfigurationMap.GoogleProjectID + "/instances/" + k + "/databases/" + config.ConfigurationMap.SpannerDb
-		ddlResp, err := cli.GetDatabaseDdl(ctx, req)
-		if err != nil {
-			return nil, errors.New(err.Error())
-		}
-		statments = append(statments, ddlResp.GetStatements()...)
-	}
-	return statments, nil
-}
 
 // SpannerBatchGet - fetch all rows
 func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, sKeys []interface{}, projectionCols []string) ([]map[string]interface{}, error) {
