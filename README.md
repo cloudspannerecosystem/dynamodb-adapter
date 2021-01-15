@@ -181,6 +181,66 @@ rice embed-go
     export ACTIVE_ENV=PRODUCTION
     go run main.go
     ```
+* Run the **Integration Tests**
+    Running the integration test will require the files present in the [staging](./config-files/staging) folder to be configured as below:
+
+    config.staging.json
+    ```
+    {
+        "GoogleProjectID": "<your-project-id>",
+        "SpannerDb": "<any-db-name>",
+        "QueryLimit": 5000
+    }       
+    ```
+
+    spanner.staging.json
+    ```
+    {
+        "dynamodb_adapter_table_ddl": "<spanner-instance-name>",
+        "dynamodb_adapter_config_manager": "<spanner-instance-name>",
+        "department": "<spanner-instance-name>",
+        "employee": "<spanner-instance-name>"
+    }
+    ```
+
+    tables.staging.json
+    ```
+    {
+        "employee":{
+            "partitionKey":"emp_id",
+            "sortKey": "",
+            "attributeTypes": {
+                "emp_id": "N",
+                "first_name":"S",
+                "last_name":"S",
+                "address":"S",
+                "age":"N"
+            },
+            "indices": {}
+        },
+        "department":{
+            "partitionKey":"d_id",
+            "sortKey": "",
+            "attributeTypes": {
+                "d_id": "N",
+                "d_name":"S",
+                "d_specialization":"S"
+            },
+            "indices": {}
+        }
+    }
+    ```
+
+    The integration tests will also require the **spanner database instance** to be set in the environment variable.
+    ```
+    export SPANNER_DB_INSTANCE=spanner-instance
+    ```
+
+    Execute test
+    ```
+
+    go test integrationtest/api_test.go integrationtest/setup.go
+    ```
 
 ## Starting Process
 * Step 1: DynamoDB-adapter will load the configuration according the Environment Variable *ACTIVE_ENV*

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package integrationtest
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"testing"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -35,6 +38,9 @@ const (
 	apiURL  = "http://127.0.0.1:9050"
 	version = "v1"
 )
+
+// database name used in all the test cases
+var databaseName string
 
 var (
 	InitialSetupParams = models.BatchWriteItem{
@@ -1415,8 +1421,8 @@ var (
 	}
 )
 
-func initFunc() *gin.Engine {
-	box := rice.MustFindBox("config-files")
+func handlerInitFunc() *gin.Engine {
+	box := rice.MustFindBox("../config-files")
 
 	initErr := initializer.InitAll(box)
 	if initErr != nil {
@@ -1473,10 +1479,47 @@ func createStatusCheckPostTestCase(name, url string, httpStatus int, input inter
 	}
 }
 
-func TestInitialDataInsert(t *testing.T) {
+func init() {
+	instance, ok := os.LookupEnv("SPANNER_DB_INSTANCE")
+	if !ok {
+		log.Fatal("spanner instance name not found in environment variable")
+	}
+	box := rice.MustFindBox("../config-files")
+	ba, err := box.Bytes("staging/config-staging.json")
+	if err != nil {
+		log.Fatal("error reading staging config json: ", err.Error())
+	}
+	var m = make(map[string]interface{})
+	if err = json.Unmarshal(ba, &m); err != nil {
+		log.Fatal(err)
+	}
+
+	databaseName = fmt.Sprintf("projects/%s/instances/%s/databases/%s", m["GoogleProjectID"].(string), instance, m["SpannerDb"].(string))
+}
+
+func setup() error {
+	w := log.Writer()
+	if err := createDatabase(w, databaseName); err != nil {
+		return err
+	}
+	if err := updateDynamodbAdapterTableDDL(databaseName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cleanup() error {
+	w := log.Writer()
+	if err := deleteDatabase(w, databaseName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func testInitialDataInsert(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1485,11 +1528,11 @@ func TestInitialDataInsert(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestGetItemAPI(t *testing.T) {
+func testGetItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1543,10 +1586,10 @@ func TestGetItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestGetBatchAPI(t *testing.T) {
+func testGetBatchAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1590,10 +1633,10 @@ func TestGetBatchAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestQueryAPI(t *testing.T) {
+func testQueryAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1671,10 +1714,10 @@ func TestQueryAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestScanAPI(t *testing.T) {
+func testScanAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1734,10 +1777,10 @@ func TestScanAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestUpdateItemAPI(t *testing.T) {
+func testUpdateItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1754,11 +1797,11 @@ func TestUpdateItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestPutItemAPI(t *testing.T) {
+func testPutItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1775,11 +1818,11 @@ func TestPutItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestDeleteItemAPI(t *testing.T) {
+func testDeleteItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1795,10 +1838,10 @@ func TestDeleteItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
-func TestBatchWriteItemAPI(t *testing.T) {
+func testBatchWriteItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return initFunc()
+			return handlerInitFunc()
 		},
 	}
 	tests := []apitesting.APITestCase{
@@ -1814,4 +1857,44 @@ func TestBatchWriteItemAPI(t *testing.T) {
 		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
 	}
 	apitest.RunTests(t, tests)
+}
+
+func TestApi(t *testing.T) {
+	// this is done to maintain the order of the test cases
+	var testNames = []string{
+		"InitialDataInsert",
+		"GetItemAPI",
+		"GetBatchAPI",
+		"QueryAPI",
+		"ScanAPI",
+		"UpdateItemAPI",
+		"PutItemAPI",
+		"DeleteItemAPI",
+		"BatchWriteItemAPI",
+	}
+
+	var tests = map[string]func(t *testing.T){
+		"InitialDataInsert": testInitialDataInsert,
+		"GetItemAPI":        testGetItemAPI,
+		"GetBatchAPI":       testGetBatchAPI,
+		"QueryAPI":          testQueryAPI,
+		"ScanAPI":           testScanAPI,
+		"UpdateItemAPI":     testUpdateItemAPI,
+		"PutItemAPI":        testPutItemAPI,
+		"DeleteItemAPI":     testDeleteItemAPI,
+		"BatchWriteItemAPI": testBatchWriteItemAPI,
+	}
+
+	// setup the test database and tables
+	if err := setup(); err != nil {
+		t.Error("setup failed:", err.Error())
+	}
+	// run the tests
+	for _, testName := range testNames {
+		t.Run(testName, tests[testName])
+	}
+	// cleanup the test database
+	if err := cleanup(); err != nil {
+		t.Error("cleanup failed:", err.Error())
+	}
 }

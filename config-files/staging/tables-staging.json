@@ -1,20 +1,24 @@
 {
-    "tableName":{
-        "partitionKey":"primary key or Partition key",
-        "sortKey": "sorting key of dynamoDB adapter",
+    "employee":{
+        "partitionKey":"emp_id",
+        "sortKey": "",
         "attributeTypes": {
-			"ColInt64": "N",
-            "ColString": "S",
-            "ColBytes": "B",
-            "ColBool": "BOOL",
-            "ColDate": "S",
-            "ColTimestamp": "S"
+            "emp_id": "N",
+            "first_name":"S",
+            "last_name":"S",
+            "address":"S",
+            "age":"N"
         },
-        "indices": { 
-			"indexName1": {
-				"sortKey": "sort key for indexName1",
-				"partitionKey": "partition key for indexName1"
-			}
-		}
+        "indices": {}
+    },
+    "department":{
+        "partitionKey":"d_id",
+        "sortKey": "",
+        "attributeTypes": {
+            "d_id": "N",
+            "d_name":"S",
+            "d_specialization":"S"
+        },
+        "indices": {}
     }
 }

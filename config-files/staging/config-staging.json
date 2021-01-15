@@ -1,5 +1,5 @@
 {
-    "GoogleProjectID": "Your Google Project ID",
-    "SpannerDb": "Your Spanner Database Name",
+    "GoogleProjectID": "cc-dev-sandbox-20200619",
+    "SpannerDb": "test-db",
     "QueryLimit": 5000
 }
