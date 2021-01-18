@@ -1,6 +1,5 @@
 {
-    "dynamodb_adapter_table_ddl": "test-instance",
-    "dynamodb_adapter_config_manager": "test-instance",
-    "department": "test-instance",
-    "employee": "test-instance"
+    "dynamodb_adapter_table_ddl": "instance-ID of dynamodb_adapter_table_ddl table",
+    "dynamodb_adapter_config_manager": "instance-ID of dynamodb_adapter_config_manager table",
+    "tableName": "instance-ID of Table"
 }
