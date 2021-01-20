@@ -61,8 +61,8 @@ dynamodb_adapter_config_manager
 
 ### 2. Creation for configuration files
 There are two folders in [config-files](./config-files). 
-* **production** : It will be used to store the config files related to Production Environment.
-* **staging** : It will be used to store the config files related to Production Environment. 
+* **production** : It is used to store the config files related to the Production Environment.
+* **staging** : It is used to store the config files related to the Staging Environment. 
 
 Add the configuration in the given files:
 #### config.{env}.json 
@@ -184,7 +184,7 @@ rice embed-go
 * Run the **Integration Tests**
     Running the integration test will require the files present in the [staging](./config-files/staging) folder to be configured as below:
 
-    config.staging.json
+    config-staging.json
     ```
     {
         "GoogleProjectID": "<your-project-id>",
@@ -193,7 +193,7 @@ rice embed-go
     }       
     ```
 
-    spanner.staging.json
+    spanner-staging.json
     ```
     {
         "dynamodb_adapter_table_ddl": "<spanner-instance-name>",
@@ -203,7 +203,7 @@ rice embed-go
     }
     ```
 
-    tables.staging.json
+    tables-staging.json
     ```
     {
         "employee":{
