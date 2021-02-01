@@ -231,11 +231,6 @@ rice embed-go
     }
     ```
 
-    The integration tests will also require the **spanner database instance** to be set in the environment variable.
-    ```
-    export SPANNER_DB_INSTANCE=spanner-instance
-    ```
-
     Execute test
     ```
 

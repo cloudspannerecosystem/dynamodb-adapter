@@ -17,10 +17,10 @@ package integrationtest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"testing"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/api"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/apitesting"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/initializer"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	httpexpect "github.com/gavv/httpexpect/v2"
@@ -35,8 +36,9 @@ import (
 )
 
 const (
-	apiURL  = "http://127.0.0.1:9050"
-	version = "v1"
+	apiURL           = "http://127.0.0.1:9050"
+	version          = "v1"
+	expectedRowCount = 18
 )
 
 // database name used in all the test cases
@@ -1480,21 +1482,31 @@ func createStatusCheckPostTestCase(name, url string, httpStatus int, input inter
 }
 
 func init() {
-	instance, ok := os.LookupEnv("SPANNER_DB_INSTANCE")
-	if !ok {
-		log.Fatal("spanner instance name not found in environment variable")
-	}
 	box := rice.MustFindBox("../config-files")
+
+	// read the config variables
 	ba, err := box.Bytes("staging/config-staging.json")
 	if err != nil {
 		log.Fatal("error reading staging config json: ", err.Error())
 	}
-	var m = make(map[string]interface{})
+	var conf = &config.Configuration{}
+	if err = json.Unmarshal(ba, &conf); err != nil {
+		log.Fatal(err)
+	}
+
+	// read the spanner table configurations
+	var m = make(map[string]string)
+	ba, err = box.Bytes("staging/spanner-staging.json")
+	if err != nil {
+		log.Fatal("error reading spanner config json: ", err.Error())
+	}
 	if err = json.Unmarshal(ba, &m); err != nil {
 		log.Fatal(err)
 	}
 
-	databaseName = fmt.Sprintf("projects/%s/instances/%s/databases/%s", m["GoogleProjectID"].(string), instance, m["SpannerDb"].(string))
+	databaseName = fmt.Sprintf(
+		"projects/%s/instances/%s/databases/%s", conf.GoogleProjectID, m["dynamodb_adapter_table_ddl"], conf.SpannerDb,
+	)
 }
 
 func setup() error {
@@ -1504,6 +1516,13 @@ func setup() error {
 	}
 	if err := updateDynamodbAdapterTableDDL(databaseName); err != nil {
 		return err
+	}
+	count, err := verifySpannerSetup(databaseName)
+	if err != nil {
+		return err
+	}
+	if count != expectedRowCount {
+		return errors.New("setup error")
 	}
 	return nil
 }
@@ -1551,7 +1570,7 @@ func testGetItemAPI(t *testing.T) {
 			ExpHTTPStatus: http.StatusNotFound,
 		},
 		{
-			Name:    "Wrong Pramamerter(Bad Request)",
+			Name:    "Wrong Parameter(Bad Request)",
 			ReqType: "POST",
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
@@ -1565,7 +1584,7 @@ func testGetItemAPI(t *testing.T) {
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
 		{
-			Name:    "Wrong Pramamerter(Key value is not passed)",
+			Name:    "Wrong Parameter(Key value is not passed)",
 			ReqType: "POST",
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
@@ -1655,7 +1674,7 @@ func testQueryAPI(t *testing.T) {
 			ExpHTTPStatus: http.StatusNotFound,
 		},
 		{
-			Name:    "Wrong Pramamerter(Bad Request)",
+			Name:    "Wrong Parameter(Bad Request)",
 			ReqType: "POST",
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
@@ -1887,7 +1906,7 @@ func TestApi(t *testing.T) {
 
 	// setup the test database and tables
 	if err := setup(); err != nil {
-		t.Error("setup failed:", err.Error())
+		t.Fatal("setup failed:", err.Error())
 	}
 	// run the tests
 	for _, testName := range testNames {
