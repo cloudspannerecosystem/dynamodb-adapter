@@ -17,7 +17,6 @@ package integrationtest
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -45,6 +44,7 @@ const (
 var databaseName string
 
 var (
+	InitialSetupParamsName = "0: InitialSetup"
 	InitialSetupParams = models.BatchWriteItem{
 		RequestItems: map[string][]models.BatchWriteSubItems{
 			"employee": {
@@ -1509,44 +1509,6 @@ func init() {
 	)
 }
 
-func setup() error {
-	w := log.Writer()
-	if err := createDatabase(w, databaseName); err != nil {
-		return err
-	}
-	if err := updateDynamodbAdapterTableDDL(databaseName); err != nil {
-		return err
-	}
-	count, err := verifySpannerSetup(databaseName)
-	if err != nil {
-		return err
-	}
-	if count != expectedRowCount {
-		return errors.New("setup error")
-	}
-	return nil
-}
-
-func cleanup() error {
-	w := log.Writer()
-	if err := deleteDatabase(w, databaseName); err != nil {
-		return err
-	}
-	return nil
-}
-
-func testInitialDataInsert(t *testing.T) {
-	apitest := apitesting.APITest{
-		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
-			return handlerInitFunc()
-		},
-	}
-	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1/BatchWriteItem", http.StatusOK, InitialSetupParams),
-	}
-	apitest.RunTests(t, tests)
-}
-
 func testGetItemAPI(t *testing.T) {
 	apitest := apitesting.APITest{
 		// APIEndpointURL: apiURL + "/" + version,
@@ -1881,7 +1843,6 @@ func testBatchWriteItemAPI(t *testing.T) {
 func TestApi(t *testing.T) {
 	// this is done to maintain the order of the test cases
 	var testNames = []string{
-		"InitialDataInsert",
 		"GetItemAPI",
 		"GetBatchAPI",
 		"QueryAPI",
@@ -1893,7 +1854,6 @@ func TestApi(t *testing.T) {
 	}
 
 	var tests = map[string]func(t *testing.T){
-		"InitialDataInsert": testInitialDataInsert,
 		"GetItemAPI":        testGetItemAPI,
 		"GetBatchAPI":       testGetBatchAPI,
 		"QueryAPI":          testQueryAPI,
@@ -1904,16 +1864,8 @@ func TestApi(t *testing.T) {
 		"BatchWriteItemAPI": testBatchWriteItemAPI,
 	}
 
-	// setup the test database and tables
-	if err := setup(); err != nil {
-		t.Fatal("setup failed:", err.Error())
-	}
 	// run the tests
 	for _, testName := range testNames {
 		t.Run(testName, tests[testName])
-	}
-	// cleanup the test database
-	if err := cleanup(); err != nil {
-		t.Error("cleanup failed:", err.Error())
 	}
 }
