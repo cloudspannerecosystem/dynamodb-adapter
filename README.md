@@ -233,8 +233,9 @@ rice embed-go
 
     Execute test
     ```
-
-    go test integrationtest/api_test.go integrationtest/setup.go
+    go run integrationtest/setup.go setup
+    go test integrationtest/api_test.go
+    go run integrationtest/setup.go teardown
     ```
 
 ## Starting Process
