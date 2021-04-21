@@ -20,8 +20,52 @@ jobs:
           name: lint
           command: golint
       - run:
-          name: unit test
-          command: go test -v ./...
+          name: integration tests
+          command: |
+            cat <<EOF > $HOME/config-files/staging/config-staging.json
+            {
+                "GoogleProjectID": "$SPANNER_PROJECT",
+                "SpannerDb": "dynamodb-adapter-int",
+                "QueryLimit": 5000
+            }
+            EOF
+            cat <<EOF > $HOME/config-files/staging/spanner-staging.json
+            {
+                "dynamodb_adapter_table_ddl": "dynamodb-adapter",
+                "dynamodb_adapter_config_manager": "dynamodb-adapter",
+                "department": "dynamodb-adapter",
+                "employee": "dynamodb-adapter"
+            }
+            EOF
+            cat <<EOF > $HOME/config-files/staging/tables-staging.json
+            {
+                "employee":{
+                    "partitionKey":"emp_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "emp_id": "N",
+                        "first_name":"S",
+                        "last_name":"S",
+                        "address":"S",
+                        "age":"N"
+                    },
+                    "indices": {}
+                },
+                "department":{
+                    "partitionKey":"d_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "d_id": "N",
+                        "d_name":"S",
+                        "d_specialization":"S"
+                    },
+                    "indices": {}
+                }
+            }
+            EOF
+            go run integrationtest/setup.go setup
+            go test integrationtest/api_test.go
+            go run integrationtest/setup.go teardown
 
 workflows:
   version: 2
