@@ -1,0 +1,86 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build_and_test:
+    docker:
+      - image: circleci/golang:1.13
+
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+
+    steps:
+      - checkout
+      - run:
+          name: set credentials
+          command: |
+            echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
+            echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
+      - run:
+          name: lint
+          command: golint
+      - run:
+          name: integration tests
+          command: |
+            cat <<EOF > $HOME/config-files/staging/config-staging.json
+            {
+                "GoogleProjectID": "$SPANNER_PROJECT",
+                "SpannerDb": "dynamodb-adapter-int",
+                "QueryLimit": 5000
+            }
+            EOF
+            cat <<EOF > $HOME/config-files/staging/spanner-staging.json
+            {
+                "dynamodb_adapter_table_ddl": "dynamodb-adapter",
+                "dynamodb_adapter_config_manager": "dynamodb-adapter",
+                "department": "dynamodb-adapter",
+                "employee": "dynamodb-adapter"
+            }
+            EOF
+            cat <<EOF > $HOME/config-files/staging/tables-staging.json
+            {
+                "employee":{
+                    "partitionKey":"emp_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "emp_id": "N",
+                        "first_name":"S",
+                        "last_name":"S",
+                        "address":"S",
+                        "age":"N"
+                    },
+                    "indices": {}
+                },
+                "department":{
+                    "partitionKey":"d_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "d_id": "N",
+                        "d_name":"S",
+                        "d_specialization":"S"
+                    },
+                    "indices": {}
+                }
+            }
+            EOF
+            go run integrationtest/setup.go setup
+            go test integrationtest/api_test.go
+            go run integrationtest/setup.go teardown
+
+workflows:
+  version: 2
+
+  commit:  # Run on every commit.
+    jobs:
+      - build_and_test
+
+  nightly:  # Run every night.
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                  - master
+    jobs:
+      - build_and_test

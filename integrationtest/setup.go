@@ -12,24 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integrationtest
+package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
 
-// tableColumnMap - this contains the list of columns for the tables
+const (
+	expectedRowCount = 18
+)
 
 var (
 	colNameRg     = regexp.MustCompile("^[a-zA-Z0-9_]*$")
@@ -37,6 +43,65 @@ var (
 	ss            = strings.Join(chars, "")
 	specialCharRg = regexp.MustCompile("[" + ss + "]+")
 )
+
+func main() {
+	box := rice.MustFindBox("../config-files")
+
+	// read the config variables
+	ba, err := box.Bytes("staging/config-staging.json")
+	if err != nil {
+		log.Fatal("error reading staging config json: ", err.Error())
+	}
+	var conf = &config.Configuration{}
+	if err = json.Unmarshal(ba, &conf); err != nil {
+		log.Fatal(err)
+	}
+
+	// read the spanner table configurations
+	var m = make(map[string]string)
+	ba, err = box.Bytes("staging/spanner-staging.json")
+	if err != nil {
+		log.Fatal("error reading spanner config json: ", err.Error())
+	}
+	if err = json.Unmarshal(ba, &m); err != nil {
+		log.Fatal(err)
+	}
+
+	var databaseName = fmt.Sprintf(
+		"projects/%s/instances/%s/databases/%s", conf.GoogleProjectID, m["dynamodb_adapter_table_ddl"], conf.SpannerDb,
+	)
+
+	switch cmd := os.Args[1]; cmd {
+	case "setup":
+		w := log.Writer()
+		if err := createDatabase(w, databaseName); err != nil {
+			log.Fatal(err)
+		}
+
+		if err := updateDynamodbAdapterTableDDL(w, databaseName); err != nil {
+			log.Fatal(err)
+		}
+
+		count, err := verifySpannerSetup(databaseName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if count != expectedRowCount {
+			log.Fatalf("Rows found: %d, exepected %d\n", count, expectedRowCount)
+		}
+
+		if err := initData(w, databaseName); err != nil {
+			log.Fatal(err)
+		}
+	case "teardown":
+		w := log.Writer()
+		if err := deleteDatabase(w, databaseName); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatal("Unknown command: use 'setup', 'teardown'")
+	}
+}
 
 func createInstance(instance string) error {
 	return nil
@@ -112,7 +177,7 @@ func deleteDatabase(w io.Writer, db string) error {
 	return nil
 }
 
-func updateDynamodbAdapterTableDDL(db string) error {
+func updateDynamodbAdapterTableDDL(w io.Writer, db string) error {
 	stmt, err := readDatabaseSchema(db)
 	if err != nil {
 		return err
@@ -150,9 +215,11 @@ func updateDynamodbAdapterTableDDL(db string) error {
 					"originalColumn": originalColumn,
 				},
 			)
+			fmt.Fprintf(w, "[%s, %s, %s, %s]\n", currentTable, colName, colType, originalColumn)
 			mutations = append(mutations, mut)
 		}
 	}
+
 	return spannerBatchPut(context.Background(), db, mutations)
 }
 
@@ -225,4 +292,47 @@ func verifySpannerSetup(db string) (int, error) {
 		count++
 	}
 	return count, nil
+}
+
+func initData(w io.Writer, db string) error {
+	ctx := context.Background()
+	client, err := spanner.NewClient(ctx, db)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT employee (emp_id, address, age, first_name, last_name) VALUES
+						(1, 'Shamli', 10, 'Marc', 'Richards'),
+						(2, 'Ney York', 20, 'Catalina', 'Smith'),
+						(3, 'Pune', 30, 'Alice', 'Trentor'),
+						(4, 'Silicon Valley', 40, 'Lea', 'Martin'),
+						(5, 'London', 50, 'David', 'Lomond')`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
+
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT department (d_id, d_name, d_specialization) VALUES
+						(100, 'Engineering', 'CSE, ECE, Civil'),
+						(200, 'Arts', 'BA'),
+						(300, 'Culture', 'History')`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
+
+	return err
 }
