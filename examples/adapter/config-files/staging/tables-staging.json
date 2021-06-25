@@ -1,0 +1,47 @@
+{
+    "Customer_Order":{
+        "partitionKey":"PK",
+        "sortKey": "SK",
+        "attributeTypes": {
+            "comment": "S",
+            "customer_addresses": "S",
+            "customer_email": "S",
+            "customer_fname": "S",
+            "customer_id": "S",
+            "customer_lname": "S",
+            "item_discount": "N",
+            "item_price": "N",
+            "item_quantity": "N",
+            "item_status": "S",
+            "line_item_id": "S",
+            "number_of_items": "N",
+            "order_amount": "N",
+            "order_id": "S",
+            "order_status": "S",
+            "order_ts": "S",
+            "product_id": "S"
+        },
+        "indices": {}
+    },
+    "department":{
+        "partitionKey":"PK",
+        "sortKey": "SK",
+        "attributeTypes": {
+            "book_authors": "S",
+            "book_format": "S",
+            "book_publisher": "S",
+            "book_title": "S",
+            "isbn": "S",
+            "manufacturer": "S",
+            "model": "S",
+            "price": "N",
+            "product_category": "S",
+            "product_description": "S",
+            "product_id": "S",
+            "publication_date": "S",
+            "shipping_amount": "N",
+            "upc": "S"
+        },
+        "indices": {}
+    }
+}

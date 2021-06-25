@@ -1,0 +1,6 @@
+{
+    "dynamodb_adapter_table_ddl": "dynamodb-migration",
+    "dynamodb_adapter_config_manager": "dynamodb-migration",
+    "Customer_Order": "dynamodb-migration",
+    "Product": "dynamodb-migration"
+}
