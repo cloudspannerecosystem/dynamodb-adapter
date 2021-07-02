@@ -267,7 +267,7 @@ func printElectronic(e Electronic) {
 	fmt.Println("\tShipping: ", e.ShippingAmount)
 }
 
-var region = "us-east-2"
+var region = os.Getenv("AWS_REGION")
 
 func createSession(url string) *session.Session {
 	if url == "" {
