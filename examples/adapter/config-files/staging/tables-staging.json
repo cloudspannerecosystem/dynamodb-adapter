@@ -21,9 +21,14 @@
             "order_ts": "S",
             "product_id": "S"
         },
-        "indices": {}
+        "indices": {
+            "By_Customer_And_Order_TS": {
+                "partitionKey": "customer_id",
+                "sortKey": "order_ts"
+            }
+        }
     },
-    "department":{
+    "Product":{
         "partitionKey":"PK",
         "sortKey": "SK",
         "attributeTypes": {
@@ -42,6 +47,11 @@
             "shipping_amount": "N",
             "upc": "S"
         },
-        "indices": {}
+        "indices": {
+            "By_Product_Category": {
+                "partitionKey": "product_category",
+                "sortKey": "product_id"
+            }
+        }
     }
 }
