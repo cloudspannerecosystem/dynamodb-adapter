@@ -29,20 +29,25 @@ import (
 )
 
 func main() {
-	var sess *session.Session
+	var sessGetItem *session.Session
+	var sessQuery *session.Session
 
 	switch cmd := os.Args[1]; cmd {
 	case "spanner":
-		sess = createAdapterSession()
+		sessGetItem = createAdapterSession("GetItem")
+		sessQuery = createAdapterSession("Query")
 	case "dynamo":
-		sess = createSession("")
+		sessGetItem = createSession("")
+		sessQuery = sessGetItem
 	}
 
-	svc := dynamodb.New(sess)
+	svc := dynamodb.New(sessGetItem)
 
 	fmt.Println("Dynamo GetItem:")
 	getCustomerContactDetails(svc)
 	
+	svc = dynamodb.New(sessQuery)
+
 	fmt.Println("\nDynamo PK/SK Query:")
 	getCustomerOrderDetails(svc)
 	
@@ -277,10 +282,11 @@ func createSession(url string) *session.Session {
 	return session.Must(session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
 			Endpoint: aws.String(url),
+			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),
 		},
 	}))
 }
 
-func createAdapterSession() *session.Session {
-	return createSession("http://localhost:9050/v1/GetItem")
+func createAdapterSession(operation string) *session.Session {
+	return createSession("http://localhost:9050/v1/" + operation)
 }
