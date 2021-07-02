@@ -26,7 +26,7 @@ type Customer struct {
 }
 
 type Order struct {
-	Id            int64   `dynamodbav:"order_id"`
+	Id            string  `dynamodbav:"order_id"`
 	Status        string  `dynamodbav:"order_status"`
 	Ts            string  `dynamodbav:"order_ts"`
 	Amount        float32 `dynamodbav:"order_amount"`
@@ -35,7 +35,7 @@ type Order struct {
 
 type LineItem struct {
 	Id        string  `dynamodbav:"line_item_id"`
-	ProductId int64   `dynamodbav:"product_id"`
+	ProductId string  `dynamodbav:"product_id"`
 	Price     float32 `dynamodbav:"item_price"`
 	Discount  float32 `dynamodbav:"item_discount"`
 	Status    string  `dynamodbav:"item_status"`
