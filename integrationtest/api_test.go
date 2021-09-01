@@ -1485,7 +1485,7 @@ func init() {
 	box := rice.MustFindBox("../config-files")
 
 	// read the config variables
-	ba, err := box.Bytes("staging/config-staging.json")
+	ba, err := box.Bytes("staging/config.json")
 	if err != nil {
 		log.Fatal("error reading staging config json: ", err.Error())
 	}
@@ -1496,7 +1496,7 @@ func init() {
 
 	// read the spanner table configurations
 	var m = make(map[string]string)
-	ba, err = box.Bytes("staging/spanner-staging.json")
+	ba, err = box.Bytes("staging/spanner.json")
 	if err != nil {
 		log.Fatal("error reading spanner config json: ", err.Error())
 	}
