@@ -22,14 +22,14 @@ jobs:
       - run:
           name: integration tests
           command: |
-            cat <<EOF > $HOME/config-files/staging/config-staging.json
+            cat <<EOF > $HOME/config-files/staging/config.json
             {
                 "GoogleProjectID": "$SPANNER_PROJECT",
                 "SpannerDb": "dynamodb-adapter-int",
                 "QueryLimit": 5000
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/spanner-staging.json
+            cat <<EOF > $HOME/config-files/staging/spanner.json
             {
                 "dynamodb_adapter_table_ddl": "dynamodb-adapter",
                 "dynamodb_adapter_config_manager": "dynamodb-adapter",
@@ -37,7 +37,7 @@ jobs:
                 "employee": "dynamodb-adapter"
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/tables-staging.json
+            cat <<EOF > $HOME/config-files/staging/tables.json
             {
                 "employee":{
                     "partitionKey":"emp_id",

@@ -15,10 +15,6 @@ This project requires two tables to store metadata and configuration for the pro
 * dynamodb_adapter_table_ddl (for meta data of all tables)
 * dynamodb_adapter_config_manager (for pubsub configuration)
 
-It supports two mode  - 
-* Production
-* Staging
-
 ## Usage
 Follow the given steps to setup the project and generate the apis.
 
@@ -60,12 +56,14 @@ dynamodb_adapter_config_manager
 
 
 ### 2. Creation for configuration files
-There are two folders in [config-files](./config-files). 
-* **production** : It is used to store the config files related to the Production Environment.
-* **staging** : It is used to store the config files related to the Staging Environment. 
+By default there are two folders in [config-files](./config-files). This is configurable by using
+the enviroment variable `ACTIVE_ENV`. If `ACTIVE_ENV` is not set the default environtment is **staging**.
+
+* **production** : Should be used to store the config files related to the Production environment.
+* **staging** : Should be used to store the config files related to the Staging environment.
 
 Add the configuration in the given files:
-#### config.{env}.json 
+#### config-files/{env}/config.json 
 | Key | Used For |
 | ------ | ------ |
 | GoogleProjectID | Your Google Project ID |
@@ -81,7 +79,7 @@ For example:
 }
 ```
 
-#### spanner.{env}.json
+#### config-files/{env}/spanner.json
 It is a mapping file for table name with instance id. It will be helpful to query data on particular instance.
 The instance-id of all tables should be stored in this file in the following format:
 "TableName" : "instance-id"
@@ -99,7 +97,7 @@ For example:
 }
 ```
 
-#### tables.{env}.json
+#### config-files/{env}/tables.json
 All table's primary key, columns, index information will be stored here.
 It will be required for query and update both type of operation to get primary key, sort or any other index present.
 It helps to query data on primary key or sort key.
@@ -142,8 +140,11 @@ For example:
 }
 ```
 
+### 3. (OPTIONAL) Creation of rice-box.go file
 
-### 3. Creation of rice-box.go file
+The rice-box package can be used to increase preformance by converting the configuration files into Golang source code
+and there by compiling them into the binary.  If they are not found in the binary rice-box will look to the disk for
+the configuration files.
 
 ##### install rice package
 This package is required to load the config files. This is required in the first step of the running dynamoDB-adapter.
@@ -184,7 +185,7 @@ rice embed-go
 * Run the **Integration Tests**
     Running the integration test will require the files present in the [staging](./config-files/staging) folder to be configured as below:
 
-    config-staging.json
+    config-files/staging/config.json
     ```
     {
         "GoogleProjectID": "<your-project-id>",
@@ -193,7 +194,7 @@ rice embed-go
     }       
     ```
 
-    spanner-staging.json
+    config-files/staging/spanner.json
     ```
     {
         "dynamodb_adapter_table_ddl": "<spanner-instance-name>",
@@ -203,7 +204,7 @@ rice embed-go
     }
     ```
 
-    tables-staging.json
+    config-files/staging/tables.json
     ```
     {
         "employee":{
