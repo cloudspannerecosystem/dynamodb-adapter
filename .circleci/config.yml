@@ -93,7 +93,7 @@ workflows:
       - build
       - lint
       - unit_test
-      - integration_test
+      - integration_test:
           filters:
             branches:
               only:
