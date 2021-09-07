@@ -30,7 +30,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-var serviceName string = "DYNAMODB-ADAPTER"
+var serviceName = "DYNAMODB-ADAPTER"
 
 var hostName, _ = os.Hostname()
 
