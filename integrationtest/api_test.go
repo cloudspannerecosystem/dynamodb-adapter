@@ -37,7 +37,6 @@ import (
 const (
 	apiURL           = "http://127.0.0.1:9050"
 	version          = "v1"
-	expectedRowCount = 18
 )
 
 // database name used in all the test cases
@@ -1841,6 +1840,10 @@ func testBatchWriteItemAPI(t *testing.T) {
 }
 
 func TestApi(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
 	// this is done to maintain the order of the test cases
 	var testNames = []string{
 		"GetItemAPI",
