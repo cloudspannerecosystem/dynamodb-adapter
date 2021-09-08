@@ -33,23 +33,35 @@ import (
 )
 
 // InitDBAPI - routes for apis
-func InitDBAPI(g *gin.RouterGroup) {
+func InitDBAPI(r *gin.Engine) {
+	r.POST("/v1", RouteRequest)
+}
 
-	r := g.Group("/")
-	r.POST("/GetItem", GetItemMeta)
-	r.POST("/BatchGetItem", BatchGetItem)
+// RouteRequest - parse X-Amz-Target and call appropiate handler
+func RouteRequest(c *gin.Context) {
+	var amzTarget = c.Request.Header.Get("X-Amz-Target")
 
-	r.POST("/Query", QueryTable)
-
-	r.POST("/PutItem", UpdateMeta)
-	r.POST("/DeleteItem", DeleteItem)
-
-	r.POST("/Scan", Scan)
-
-	r.POST("/UpdateItem", Update)
-
-	r.POST("/BatchWriteItem", BatchWriteItem)
-
+	switch strings.Split(amzTarget, ".")[1] {
+	case "BatchGetItem":
+		BatchGetItem(c)
+	case "BatchWriteItem":
+		BatchWriteItem(c)
+	case "DeleteItem":
+		DeleteItem(c)
+	case "GetItem":
+		GetItemMeta(c)
+	case "PutItem":
+		UpdateMeta(c)
+	case "Query":
+		QueryTable(c)
+	case "Scan":
+		Scan(c)
+	case "UpdateItem":
+		Update(c)
+	default:
+		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of" + amzTarget).
+			HTTPResponse("X-Amz-Target Header not supported"))
+	}
 }
 
 func enrichSpan(c *gin.Context, span opentracing.Span, query models.Query) opentracing.Span {
