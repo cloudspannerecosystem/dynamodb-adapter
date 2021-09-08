@@ -52,12 +52,6 @@ func InitDBAPI(g *gin.RouterGroup) {
 
 }
 
-func enrichSpan(c *gin.Context, span opentracing.Span, query models.Query) opentracing.Span {
-	span = span.SetTag("table", query.TableName)
-	span = span.SetTag("index", query.IndexName)
-	return span
-}
-
 func addParentSpanID(c *gin.Context, span opentracing.Span) opentracing.Span {
 	parentSpanID := c.Request.Header.Get("X-B3-Spanid")
 	traceID := c.Request.Header.Get("X-B3-Traceid")

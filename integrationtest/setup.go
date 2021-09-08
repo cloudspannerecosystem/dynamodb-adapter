@@ -103,10 +103,6 @@ func main() {
 	}
 }
 
-func createInstance(instance string) error {
-	return nil
-}
-
 func createDatabase(w io.Writer, db string) error {
 	matches := regexp.MustCompile("^(.*)/databases/(.*)$").FindStringSubmatch(db)
 	if matches == nil || len(matches) != 3 {
@@ -248,11 +244,6 @@ func getColNameAndType(stmt string) (string, string) {
 	tokens := strings.Split(stmt, " ")
 	tokens[0] = strings.Trim(tokens[0], "`")
 	return tokens[0], tokens[1]
-}
-
-func changeTableNameForSP(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
 }
 
 // spannerBatchPut - this insert or update data in batch

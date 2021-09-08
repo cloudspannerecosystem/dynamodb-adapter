@@ -42,7 +42,6 @@ func init() {
 var percentMap = make(map[string]int64)
 var counterTableIndex = make(map[string]int)
 var counters []int64
-var max int64 = 100
 var ctx = context.Background()
 
 var c *cron.Cron
