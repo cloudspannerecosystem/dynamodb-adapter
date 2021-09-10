@@ -35,85 +35,60 @@ type Configuration struct {
 	QueryLimit      int64
 }
 
-var once sync.Once
-
 // ConfigurationMap pointer
 var ConfigurationMap *Configuration
+
+// DbConfigMap dynamo to Spanner
+var DbConfigMap map[string]models.TableConfig
+
+var once sync.Once
 
 func init() {
 	ConfigurationMap = new(Configuration)
 }
 
-// DbConfigMap dynamo to Spanner
-var DbConfigMap map[string]models.TableConfig
-
-// InitConfig loads ConfigurationMap and DbConfigMap in memory based on ACTIVE_ENV
+// InitConfig loads ConfigurationMap and DbConfigMap in memory based on
+// ACTIVE_ENV. If ACTIVE_ENV is not set or and empty string the environment
+// is defaulted to staging.
+// 
 // These config files are read from rice-box
 func InitConfig(box *rice.Box) {
 	once.Do(func() {
-		env := os.Getenv("ACTIVE_ENV")
-		ConfigurationMap = new(Configuration)
-		if env == "PRODUCTION" {
-			ba, err := box.Bytes("production/tables-production.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			err = json.Unmarshal(ba, &DbConfigMap)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			ba, err = box.Bytes("production/config-production.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			err = json.Unmarshal(ba, ConfigurationMap)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			ba, err = box.Bytes("production/spanner-production.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			tmp := make(map[string]string)
-			err = json.Unmarshal(ba, &tmp)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			for k, v := range tmp {
-				models.SpannerTableMap[changeTableNameForSP(k)] = v
-			}
-		} else {
-			ba, err := box.Bytes("staging/tables-staging.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			err = json.Unmarshal(ba, &DbConfigMap)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			ba, err = box.Bytes("staging/config-staging.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			err = json.Unmarshal(ba, ConfigurationMap)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			ba, err = box.Bytes("staging/spanner-staging.json")
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			tmp := make(map[string]string)
-			err = json.Unmarshal(ba, &tmp)
-			if err != nil {
-				logger.LogFatal(err)
-			}
-			for k, v := range tmp {
-				models.SpannerTableMap[changeTableNameForSP(k)] = v
-			}
-
+		env := strings.ToLower(os.Getenv("ACTIVE_ENV"))
+		if env == "" {
+			env = "staging"
 		}
 
+		ConfigurationMap = new(Configuration)
+
+		ba, err := box.Bytes(env + "/tables.json")
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		err = json.Unmarshal(ba, &DbConfigMap)
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		ba, err = box.Bytes(env + "/config.json")
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		err = json.Unmarshal(ba, ConfigurationMap)
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		ba, err = box.Bytes(env + "/spanner.json")
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		tmp := make(map[string]string)
+		err = json.Unmarshal(ba, &tmp)
+		if err != nil {
+			logger.LogFatal(err)
+		}
+		for k, v := range tmp {
+			models.SpannerTableMap[changeTableNameForSpanner(k)] = v
+		}
 	})
 }
 
@@ -135,8 +110,9 @@ func GetTableConf(tableName string) (models.TableConfig, error) {
 	return models.TableConfig{}, errors.New("ResourceNotFoundException", tableName)
 }
 
-// changeTableNameForSP - ReplaceAll the hyphens (-) with underscore for giver string
-func changeTableNameForSP(tableName string) string {
+// changeTableNameForSpanner - ReplaceAll the hyphens (-) with underscore for given table name
+// https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions
+func changeTableNameForSpanner(tableName string) string {
 	tableName = strings.ReplaceAll(tableName, "-", "_")
 	return tableName
 }
