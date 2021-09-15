@@ -42,6 +42,15 @@ Migrate the data:
 harbourbridge -driver=dynamodb -instance=dynamodb-migration -dbname=ecommerce
 ```
 
+Create the indexes:
+```
+CREATE INDEX By_customer
+  ON Customer_Order (customer_id, order_ts ASC);
+
+CREATE INDEX By_Product_Category
+  ON Product (product_category, product_id ASC);
+```
+
 ## Initialize the adapter configuration
 
 The DynamoDB adapter uses tables in Cloud Spanner to store some configuration
@@ -54,7 +63,8 @@ of the config-files needed for the ecommerce sample.
 Set your project id in the sample configuration files:
 
 ```shell
-sed -i "s/YOUR_PROJECT_HERE/[your project id]/g" adapter/config-files/staging/config-staging.json
+cd examples
+sed -i "s/YOUR_PROJECT_HERE/[your project id]/g" adapter/config-files/staging/config.json
 ```
 
 Initialize the adapter's configuration tables:
@@ -76,14 +86,14 @@ cp dyanmodb-adapter examples/adpater/
 ## Start the adapter
 
 ```shell
+cd examples/adapter
 ./dynamodb-adapter
 ```
 
 Should see output similar to:
 
 ```shell
-{"L":"INFO","T":"2021-06-25T10:19:25.245-0600","C":"services/config-control.go:64","M":"[Fetching starts]"}
-
+2021-09-14T23:16:45.994-0600	DEBUG	logger/logger.go:66	[Fetching starts]
 [GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
 
 [GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
@@ -104,15 +114,9 @@ Should see output similar to:
 [GIN-debug] GET    /debug/pprof/threadcreate --> github.com/gin-contrib/pprof.pprofHandler.func1 (3 handlers)
 [GIN-debug] GET    /doc/*any                 --> github.com/swaggo/gin-swagger.CustomWrapHandler.func1 (3 handlers)
 [GIN-debug] GET    /                         --> main.main.func1 (3 handlers)
-[GIN-debug] POST   /v1/GetItem               --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.GetItemMeta (3 handlers)
-[GIN-debug] POST   /v1/BatchGetItem          --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.BatchGetItem (3 handlers)
-[GIN-debug] POST   /v1/Query                 --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.QueryTable (3 handlers)
-[GIN-debug] POST   /v1/PutItem               --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.UpdateMeta (3 handlers)
-[GIN-debug] POST   /v1/DeleteItem            --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.DeleteItem (3 handlers)
-[GIN-debug] POST   /v1/Scan                  --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.Scan (3 handlers)
-[GIN-debug] POST   /v1/UpdateItem            --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.Update (3 handlers)
-[GIN-debug] POST   /v1/BatchWriteItem        --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.BatchWriteItem (3 handlers)
+[GIN-debug] POST   /v1                       --> github.com/cloudspannerecosystem/dynamodb-adapter/api/v1.RouteRequest (3 handlers)
 [GIN-debug] Listening and serving HTTP on :9050
+
 ```
 
 ## Run the sample application

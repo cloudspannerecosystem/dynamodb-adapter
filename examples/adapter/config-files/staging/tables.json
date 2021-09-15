@@ -22,7 +22,7 @@
             "product_id": "S"
         },
         "indices": {
-            "By_Customer_And_Order_TS": {
+            "By_customer": {
                 "partitionKey": "customer_id",
                 "sortKey": "order_ts"
             }
