@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	expectedRowCount = 18
+	expectedRowCount = 45
 )
 
 var (
@@ -64,7 +64,7 @@ func main() {
 	box := rice.MustFindBox("./config-files")
 
 	// read the config variables
-	ba, err := box.Bytes("staging/config-staging.json")
+	ba, err := box.Bytes("staging/config.json")
 	if err != nil {
 		log.Fatal("error reading staging config json: ", err.Error())
 	}
@@ -75,7 +75,7 @@ func main() {
 
 	// read the spanner table configurations
 	var m = make(map[string]string)
-	ba, err = box.Bytes("staging/spanner-staging.json")
+	ba, err = box.Bytes("staging/spanner.json")
 	if err != nil {
 		log.Fatal("error reading spanner config json: ", err.Error())
 	}
@@ -106,7 +106,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Fprintf(w, "Found %d rows", count)
+		fmt.Fprintf(w, "Found %d rows\n", count)
 		if count != expectedRowCount {
 			log.Fatalf("Rows found: %d, exepected %d\n", count, expectedRowCount)
 		}
