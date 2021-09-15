@@ -198,6 +198,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 	query = ReplaceHashRangeExpr(query)
 	res, hash, err := services.QueryAttributes(c.Request.Context(), query)
 	if err == nil {
+		finalResult := make(map[string]interface{})
 		changedOutput := ChangeQueryResponseColumn(query.TableName, res)
 		if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 			changedOutput["Items"], err = ChangeMaptoDynamoMap(changedOutput["Items"])
@@ -205,14 +206,19 @@ func queryResponse(query models.Query, c *gin.Context) {
 				c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
 			}
 		}
+		if _, ok := changedOutput["Items"].(map[string]interface{})["L"]; ok {
+			finalResult["Count"] = changedOutput["Count"]
+			finalResult["Items"] = changedOutput["Items"].(map[string]interface{})["L"]
+		}
+
 		if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
-			changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+			finalResult["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
 			if err != nil {
 				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 			}
 		}
 
-		c.JSON(http.StatusOK, changedOutput)
+		c.JSON(http.StatusOK, finalResult)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
