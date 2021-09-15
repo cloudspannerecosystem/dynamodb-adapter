@@ -245,6 +245,23 @@ func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (m
 			if !s.IsNull() {
 				singleRow[k] = s.Float64
 			}
+		case "NUMERIC":
+			var s spanner.NullNumeric
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+			}
+			if !s.IsNull() {
+				if s.Numeric.IsInt() {
+					tmp, _ := s.Numeric.Float64()
+					singleRow[k] = int64(tmp)
+				} else {
+					singleRow[k], _ = s.Numeric.Float64()
+				}
+			}
 		case "BOOL":
 			var s spanner.NullBool
 			err := r.Column(i, &s)
