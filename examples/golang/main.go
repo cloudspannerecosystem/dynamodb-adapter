@@ -29,28 +29,23 @@ import (
 )
 
 func main() {
-	var sessGetItem *session.Session
-	var sessQuery *session.Session
+	var sess *session.Session
 
 	switch cmd := os.Args[1]; cmd {
 	case "spanner":
-		sessGetItem = createAdapterSession("GetItem")
-		sessQuery = createAdapterSession("Query")
+		sess = createAdapterSession()
 	case "dynamo":
-		sessGetItem = createSession("")
-		sessQuery = sessGetItem
+		sess = createSession("")
 	}
 
-	svc := dynamodb.New(sessGetItem)
+	svc := dynamodb.New(sess)
 
 	fmt.Println("Dynamo GetItem:")
 	getCustomerContactDetails(svc)
-	
-	svc = dynamodb.New(sessQuery)
 
 	fmt.Println("\nDynamo PK/SK Query:")
 	getCustomerOrderDetails(svc)
-	
+
 	fmt.Println("\nDynamo Index Query:")
 	getCustomerMostRecentOrder(svc)
 
@@ -80,7 +75,7 @@ func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
 	if result.Item == nil {
 		fmt.Printf("No record found")
 	}
-	
+
 	customer := Customer{}
 	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
 	if err != nil {
@@ -92,7 +87,7 @@ func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
 
 func getCustomerOrderDetails(svc *dynamodb.DynamoDB) {
 	result, err := svc.Query(&dynamodb.QueryInput{
-		TableName: aws.String("Customer_Order"),
+		TableName:              aws.String("Customer_Order"),
 		KeyConditionExpression: aws.String("PK = :customer_id and SK = :order_id"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":customer_id": {
@@ -110,7 +105,7 @@ func getCustomerOrderDetails(svc *dynamodb.DynamoDB) {
 	if result.Items == nil {
 		fmt.Printf("No record found")
 	}
-	
+
 	customer := Customer{}
 	err = dynamodbattribute.UnmarshalMap(result.Items[0], &customer)
 	if err != nil {
@@ -129,8 +124,8 @@ func getCustomerOrderDetails(svc *dynamodb.DynamoDB) {
 
 func getCustomerMostRecentOrder(svc *dynamodb.DynamoDB) {
 	result, err := svc.Query(&dynamodb.QueryInput{
-		TableName: aws.String("Customer_Order"),
-		IndexName: aws.String("By_Customer_And_Order_TS"),
+		TableName:              aws.String("Customer_Order"),
+		IndexName:              aws.String("By_customer"),
 		KeyConditionExpression: aws.String("customer_id = :customer_id AND order_ts BETWEEN :order_ts_start AND :order_ts_end"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":customer_id": {
@@ -151,7 +146,7 @@ func getCustomerMostRecentOrder(svc *dynamodb.DynamoDB) {
 	if result.Items == nil {
 		fmt.Printf("No record found")
 	}
-	
+
 	customer := Customer{}
 	err = dynamodbattribute.UnmarshalMap(result.Items[0], &customer)
 	if err != nil {
@@ -172,7 +167,7 @@ func getCustomerMostRecentOrder(svc *dynamodb.DynamoDB) {
 
 func getOrderLineItemDetails(svc *dynamodb.DynamoDB) {
 	result, err := svc.Query(&dynamodb.QueryInput{
-		TableName: aws.String("Customer_Order"),
+		TableName:              aws.String("Customer_Order"),
 		KeyConditionExpression: aws.String("PK = :order_id"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":order_id": {
@@ -207,8 +202,8 @@ func getOrderLineItemDetails(svc *dynamodb.DynamoDB) {
 
 func getProductsByCategory(svc *dynamodb.DynamoDB) {
 	result, err := svc.Query(&dynamodb.QueryInput{
-		TableName: aws.String("Product"),
-		IndexName: aws.String("By_Product_Category"),
+		TableName:              aws.String("Product"),
+		IndexName:              aws.String("By_Product_Category"),
 		KeyConditionExpression: aws.String("product_category = :product_category"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":product_category": {
@@ -282,11 +277,10 @@ func createSession(url string) *session.Session {
 	return session.Must(session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
 			Endpoint: aws.String(url),
-			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),
 		},
 	}))
 }
 
-func createAdapterSession(operation string) *session.Session {
-	return createSession("http://localhost:9050/v1/" + operation)
+func createAdapterSession() *session.Session {
+	return createSession("http://localhost:9050/v1")
 }
