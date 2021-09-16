@@ -33,23 +33,35 @@ import (
 )
 
 // InitDBAPI - routes for apis
-func InitDBAPI(g *gin.RouterGroup) {
+func InitDBAPI(r *gin.Engine) {
+	r.POST("/v1", RouteRequest)
+}
 
-	r := g.Group("/")
-	r.POST("/GetItem", GetItemMeta)
-	r.POST("/BatchGetItem", BatchGetItem)
+// RouteRequest - parse X-Amz-Target and call appropiate handler
+func RouteRequest(c *gin.Context) {
+	var amzTarget = c.Request.Header.Get("X-Amz-Target")
 
-	r.POST("/Query", QueryTable)
-
-	r.POST("/PutItem", UpdateMeta)
-	r.POST("/DeleteItem", DeleteItem)
-
-	r.POST("/Scan", Scan)
-
-	r.POST("/UpdateItem", Update)
-
-	r.POST("/BatchWriteItem", BatchWriteItem)
-
+	switch strings.Split(amzTarget, ".")[1] {
+	case "BatchGetItem":
+		BatchGetItem(c)
+	case "BatchWriteItem":
+		BatchWriteItem(c)
+	case "DeleteItem":
+		DeleteItem(c)
+	case "GetItem":
+		GetItemMeta(c)
+	case "PutItem":
+		UpdateMeta(c)
+	case "Query":
+		QueryTable(c)
+	case "Scan":
+		Scan(c)
+	case "UpdateItem":
+		Update(c)
+	default:
+		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of" + amzTarget).
+			HTTPResponse("X-Amz-Target Header not supported"))
+	}
 }
 
 func addParentSpanID(c *gin.Context, span opentracing.Span) opentracing.Span {
@@ -180,6 +192,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 	query = ReplaceHashRangeExpr(query)
 	res, hash, err := services.QueryAttributes(c.Request.Context(), query)
 	if err == nil {
+		finalResult := make(map[string]interface{})
 		changedOutput := ChangeQueryResponseColumn(query.TableName, res)
 		if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 			changedOutput["Items"], err = ChangeMaptoDynamoMap(changedOutput["Items"])
@@ -187,14 +200,19 @@ func queryResponse(query models.Query, c *gin.Context) {
 				c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
 			}
 		}
+		if _, ok := changedOutput["Items"].(map[string]interface{})["L"]; ok {
+			finalResult["Count"] = changedOutput["Count"]
+			finalResult["Items"] = changedOutput["Items"].(map[string]interface{})["L"]
+		}
+
 		if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
-			changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+			finalResult["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
 			if err != nil {
 				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 			}
 		}
 
-		c.JSON(http.StatusOK, changedOutput)
+		c.JSON(http.StatusOK, finalResult)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
 	}

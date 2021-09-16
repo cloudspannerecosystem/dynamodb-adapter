@@ -1326,13 +1326,14 @@ func handlerInitFunc() *gin.Engine {
 	return r
 }
 
-func createPostTestCase(name, url, outputString string, input interface{}) apitesting.APITestCase {
+func createPostTestCase(name, url, dynamoAction, outputString string, input interface{}) apitesting.APITestCase {
 	return apitesting.APITestCase{
 		Name:    name,
 		ReqType: "POST",
 		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 			return map[string]string{
 				"Content-Type": "application/json",
+				"X-Amz-Target": "DynamoDB_20120810." + dynamoAction,
 			}
 		},
 		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
@@ -1347,13 +1348,14 @@ func createPostTestCase(name, url, outputString string, input interface{}) apite
 	}
 }
 
-func createStatusCheckPostTestCase(name, url string, httpStatus int, input interface{}) apitesting.APITestCase {
+func createStatusCheckPostTestCase(name, url, dynamoAction string, httpStatus int, input interface{}) apitesting.APITestCase {
 	return apitesting.APITestCase{
 		Name:    name,
 		ReqType: "POST",
 		PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 			return map[string]string{
 				"Content-Type": "application/json",
+				"X-Amz-Target": "DynamoDB_20120810." + dynamoAction,
 			}
 		},
 		ResourcePath: func(ctx context.Context, t *testing.T) string { return url },
@@ -1406,6 +1408,7 @@ func testGetItemAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.GetItem",
 				}
 			},
 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetIte" },
@@ -1420,9 +1423,10 @@ func testGetItemAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.GetItem",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return getItemTest1
 			},
@@ -1434,18 +1438,19 @@ func testGetItemAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.GetItem",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/GetItem" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return getItemTest1_1
 			},
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
-		createPostTestCase("Crorect Data TestCase", "/v1/GetItem", getItemTest2Output, getItemTest2),
-		createPostTestCase("Crorect data with Projection param Testcase", "/v1/GetItem", getItemTest3Output, getItemTest3),
-		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1/GetItem", getItemTest3Output, getItemTest4),
-		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1/GetItem", getItemTest5Output, getItemTest5),
+		createPostTestCase("Crorect Data TestCase", "/v1", "GetItem", getItemTest2Output, getItemTest2),
+		createPostTestCase("Crorect data with Projection param Testcase", "/v1", "GetItem", getItemTest3Output, getItemTest3),
+		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1", "GetItem", getItemTest3Output, getItemTest4),
+		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1", "GetItem", getItemTest5Output, getItemTest5),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1463,6 +1468,7 @@ func testGetBatchAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.BatchGetItem",
 				}
 			},
 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetIt" },
@@ -1477,22 +1483,23 @@ func testGetBatchAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.BatchGetItem",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/BatchGetItem" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return TestGetBatch10
 			},
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
-		createPostTestCase(TestGetBatch2Name, "/v1/BatchGetItem", TestGetBatch2Output, TestGetBatch2),
-		createPostTestCase(TestGetBatch3Name, "/v1/BatchGetItem", TestGetBatch3Output, TestGetBatch3),
-		createPostTestCase(TestGetBatch4Name, "/v1/BatchGetItem", TestGetBatch4Output, TestGetBatch4),
-		createPostTestCase(TestGetBatch5Name, "/v1/BatchGetItem", TestGetBatch5Output, TestGetBatch5),
-		createPostTestCase(TestGetBatch6Name, "/v1/BatchGetItem", TestGetBatch6Output, TestGetBatch6),
-		createPostTestCase(TestGetBatch7Name, "/v1/BatchGetItem", TestGetBatch7Output, TestGetBatch7),
-		createPostTestCase(TestGetBatch8Name, "/v1/BatchGetItem", TestGetBatch8Output, TestGetBatch8),
-		createPostTestCase(TestGetBatch9Name, "/v1/BatchGetItem", TestGetBatch9Output, TestGetBatch9),
+		createPostTestCase(TestGetBatch2Name, "/v1", "BatchGetItem", TestGetBatch2Output, TestGetBatch2),
+		createPostTestCase(TestGetBatch3Name, "/v1", "BatchGetItem", TestGetBatch3Output, TestGetBatch3),
+		createPostTestCase(TestGetBatch4Name, "/v1", "BatchGetItem", TestGetBatch4Output, TestGetBatch4),
+		createPostTestCase(TestGetBatch5Name, "/v1", "BatchGetItem", TestGetBatch5Output, TestGetBatch5),
+		createPostTestCase(TestGetBatch6Name, "/v1", "BatchGetItem", TestGetBatch6Output, TestGetBatch6),
+		createPostTestCase(TestGetBatch7Name, "/v1", "BatchGetItem", TestGetBatch7Output, TestGetBatch7),
+		createPostTestCase(TestGetBatch8Name, "/v1", "BatchGetItem", TestGetBatch8Output, TestGetBatch8),
+		createPostTestCase(TestGetBatch9Name, "/v1", "BatchGetItem", TestGetBatch9Output, TestGetBatch9),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1510,6 +1517,7 @@ func testQueryAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Query",
 				}
 			},
 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Quer" },
@@ -1524,9 +1532,10 @@ func testQueryAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Query",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return queryTestCase0
 			},
@@ -1538,9 +1547,10 @@ func testQueryAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Query",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return queryTestCase5
 			},
@@ -1552,28 +1562,29 @@ func testQueryAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Query",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Query" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return queryTestCase7
 			},
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
-		createPostTestCase("Only table name passed", "/v1/Query", queryTestCaseOutput1, queryTestCase1),
-		createPostTestCase("table & projection Expression", "/v1/Query", queryTestCaseOutput2, queryTestCase2),
-		createPostTestCase("projection expression with ExpressionAttributeNames", "/v1/Query", queryTestCaseOutput3, queryTestCase3),
-		createPostTestCase("KeyconditionExpression ", "/v1/Query", queryTestCaseOutput4, queryTestCase4),
-		createPostTestCase("KeyconditionExpression & filterExperssion", "/v1/Query", queryTestCaseOutput6, queryTestCase6),
-		createPostTestCase("only filter expression", "/v1/Query", queryTestCaseOutput8, queryTestCase8),
-		createPostTestCase("with ScanIndexForward and other attributes", "/v1/Query", queryTestCaseOutput9, queryTestCase9),
-		createPostTestCase("with only ScanIndexForward ", "/v1/Query", queryTestCaseOutput10, queryTestCase10),
-		createPostTestCase("with Limit", "/v1/Query", queryTestCaseOutput11, queryTestCase11),
-		createPostTestCase("with Limit & ScanIndexForward", "/v1/Query", queryTestCaseOutput12, queryTestCase12),
-		createPostTestCase("only count", "/v1/Query", queryTestCaseOutput13, queryTestCase13),
-		createPostTestCase("count with other attributes present", "/v1/Query", queryTestCaseOutput14, queryTestCase14),
-		createPostTestCase("Select with other than count", "/v1/Query", queryTestCaseOutput15, queryTestCase15),
-		createPostTestCase("all attributes", "/v1/Query", queryTestCaseOutput16, queryTestCase16),
+		createPostTestCase("Only table name passed", "/v1", "Query", queryTestCaseOutput1, queryTestCase1),
+		createPostTestCase("table & projection Expression", "/v1", "Query", queryTestCaseOutput2, queryTestCase2),
+		createPostTestCase("projection expression with ExpressionAttributeNames", "/v1", "Query", queryTestCaseOutput3, queryTestCase3),
+		createPostTestCase("KeyconditionExpression ", "/v1", "Query", queryTestCaseOutput4, queryTestCase4),
+		createPostTestCase("KeyconditionExpression & filterExperssion", "/v1", "Query", queryTestCaseOutput6, queryTestCase6),
+		createPostTestCase("only filter expression", "/v1", "Query", queryTestCaseOutput8, queryTestCase8),
+		createPostTestCase("with ScanIndexForward and other attributes", "/v1", "Query", queryTestCaseOutput9, queryTestCase9),
+		createPostTestCase("with only ScanIndexForward ", "/v1", "Query", queryTestCaseOutput10, queryTestCase10),
+		createPostTestCase("with Limit", "/v1", "Query", queryTestCaseOutput11, queryTestCase11),
+		createPostTestCase("with Limit & ScanIndexForward", "/v1", "Query", queryTestCaseOutput12, queryTestCase12),
+		createPostTestCase("only count", "/v1", "Query", queryTestCaseOutput13, queryTestCase13),
+		createPostTestCase("count with other attributes present", "/v1", "Query", queryTestCaseOutput14, queryTestCase14),
+		createPostTestCase("Select with other than count", "/v1", "Query", queryTestCaseOutput15, queryTestCase15),
+		createPostTestCase("all attributes", "/v1", "Query", queryTestCaseOutput16, queryTestCase16),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1591,6 +1602,7 @@ func testScanAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Scan",
 				}
 			},
 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Sca" },
@@ -1605,9 +1617,10 @@ func testScanAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Scan",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return ScanTestCase8
 			},
@@ -1619,24 +1632,25 @@ func testScanAPI(t *testing.T) {
 			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
 				return map[string]string{
 					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.Scan",
 				}
 			},
-			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/Scan" },
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
 				return ScanTestCase10
 			},
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
-		createPostTestCase(ScanTestCase2Name, "/v1/Query", ScanTestCase2Output, ScanTestCase2),
-		createPostTestCase(ScanTestCase3Name, "/v1/Query", ScanTestCase3Output, ScanTestCase3),
-		createPostTestCase(ScanTestCase4Name, "/v1/Query", ScanTestCase4Output, ScanTestCase4),
-		createPostTestCase(ScanTestCase5Name, "/v1/Query", ScanTestCase5Output, ScanTestCase5),
-		createPostTestCase(ScanTestCase6Name, "/v1/Query", ScanTestCase6Output, ScanTestCase6),
-		createPostTestCase(ScanTestCase7Name, "/v1/Query", ScanTestCase7Output, ScanTestCase7),
-		createPostTestCase(ScanTestCase9Name, "/v1/Query", ScanTestCase9Output, ScanTestCase9),
-		createPostTestCase(ScanTestCase11Name, "/v1/Query", ScanTestCase11Output, ScanTestCase11),
-		createPostTestCase(ScanTestCase12Name, "/v1/Query", ScanTestCase12Output, ScanTestCase12),
-		createPostTestCase(ScanTestCase13Name, "/v1/Query", ScanTestCase13Output, ScanTestCase13),
+		createPostTestCase(ScanTestCase2Name, "/v1", "Query", ScanTestCase2Output, ScanTestCase2),
+		createPostTestCase(ScanTestCase3Name, "/v1", "Query", ScanTestCase3Output, ScanTestCase3),
+		createPostTestCase(ScanTestCase4Name, "/v1", "Query", ScanTestCase4Output, ScanTestCase4),
+		createPostTestCase(ScanTestCase5Name, "/v1", "Query", ScanTestCase5Output, ScanTestCase5),
+		createPostTestCase(ScanTestCase6Name, "/v1", "Query", ScanTestCase6Output, ScanTestCase6),
+		createPostTestCase(ScanTestCase7Name, "/v1", "Query", ScanTestCase7Output, ScanTestCase7),
+		createPostTestCase(ScanTestCase9Name, "/v1", "Query", ScanTestCase9Output, ScanTestCase9),
+		createPostTestCase(ScanTestCase11Name, "/v1", "Query", ScanTestCase11Output, ScanTestCase11),
+		createPostTestCase(ScanTestCase12Name, "/v1", "Query", ScanTestCase12Output, ScanTestCase12),
+		createPostTestCase(ScanTestCase13Name, "/v1", "Query", ScanTestCase13Output, ScanTestCase13),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1648,16 +1662,16 @@ func testUpdateItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(UpdateItemTestCase1Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase1),
-		createStatusCheckPostTestCase(UpdateItemTestCase4Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase4),
-		createStatusCheckPostTestCase(UpdateItemTestCase6Name, "/v1/UpdateItem", http.StatusOK, UpdateItemTestCase6),
-		createStatusCheckPostTestCase(UpdateItemTestCase5Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase5),
-		createStatusCheckPostTestCase(UpdateItemTestCase8Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase8),
-		createStatusCheckPostTestCase(UpdateItemTestCase9Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase9),
-		createStatusCheckPostTestCase(UpdateItemTestCase10Name, "/v1/UpdateItem", http.StatusBadRequest, UpdateItemTestCase10),
-		createPostTestCase(UpdateItemTestCase2Name, "/v1/UpdateItem", UpdateItemTestCase2Output, UpdateItemTestCase2),
-		createPostTestCase(UpdateItemTestCase3Name, "/v1/UpdateItem", UpdateItemTestCase3Output, UpdateItemTestCase3),
-		createPostTestCase(UpdateItemTestCase7Name, "/v1/UpdateItem", UpdateItemTestCase7Output, UpdateItemTestCase7),
+		createStatusCheckPostTestCase(UpdateItemTestCase1Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase1),
+		createStatusCheckPostTestCase(UpdateItemTestCase4Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase4),
+		createStatusCheckPostTestCase(UpdateItemTestCase6Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase6),
+		createStatusCheckPostTestCase(UpdateItemTestCase5Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase5),
+		createStatusCheckPostTestCase(UpdateItemTestCase8Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase8),
+		createStatusCheckPostTestCase(UpdateItemTestCase9Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase9),
+		createStatusCheckPostTestCase(UpdateItemTestCase10Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase10),
+		createPostTestCase(UpdateItemTestCase2Name, "/v1", "UpdateItem", UpdateItemTestCase2Output, UpdateItemTestCase2),
+		createPostTestCase(UpdateItemTestCase3Name, "/v1", "UpdateItem", UpdateItemTestCase3Output, UpdateItemTestCase3),
+		createPostTestCase(UpdateItemTestCase7Name, "/v1", "UpdateItem", UpdateItemTestCase7Output, UpdateItemTestCase7),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1670,15 +1684,15 @@ func testPutItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase1),
-		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase5),
-		createStatusCheckPostTestCase(PutItemTestCase6Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase6),
-		createStatusCheckPostTestCase(PutItemTestCase7Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase7),
-		createStatusCheckPostTestCase(PutItemTestCase8Name, "/v1/PutItem", http.StatusBadRequest, PutItemTestCase8),
-		createPostTestCase(PutItemTestCase2Name, "/v1/PutItem", PutItemTestCase2Output, PutItemTestCase2),
-		createPostTestCase(PutItemTestCase3Name, "/v1/PutItem", PutItemTestCase3Output, PutItemTestCase3),
-		createPostTestCase(PutItemTestCase4Name, "/v1/PutItem", PutItemTestCase4Output, PutItemTestCase4),
-		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1/PutItem", http.StatusOK, PutItemTestCase9),
+		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase1),
+		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase5),
+		createStatusCheckPostTestCase(PutItemTestCase6Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase6),
+		createStatusCheckPostTestCase(PutItemTestCase7Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase7),
+		createStatusCheckPostTestCase(PutItemTestCase8Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase8),
+		createPostTestCase(PutItemTestCase2Name, "/v1", "PutItem", PutItemTestCase2Output, PutItemTestCase2),
+		createPostTestCase(PutItemTestCase3Name, "/v1", "PutItem", PutItemTestCase3Output, PutItemTestCase3),
+		createPostTestCase(PutItemTestCase4Name, "/v1", "PutItem", PutItemTestCase4Output, PutItemTestCase4),
+		createStatusCheckPostTestCase(PutItemTestCase9Name, "/v1", "PutItem", http.StatusOK, PutItemTestCase9),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1691,14 +1705,14 @@ func testDeleteItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(DeleteItemTestCase1Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase1),
-		createStatusCheckPostTestCase(DeleteItemTestCase6Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase6),
-		createStatusCheckPostTestCase(DeleteItemTestCase7Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase7),
-		createStatusCheckPostTestCase(DeleteItemTestCase8Name, "/v1/DeleteItem", http.StatusBadRequest, DeleteItemTestCase8),
-		createPostTestCase(DeleteItemTestCase2Name, "/v1/DeleteItem", DeleteItemTestCase2Output, DeleteItemTestCase2),
-		createStatusCheckPostTestCase(DeleteItemTestCase3Name, "/v1/DeleteItem", http.StatusOK, DeleteItemTestCase3),
-		createPostTestCase(DeleteItemTestCase4Name, "/v1/DeleteItem", DeleteItemTestCase4Output, DeleteItemTestCase4),
-		createPostTestCase(DeleteItemTestCase5Name, "/v1/DeleteItem", DeleteItemTestCase5Output, DeleteItemTestCase5),
+		createStatusCheckPostTestCase(DeleteItemTestCase1Name, "/v1", "DeleteItem", http.StatusBadRequest, DeleteItemTestCase1),
+		createStatusCheckPostTestCase(DeleteItemTestCase6Name, "/v1", "DeleteItem", http.StatusBadRequest, DeleteItemTestCase6),
+		createStatusCheckPostTestCase(DeleteItemTestCase7Name, "/v1", "DeleteItem", http.StatusBadRequest, DeleteItemTestCase7),
+		createStatusCheckPostTestCase(DeleteItemTestCase8Name, "/v1", "DeleteItem", http.StatusBadRequest, DeleteItemTestCase8),
+		createPostTestCase(DeleteItemTestCase2Name, "/v1", "DeleteItem", DeleteItemTestCase2Output, DeleteItemTestCase2),
+		createStatusCheckPostTestCase(DeleteItemTestCase3Name, "/v1", "DeleteItem", http.StatusOK, DeleteItemTestCase3),
+		createPostTestCase(DeleteItemTestCase4Name, "/v1", "DeleteItem", DeleteItemTestCase4Output, DeleteItemTestCase4),
+		createPostTestCase(DeleteItemTestCase5Name, "/v1", "DeleteItem", DeleteItemTestCase5Output, DeleteItemTestCase5),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1710,16 +1724,16 @@ func testBatchWriteItemAPI(t *testing.T) {
 		},
 	}
 	tests := []apitesting.APITestCase{
-		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase1),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase2Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase2),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase3Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase3),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase4Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase4),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase5Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase5),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase6Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase6),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase7Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase7),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase8Name, "/v1/BatchWriteItem", http.StatusOK, BatchWriteItemTestCase8),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase9),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1/BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase1Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase1),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase2Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase2),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase3Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase3),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase4Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase4),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase5Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase5),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase6Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase6),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase7Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase7),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase8Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase8),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1", "BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase9),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1", "BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
 	}
 	apitest.RunTests(t, tests)
 }
