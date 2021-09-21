@@ -349,7 +349,7 @@ func ReplaceHashRangeExpr(query models.Query) models.Query {
 
 // ConvertDynamoToMap converts the Dynamodb Object to Map
 func ConvertDynamoToMap(tableName string, dynamoMap map[string]*dynamodb.AttributeValue) (map[string]interface{}, error) {
-	if dynamoMap == nil || len(dynamoMap) == 0 {
+	if len(dynamoMap) == 0 {
 		return nil, nil
 	}
 	rs := make(map[string]interface{})
@@ -451,15 +451,13 @@ func ChangeResponseColumn(obj map[string]interface{}) map[string]interface{} {
 // ChangeColumnToSpanner converts original column name to  spanner supported column names
 func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	rs := make(map[string]interface{})
+	
+	for k, v := range obj {
 
-	if obj != nil {
-		for k, v := range obj {
-
-			if k1, ok := models.ColumnToOriginalCol[k]; ok {
-				rs[k1] = v
-			} else {
-				rs[k] = v
-			}
+		if k1, ok := models.ColumnToOriginalCol[k]; ok {
+			rs[k1] = v
+		} else {
+			rs[k] = v
 		}
 	}
 
