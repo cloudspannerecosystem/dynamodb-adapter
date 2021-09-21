@@ -64,7 +64,7 @@ func InitializeDriver() {
 // Close - This gracefully returns the session pool objects, when driver gets exit signal
 func (s Storage) Close() {
 	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	<-shutdown
 	logger.LogDebug("Connection Shutdown start")
 	for _, v := range s.spannerClient {

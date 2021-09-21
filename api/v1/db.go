@@ -95,7 +95,7 @@ func UpdateMeta(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var meta models.Meta
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -144,7 +144,7 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	}
 	sKey := tableConf.SortKey
 	pKey := tableConf.PartitionKey
-	var oldResp = map[string]interface{}{}
+	var oldResp map[string]interface{}
 
 	oldResp, err = storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
 	if err != nil {
@@ -217,7 +217,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
 	if hash != "" {
-		span = span.SetTag("qHash", hash)
+		span.SetTag("qHash", hash)
 	}
 }
 
@@ -242,7 +242,7 @@ func QueryTable(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var query models.Query
 	if err := c.ShouldBindJSON(&query); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))

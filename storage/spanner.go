@@ -85,12 +85,12 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 	return allRows, nil
 }
 
-func createRowMap(r *spanner.Row, colDDL map[string]string, cols []string) (map[string]interface{}, error) {
+func createRowMap(r *spanner.Row, colDDL map[string]string) (map[string]interface{}, error) {
 	singleRow := make(map[string]interface{})
 	if r == nil {
 		return singleRow, nil
 	}
-	cols = r.ColumnNames()
+	cols := r.ColumnNames()
 	for i, k := range cols {
 		if k == "" {
 			continue
@@ -147,7 +147,7 @@ func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (m
 		return singleRow, nil
 	}
 
-	cols = r.ColumnNames()
+	cols = r.ColumnNames() //nolint:staticcheck
 	for i, k := range cols {
 		if k == "" || k == "commit_timestamp" {
 			continue
@@ -285,7 +285,7 @@ func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (m
 
 // SpannerGet - get with spanner
 func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error) {
-	key := spanner.Key{}
+	var key spanner.Key
 	if sKeys == nil {
 		key = spanner.Key{pKeys}
 	} else {
@@ -420,7 +420,7 @@ func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTran
 	if e := errors.AssignError(err); e != nil {
 		return false, e
 	}
-	rowMap, err := createRowMap(r, colDDL, cols)
+	rowMap, err := createRowMap(r, colDDL)
 	if err != nil {
 		return false, err
 	}
