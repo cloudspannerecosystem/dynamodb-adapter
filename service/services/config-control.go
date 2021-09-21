@@ -16,8 +16,6 @@ package services
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -28,16 +26,6 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/robfig/cron"
 )
-
-var serviceName = "DYNAMODB-ADAPTER"
-
-func init() {
-	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if credFile != "" {
-		credFile = filepath.Base(credFile)
-		serviceName = strings.TrimSuffix(credFile, ".json")
-	}
-}
 
 var percentMap = make(map[string]int64)
 var counterTableIndex = make(map[string]int)

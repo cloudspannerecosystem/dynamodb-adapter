@@ -958,7 +958,6 @@ func changeTableNameForSP(tableName string) string {
 }
 
 var queryHash = make(map[string]string)
-var pushFlag bool
 var mux = new(sync.Mutex)
 
 func captureQueryHash(table string, query string) {
@@ -966,7 +965,6 @@ func captureQueryHash(table string, query string) {
 	defer mux.Unlock()
 	_, ok := queryHash[query]
 	if !ok {
-		pushFlag = true
 		queryHash[query] = table
 	}
 }

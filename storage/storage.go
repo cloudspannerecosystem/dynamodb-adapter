@@ -19,7 +19,6 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -29,26 +28,6 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/tidwall/gjson"
 )
-
-var serviceName = "DYNAMODB-ADAPTER"
-
-var hostName, _ = os.Hostname()
-
-func init() {
-	hostName = strings.ReplaceAll(hostName, ".", "-")
-	tokens := strings.Split(hostName, "-")
-	if len(tokens) >= 3 {
-		sb := strings.Builder{}
-		length := len(tokens) - 2
-		for i := 0; i < length; i++ {
-			sb.WriteString(tokens[i])
-			if i != length-1 {
-				sb.WriteString("-")
-			}
-		}
-		serviceName = sb.String()
-	}
-}
 
 // Storage object for intracting with storage package
 type Storage struct {
