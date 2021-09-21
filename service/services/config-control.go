@@ -124,7 +124,6 @@ func fetchConfigData() {
 
 		count++
 	}
-	return
 }
 
 func parseConfig(table string, config string, count int) {

@@ -78,7 +78,7 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 		if err != nil {
 			return nil, err
 		}
-		if singleRow != nil && len(singleRow) > 0 {
+		if len(singleRow) > 0 {
 			allRows = append(allRows, singleRow)
 		}
 	}
@@ -319,8 +319,7 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
 	go captureQueryHash(table, stmt.SQL)
-	var itr *spanner.RowIterator
-	itr = s.getSpannerClient(table).Single().WithTimestampBound(spanner.ExactStaleness(time.Second*10)).Query(ctx, stmt)
+	itr := s.getSpannerClient(table).Single().WithTimestampBound(spanner.ExactStaleness(time.Second*10)).Query(ctx, stmt)
 	defer itr.Stop()
 	allRows := []map[string]interface{}{}
 	for {
@@ -488,20 +487,14 @@ func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap m
 			return true
 		}
 		_, ok := rowMap[colName]
-		if ok {
-			return false
-		}
-		return true
+		return !ok 
 	}
 	if strings.HasPrefix(conditionalExpression, "attribute_exists") || strings.HasPrefix(conditionalExpression, "if_exists") {
 		if len(rowMap) == 0 {
 			return false
 		}
 		_, ok := rowMap[colName]
-		if ok {
-			return true
-		}
-		return false
+		return ok
 	}
 	return rowMap[conditionalExpression]
 }

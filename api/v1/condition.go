@@ -72,7 +72,7 @@ func after(value string, a string) string {
 	if adjustedPos >= len(value) {
 		return ""
 	}
-	return value[adjustedPos:len(value)]
+	return value[adjustedPos:]
 }
 
 func deleteEmpty(s []string) []string {
@@ -287,7 +287,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 	case "ALL_NEW":
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	case "ALL_OLD":
-		if oldRes == nil || len(oldRes) == 0 {
+		if len(oldRes) == 0 {
 			return nil, er
 		}
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
@@ -298,7 +298,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 		}
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
 	case "UPDATED_OLD":
-		if oldRes == nil || len(oldRes) == 0 {
+		if len(oldRes) == 0 {
 			return nil, er
 		}
 		var resVal = make(map[string]interface{})
@@ -366,7 +366,7 @@ func ConvertDynamoToMap(tableName string, dynamoMap map[string]*dynamodb.Attribu
 
 // ConvertDynamoArrayToMapArray this converts Dynamodb Object Array into Map Array
 func ConvertDynamoArrayToMapArray(tableName string, dynamoMap []map[string]*dynamodb.AttributeValue) ([]map[string]interface{}, error) {
-	if dynamoMap == nil || len(dynamoMap) == 0 {
+	if len(dynamoMap) == 0 {
 		return nil, nil
 	}
 	rs := make([]map[string]interface{}, len(dynamoMap))
@@ -391,13 +391,11 @@ func ChangeColumnToSpannerExpressionName(tableName string, expressNameMap map[st
 	}
 
 	rs := make(map[string]string)
-	if expressNameMap != nil {
-		for k, v := range expressNameMap {
-			if v1, ok := models.ColumnToOriginalCol[v]; ok {
-				rs[k] = v1
-			} else {
-				rs[k] = v
-			}
+	for k, v := range expressNameMap {
+		if v1, ok := models.ColumnToOriginalCol[v]; ok {
+			rs[k] = v1
+		} else {
+			rs[k] = v
 		}
 	}
 
@@ -424,14 +422,11 @@ func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{
 	}
 	rs := make(map[string]interface{})
 	logger.LogInfo(models.ColumnToOriginalCol)
-	if obj != nil {
-		for k, v := range obj {
-
-			if k1, ok := models.OriginalColResponse[k]; ok {
-				rs[k1] = v
-			} else {
-				rs[k] = v
-			}
+	for k, v := range obj {
+		if k1, ok := models.OriginalColResponse[k]; ok {
+			rs[k1] = v
+		} else {
+			rs[k] = v
 		}
 	}
 
@@ -442,14 +437,11 @@ func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{
 func ChangeResponseColumn(obj map[string]interface{}) map[string]interface{} {
 	rs := make(map[string]interface{})
 
-	if obj != nil {
-		for k, v := range obj {
-
-			if k1, ok := models.OriginalColResponse[k]; ok {
-				rs[k1] = v
-			} else {
-				rs[k] = v
-			}
+	for k, v := range obj {
+		if k1, ok := models.OriginalColResponse[k]; ok {
+			rs[k1] = v
+		} else {
+			rs[k] = v
 		}
 	}
 
