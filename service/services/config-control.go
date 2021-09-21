@@ -49,7 +49,10 @@ var c *cron.Cron
 // StartConfigManager starts config mangager for fetching the config manager data after certain time
 func StartConfigManager() {
 	c = cron.New()
-	c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
+	err := c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
+	if err != nil {
+		logger.LogError(err)
+	}
 	c.Start()
 	fetchConfigData()
 }

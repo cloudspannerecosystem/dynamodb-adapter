@@ -112,7 +112,10 @@ func createRowMap(r *spanner.Row, colDDL map[string]string, cols []string) (map[
 			err := r.Column(i, &s)
 			if err == nil {
 				var m interface{}
-				json.Unmarshal(s, &m)
+				err = json.Unmarshal(s, &m)
+				if err != nil {
+					logger.LogError(err, string(s))
+				}
 				singleRow[k] = m
 			}
 		case "INT64":
@@ -748,7 +751,10 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 					var ifaces1 []interface{}
 					ba, ok := v.([]byte)
 					if ok {
-						json.Unmarshal(ba, &ifaces1)
+						err = json.Unmarshal(ba, &ifaces1)
+						if err != nil {
+							logger.LogError(err, string(ba))
+						}
 					} else {
 						ifaces1 = v.([]interface{})
 					}
@@ -865,8 +871,10 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 					var ifaces1 []interface{}
 					ba, ok := v.([]byte)
 					if ok {
-
-						json.Unmarshal(ba, &ifaces1)
+						err = json.Unmarshal(ba, &ifaces1)
+						if err != nil {
+							logger.LogError(err, string(ba))
+						}
 					} else {
 						ifaces1 = v.([]interface{})
 					}
