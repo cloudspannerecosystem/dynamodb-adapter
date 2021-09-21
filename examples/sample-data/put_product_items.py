@@ -19,7 +19,6 @@ import csv
 dynamo = boto3.resource('dynamodb')
 
 def put_book_product_item(pk, sk, product_id, product_category, isbn, book_title, book_authors, book_format, book_publisher, publication_date, price, shipping_amount):
-    
     table = dynamo.Table('Product')
     resp = table.put_item(
        Item={
@@ -42,15 +41,11 @@ def put_book_product_item(pk, sk, product_id, product_category, isbn, book_title
 
 
 def process_book_product_items():
-
     with open('data/book_product.tsv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t', quotechar='"')
         next(reader) # skip header line
     
         for row in reader:
-            
-            #print('row: ' + str(row))
-            
             pk = row[0]
             sk = row[1]
             product_id = row[2]
@@ -84,7 +79,6 @@ def process_book_product_items():
             
 
 def put_electronic_product_item(pk, sk, product_id, product_name, product_category, price, upc, shipping_amount, product_description, manufacturer, model):
-    
     table = dynamo.Table('Product')
     resp = table.put_item(
        Item={
@@ -104,15 +98,11 @@ def put_electronic_product_item(pk, sk, product_id, product_name, product_catego
     return resp
 
 def process_electronic_product_items():
-
     with open('data/electronic_product.tsv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t', quotechar='"')
         next(reader) # skip header line
     
         for row in reader:
-            
-            print('row: ' + str(row))
-            
             pk = row[0]
             sk = row[1]
             product_id = row[2]

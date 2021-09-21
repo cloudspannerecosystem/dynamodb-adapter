@@ -19,7 +19,6 @@ import csv
 dynamo = boto3.resource('dynamodb')
 
 def put_customer_item(pk, sk, customer_id, customer_fname, customer_lname, customer_email, customer_addresses):
-    
     table = dynamo.Table('Customer_Order')
     resp = table.put_item(
        Item={
@@ -35,17 +34,12 @@ def put_customer_item(pk, sk, customer_id, customer_fname, customer_lname, custo
         
     return resp
 
-
 def process_customer_items():
-
     with open('data/customer.tsv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t', quotechar='"')
         next(reader) # skip header line
     
         for row in reader:
-            
-            #print('row: ' + str(row))
-            
             pk = row[0]
             sk = row[1]
             customer_id = row[2]
@@ -67,7 +61,6 @@ def process_customer_items():
             print('resp: ' + str(resp))
 
 def put_order_item(pk, sk, customer_id, order_id, order_status, order_ts, order_amount, number_of_items):
-    
     table = dynamo.Table('Customer_Order')
     resp = table.put_item(
        Item={
@@ -85,15 +78,11 @@ def put_order_item(pk, sk, customer_id, order_id, order_status, order_ts, order_
     return resp
 
 def process_order_items():
-
     with open('data/order.tsv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t', quotechar='"')
         next(reader) # skip header line
     
         for row in reader:
-            
-            #print('row: ' + str(row))
-            
             pk = row[0]
             sk = row[1]
             customer_id = row[2]
@@ -116,9 +105,7 @@ def process_order_items():
 
             print('resp: ' + str(resp))
 
-
 def put_line_item(pk, sk, order_id, line_item_id, product_id, item_price, item_discount, item_quantity, item_status, comment):
-    
     table = dynamo.Table('Customer_Order')
     resp = table.put_item(
        Item={
@@ -138,15 +125,11 @@ def put_line_item(pk, sk, order_id, line_item_id, product_id, item_price, item_d
     return resp
 
 def process_line_items():
-
     with open('data/line_item.tsv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t', quotechar='"')
         next(reader) # skip header line
     
         for row in reader:
-            
-            #print('row: ' + str(row) + ', len: ' + str(len(row)))
-            
             pk = row[0]
             sk = row[1]
             order_id = row[2]
