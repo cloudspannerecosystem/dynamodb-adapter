@@ -583,7 +583,7 @@ func BatchWriteItem(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var batchWriteItem models.BatchWriteItem
 	if err1 := c.ShouldBindJSON(&batchWriteItem); err1 != nil {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
