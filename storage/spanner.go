@@ -141,6 +141,7 @@ func createRowMap(r *spanner.Row, colDDL map[string]string) (map[string]interfac
 	return singleRow, nil
 }
 
+//nolint:staticcheck
 func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (map[string]interface{}, error) {
 	singleRow := make(map[string]interface{})
 	if r == nil {

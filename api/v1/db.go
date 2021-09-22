@@ -406,7 +406,7 @@ func DeleteItem(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var deleteItem models.Delete
 	if err := c.ShouldBindJSON(&deleteItem); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
@@ -464,7 +464,7 @@ func Scan(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var meta models.ScanMeta
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -534,7 +534,7 @@ func Update(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var updateAttr models.UpdateAttr
 	if err := c.ShouldBindJSON(&updateAttr); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
