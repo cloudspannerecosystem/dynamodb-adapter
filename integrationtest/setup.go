@@ -250,11 +250,6 @@ func getColNameAndType(stmt string) (string, string) {
 	return tokens[0], tokens[1]
 }
 
-func changeTableNameForSP(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
-}
-
 // spannerBatchPut - this insert or update data in batch
 func spannerBatchPut(ctx context.Context, db string, m []*spanner.Mutation) error {
 	client, err := spanner.NewClient(ctx, db)

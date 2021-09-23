@@ -90,37 +90,3 @@ func TestGetTableConf(t *testing.T) {
 		assert.Equal(t, got, tc.want)
 	}
 }
-
-func TestChangeTableNameForSP(t *testing.T) {
-	tests := []struct {
-		testName  string
-		tableName string
-		want      string
-	}{
-		{
-			"empty table Name",
-			"",
-			"",
-		},
-		{
-			"table name without underscore",
-			"department",
-			"department",
-		},
-		{
-			"table name with one underscore",
-			"department-data",
-			"department_data",
-		},
-		{
-			"table name with more than one underscore",
-			"department-data-1-7",
-			"department_data_1_7",
-		},
-	}
-
-	for _, tc := range tests {
-		got := changeTableNameForSP(tc.tableName)
-		assert.Equal(t, got, tc.want)
-	}
-}

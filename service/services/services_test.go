@@ -487,39 +487,6 @@ func Test_parseSpannerColumns(t *testing.T) {
 	}
 }
 
-func Test_changeTableNameForSP(t *testing.T) {
-	tests := []struct {
-		tableName string
-		want      string
-	}{
-		{
-			"",
-			"",
-		},
-		{
-			"anyTableName",
-			"anyTableName",
-		},
-		{
-			"table_name_with_underscores",
-			"table_name_with_underscores",
-		},
-		{
-			"table-name-with-hypen",
-			"table_name_with_hypen",
-		},
-		{
-			"table_name-with-hypen_and_underscore",
-			"table_name_with_hypen_and_underscore",
-		},
-	}
-
-	for _, tc := range tests {
-		got := changeTableNameForSP(tc.tableName)
-		assert.Equal(t, got, tc.want)
-	}
-}
-
 func Test_parseSpannerTableName(t *testing.T) {
 	tests := []struct {
 		testName   string
