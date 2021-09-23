@@ -1,77 +1,97 @@
-# dynamodb-adapter
+# DynamoDB Adapter
 
 [![Join the chat at
 https://gitter.im/cloudspannerecosystem/dynamodb-adapter](https://badges.gitter.im/cloudspannerecosystem/dynamodb-adapter.svg)](https://gitter.im/cloudspannerecosystem/dynamodb-adapter?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-
 ## Introduction
-Dynamodb-adapter is an API tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. By running this project locally or in the cloud, this would work seamlessly.
 
-Additionally, it also supports primary and secondary indexes in a similar way as DynamoDB.
+DynamoDB Adapter is a tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. The adapter serves as a proxy whereby applications that use DynamoDB can send their queries to the proxy where they are then translated and executed against Cloud Spanner. DynamoDB Adapter is helpful when moving to Cloud Spanner from a DynamoDB environment without changing the code for DynamoDB queries. The APIs created by this project can be directly consumed where DynamoDB queries are used in your application.
 
-It will be helpful for moving to Cloud Spanner from DynamoDB environment without changing the code for DynamoDB queries. The APIs created by this project can be directly consumed where DynamoDB queries are used in your application.
+The adapter supports the basic data types and operations required for most applications.  Additionally, it also supports primary and secondary indexes in a similar way as DynamoDB. For detailed comparison of supported operations and data types, refer to the [Compatibility Matrix](#compatibility_matrix)
 
-This project requires two tables to store metadata and configuration for the project:
-* dynamodb_adapter_table_ddl (for meta data of all tables)
-* dynamodb_adapter_config_manager (for pubsub configuration)
+## Examples and Quickstart
 
-## Usage
-Follow the given steps to setup the project and generate the apis.
+This project includes an example application and sample eCommerce data model. The [instructions](./examples/README.md) for the sample application include migration using [Harbourbridge](https://github.com/cloudspannerecosystem/harbourbridge) and [setup](./examples/README.md#initialize_the_adapter_configuration) for the adapter.
 
-### 1. Creation of the required configuration tables in Spanner
-#### Table: dynamodb_adapter_table_ddl
-This table will be used to store the metadata for other tables. It will be used at the time of initiation of project to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because dynamoDB supports the special characters in column names while spanner does not support special characters other than underscores(_). 
-For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
+## Compatibility Matrix
 
-```
+### Supported Actions
+
+DynamoDB Adapter currently supports the folowing operations:
+
+| DyanmoDB Action
+|----------------
+| BatchGetItem
+| BatchWriteItem
+| DeleteItem
+| GetItem
+| PutItem
+| Query
+| Scan
+| UpdateItem
+
+### Supported Data Types
+
+DynamoDB Adapter currently supports the following DynamoDB data types
+
+| DynamoDB Data Type            | Spanner Data Types
+| ------------------------------| ------------------
+| `N` (number type)             | `INT64`, `FLOAT64`, `NUMERIC`
+| `BOOL` (boolean)              | `BOOL`
+| `B` (binary type)             | `BYTES(MAX)`
+| `S` (string and data values)  | `STRING(MAX)`
+
+## Configuration
+
+DynamoDB Adapter requires two tables to store metadata and configuration for the project: `dynamodb_adapter_table_ddl` and `dynamodb_adapter_config_manager`. There are also three configuration files required by the adapter: `config.json`, `spanner.json`, `tables.json`.
+
+By default there are two folders **production** and **staging** in [config-files](./config-files). This is configurable by using the enviroment variable `ACTIVE_ENV` and can be set to other environment names, so long as there is a matching directory in the `config-files` directory. If `ACTIVE_ENV` is not set the default environtment is **staging**.
+
+### dynamodb_adapter_table_ddl
+
+This table stores the metadata for all DynamoDB tables now stored in Cloud Spanner. It is used when the adapter starts up to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because DynamoDB supports the special characters in column names while Cloud Spanner only supports underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
+
+```sql
 CREATE TABLE 
 dynamodb_adapter_table_ddl 
 (
- column		    STRING(MAX),
- tableName	    STRING(MAX),
- dataType 	    STRING(MAX),
- originalColumn     STRING(MAX),
+ column         STRING(MAX),
+ tableName      STRING(MAX),
+ dataType       STRING(MAX),
+ originalColumn STRING(MAX),
 ) PRIMARY KEY (tableName, column)
 ```
 
-Add the meta data of all the tables in the similar way as shown below.
-
 ![dynamodb_adapter_table_ddl sample data](images/config_spanner.png)
 
-#### Table: dynamodb_adapter_config_manager
-This table will be used to store the configuration info for publishing the data in Pub/Sub topic for other processes on change of data. It will be used to do some additional operation required on the change of data in tables. It can trigger New and Old data on given Pub/Sub topic. 
+### dynamodb_adapter_config_manager
 
-```
+This table contains the pubsub configuration used for DynamoDB Stream compatability. It is used to do some additional operation required on the change of data in tables. It can trigger New and Old data on given Pub/Sub topic.
+
+```sql
 CREATE TABLE 
 dynamodb_adapter_config_manager 
 (
- tableName 	STRING(MAX),
- config 	STRING(MAX),
- cronTime 	STRING(MAX),
- enabledStream 	STRING(MAX),
+ tableName      STRING(MAX),
+ config         STRING(MAX),
+ cronTime       STRING(MAX),
+ enabledStream  STRING(MAX),
  pubsubTopic    STRING(MAX),
  uniqueValue    STRING(MAX),
 ) PRIMARY KEY (tableName)
 ```
 
+### config-files/{env}/config.json
 
-### 2. Creation for configuration files
-By default there are two folders in [config-files](./config-files). This is configurable by using
-the enviroment variable `ACTIVE_ENV`. If `ACTIVE_ENV` is not set the default environtment is **staging**.
-
-* **production** : Should be used to store the config files related to the Production environment.
-* **staging** : Should be used to store the config files related to the Staging environment.
-
-Add the configuration in the given files:
-#### config-files/{env}/config.json 
-| Key | Used For |
-| ------ | ------ |
-| GoogleProjectID | Your Google Project ID |
-| SpannerDb | Your Spanner Database Name |
-| QueryLimit | Default limit for data|
+| Key               | Description
+| ----------------- | -----------
+| GoogleProjectID   | Your Google Project ID
+| SpannerDb         | Your Spanner Database Name
+| QueryLimit        | Default limit for the number of records returned in query
 
 For example:
-```
+
+```json
 {
     "GoogleProjectID"   : "first-project",
     "SpannerDb"         : "test-db",
@@ -79,14 +99,13 @@ For example:
 }
 ```
 
-#### config-files/{env}/spanner.json
-It is a mapping file for table name with instance id. It will be helpful to query data on particular instance.
-The instance-id of all tables should be stored in this file in the following format:
-"TableName" : "instance-id"
+### config-files/{env}/spanner.json
+
+`spanner.json` is a key/value mapping file for table names with a Cloud Spanner instance ids. This enables the adapter to query data for a particular table on different Cloud Spanner instances.
 
 For example:
 
-```
+```json
 {
     "dynamodb_adapter_table_ddl": "spanner-2 ",
     "dynamodb_adapter_config_manager": "spanner-2",
@@ -97,156 +116,101 @@ For example:
 }
 ```
 
-#### config-files/{env}/tables.json
-All table's primary key, columns, index information will be stored here.
-It will be required for query and update both type of operation to get primary key, sort or any other index present.
-It helps to query data on primary key or sort key.
-It helps to update data based on primary key or sort key.
-It will be similar to dynamodb table's architecture.
+### config-files/{env}/tables.json
 
-| Key | Used For |
-| ------ | ------ |
-| tableName | table name present in dynamoDb |
-| partitionKey | Primary key |
-| sortKey| Sorting key |
-| attributeTypes | Column names and type present |
-| indices | indexes present in the table |
+`tables.json` contains the description of the tables as they appear in DynamoDB. This includes all table's primary key, columns and index information. This file supports the update and query operations by providing the primary key, sort key and any other indexes present.
 
+| Key               | Description
+| ----------------- | -----------
+| tableName         | Name of the table in DynamoDB
+| partitionKey      | Primary key of the table in DynamoDB
+| sortKey           | Sorting key of the table in DynamoDB
+| attributeTypes    | Key/Value list of column names and type
+| indices           | Collection of index objects that represent the indexes present in the DyanmoDB table
 
 For example:
 
-```
+```json
 {
     "tableName":{
         "partitionKey":"primary key or Partition key",
         "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
-			"ColInt64": "N",
-            "ColString": "S",
-            "ColBytes": "B",
-            "ColBool": "BOOL",
-            "ColDate": "S",
-            "ColTimestamp": "S"
+            "column_a": "N",
+            "column_b": "S",
+            "column_of_bytes": "B",
+            "my_boolean_column": "BOOL"
         },
         "indices": { 
-			"indexName1": {
-				"sortKey": "sort key for indexName1",
-				"partitionKey": "partition key for indexName1"
-			}
-		}
+            "indexName1": {
+                "sortKey": "sort key for indexName1",
+                "partitionKey": "partition key for indexName1"
+            },
+            "another_index": {
+                "sortKey": "sort key for another_index",
+                "partitionKey": "partition key for another_index"
+            } 
+        }
     },
     .....
     .....
 }
 ```
 
-### 3. (OPTIONAL) Creation of rice-box.go file
+## Starting DynamoDB Adapter
 
-The rice-box package can be used to increase preformance by converting the configuration files into Golang source code
-and there by compiling them into the binary.  If they are not found in the binary rice-box will look to the disk for
-the configuration files.
+Complete the steps described in [Set up](https://cloud.google.com/spanner/docs/getting-started/set-up), which covers creating and setting a default Google Cloud project, enabling billing, enabling the Cloud Spanner API, and setting up OAuth 2.0 to get authentication credentials to use the Cloud Spanner API.
 
-##### install rice package
-This package is required to load the config files. This is required in the first step of the running dynamoDB-adapter.
+In particular, ensure that you run
+
+```sh
+gcloud auth application-default login
+```
+
+to set up your local development environment with authentication credentials.
+
+Set the GCLOUD_PROJECT environment variable to your Google Cloud project ID:
+
+```sh
+gcloud config set project [MY_PROJECT NAME]
+```
+
+```sh
+export ACTIVE_ENV=PRODUCTION
+go run main.go
+```
+
+### Internal Startup Stages
+
+When DynamoDB Adapter starts up the following steps are performed:
+
+* Stage 1 - Configuration is loaded according the Environment Variable *ACTIVE_ENV*
+* Stage 2 - Connections to Cloud Spanner instances are initialized. Connections to all the instances are started it doesn't need to start the connection again and again for every request.
+* Stage 3 - `dynamodb_adapter_table_ddl` is parsed and will stored in ram for faster access of data.
+* Stage 4 - `dynamodb_adapter_config_manager` is loaded into ram. The adapter will check every 1 min if configuration has been changed, if data is changed it will be updated in memory.
+* Stage 5 - Start the API listener to accept DynamoDB operations.
+
+## Advanced
+
+### Embedding the Configuration
+
+The rice-box package can be used to increase preformance by converting the configuration files into Golang source code and there by compiling them into the binary.  If they are not found in the binary rice-box will look to the disk for the configuration files.
+
+#### Install rice package
+
+This package is required to load the config files. This is required in the first step of the running DynamoDB Adapter.
 
 Follow the [link](https://github.com/GeertJohan/go.rice#installation).
 
-##### run command for creating the file.
+#### run command for creating the file.
+
 This is required to increase the performance when any config file is changed so that configuration files can be loaded directly from go file.
-```
+
+```sh
 rice embed-go
 ```
 
-### 4. Run 
-* Setup GCP project on **gcloud cli** 
-
-    If **gcloud cli** is not installed then firstly install **gcloud cli** [reference](https://cloud.google.com/sdk/docs/install)
-    Then run the following commands for setting up the project which has Cloud Spanner Database.
-    ```
-    gcloud auth login 
-    gcloud projects list
-    gcloud config set project `PROJECT NAME`
-    ```
-    [Reference](https://cloud.google.com/sdk/gcloud/reference/auth/login) for `gcloud auth login` 
-
-    [Reference](https://cloud.google.com/sdk/gcloud/reference/projects/list) for `gcloud auth login` 
-    
-    [Reference](https://cloud.google.com/sdk/gcloud/reference/config/set) for `gcloud auth login`
-
-* Run for **staging**
-    ```
-    go run main.go
-    ```
-* Run for **Production**
-    ```
-    export ACTIVE_ENV=PRODUCTION
-    go run main.go
-    ```
-* Run the **Integration Tests**
-    Running the integration test will require the files present in the [staging](./config-files/staging) folder to be configured as below:
-
-    config-files/staging/config.json
-    ```
-    {
-        "GoogleProjectID": "<your-project-id>",
-        "SpannerDb": "<any-db-name>",
-        "QueryLimit": 5000
-    }       
-    ```
-
-    config-files/staging/spanner.json
-    ```
-    {
-        "dynamodb_adapter_table_ddl": "<spanner-instance-name>",
-        "dynamodb_adapter_config_manager": "<spanner-instance-name>",
-        "department": "<spanner-instance-name>",
-        "employee": "<spanner-instance-name>"
-    }
-    ```
-
-    config-files/staging/tables.json
-    ```
-    {
-        "employee":{
-            "partitionKey":"emp_id",
-            "sortKey": "",
-            "attributeTypes": {
-                "emp_id": "N",
-                "first_name":"S",
-                "last_name":"S",
-                "address":"S",
-                "age":"N"
-            },
-            "indices": {}
-        },
-        "department":{
-            "partitionKey":"d_id",
-            "sortKey": "",
-            "attributeTypes": {
-                "d_id": "N",
-                "d_name":"S",
-                "d_specialization":"S"
-            },
-            "indices": {}
-        }
-    }
-    ```
-
-    Execute test
-    ```
-    go run integrationtest/setup.go setup
-    go test integrationtest/api_test.go
-    go run integrationtest/setup.go teardown
-    ```
-
-## Starting Process
-* Step 1: DynamoDB-adapter will load the configuration according the Environment Variable *ACTIVE_ENV*
-* Step 2: DynamoDB-adapter will initialize all the connections for all the instances so that it doesn't need to start the connection again and again for every request.
-* Step 3: DynamoDB-adapter will parse the data inside dynamodb_adapter_table_ddl table and will store in ram for faster access of data.
-* Step 4: DynamoDB-adapter will parse the dynamodb_adapter_config_manager table then will load it in ram. It will check for every 1 min if data has been changed in this table or not. If data is changed then It will update the data for this in ram. 
-* Step 5: After all these steps, DynamoDB-adapter will start the APIs which are similar to dynamodb APIs.
-
-
 ## API Documentation
+
 This is can be imported in Postman or can be used for Swagger UI.
 You can get open-api-spec file here [here](https://github.com/cldcvr/dynamodb-adapter/wiki/Open-API-Spec)
