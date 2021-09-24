@@ -5,13 +5,13 @@ https://gitter.im/cloudspannerecosystem/dynamodb-adapter](https://badges.gitter.
 
 ## Introduction
 
-DynamoDB Adapter is a tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. The adapter serves as a proxy whereby applications that use DynamoDB can send their queries to the proxy where they are then translated and executed against Cloud Spanner. DynamoDB Adapter is helpful when moving to Cloud Spanner from a DynamoDB environment without changing the code for DynamoDB queries. The APIs created by this project can be directly consumed where DynamoDB queries are used in your application.
+DynamoDB Adapter is a tool that translates AWS DynamoDB queries to Cloud Spanner equivalent queries and runs those queries on Cloud Spanner. The adapter serves as a proxy whereby applications that use DynamoDB can send their queries to the adapter where they are then translated and executed against Cloud Spanner. DynamoDB Adapter is helpful when moving to Cloud Spanner from a DynamoDB environment without changing the code for DynamoDB queries. The APIs created by this project can be directly consumed where DynamoDB queries are used in your application.
 
 The adapter supports the basic data types and operations required for most applications.  Additionally, it also supports primary and secondary indexes in a similar way as DynamoDB. For detailed comparison of supported operations and data types, refer to the [Compatibility Matrix](#compatibility_matrix)
 
 ## Examples and Quickstart
 
-This project includes an example application and sample eCommerce data model. The [instructions](./examples/README.md) for the sample application include migration using [Harbourbridge](https://github.com/cloudspannerecosystem/harbourbridge) and [setup](./examples/README.md#initialize_the_adapter_configuration) for the adapter.
+The adapter project includes an example application and sample eCommerce data model. The [instructions](./examples/README.md) for the sample application include migration using [Harbourbridge](https://github.com/cloudspannerecosystem/harbourbridge) and [setup](./examples/README.md#initialize_the_adapter_configuration) for the adapter.
 
 ## Compatibility Matrix
 
@@ -19,7 +19,7 @@ This project includes an example application and sample eCommerce data model. Th
 
 DynamoDB Adapter currently supports the folowing operations:
 
-| DyanmoDB Action
+| DynamoDB Action
 |----------------
 | BatchGetItem
 | BatchWriteItem
@@ -49,7 +49,7 @@ By default there are two folders **production** and **staging** in [config-files
 
 ### dynamodb_adapter_table_ddl
 
-This table stores the metadata for all DynamoDB tables now stored in Cloud Spanner. It is used when the adapter starts up to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because DynamoDB supports the special characters in column names while Cloud Spanner only supports underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
+`dynamodb_adapter_table_ddl` stores the metadata for all DynamoDB tables now stored in Cloud Spanner. It is used when the adapter starts up to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because DynamoDB supports the special characters in column names while Cloud Spanner only supports underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
 
 ```sql
 CREATE TABLE 
@@ -66,7 +66,7 @@ dynamodb_adapter_table_ddl
 
 ### dynamodb_adapter_config_manager
 
-This table contains the pubsub configuration used for DynamoDB Stream compatability. It is used to do some additional operation required on the change of data in tables. It can trigger New and Old data on given Pub/Sub topic.
+`dynamodb_adapter_config_manager` contains the Pub/Sub configuration used for DynamoDB Stream compatability. It is used to do some additional operation required on the change of data in tables. It can trigger New and Old data on given Pub/Sub topic.
 
 ```sql
 CREATE TABLE 
@@ -82,6 +82,8 @@ dynamodb_adapter_config_manager
 ```
 
 ### config-files/{env}/config.json
+
+`config.json` contains the basic settings for DynamoDB Adapter; GCP Projecct, Cloud Spanner Database and query record limit.
 
 | Key               | Description
 | ----------------- | -----------
@@ -126,7 +128,7 @@ For example:
 | partitionKey      | Primary key of the table in DynamoDB
 | sortKey           | Sorting key of the table in DynamoDB
 | attributeTypes    | Key/Value list of column names and type
-| indices           | Collection of index objects that represent the indexes present in the DyanmoDB table
+| indices           | Collection of index objects that represent the indexes present in the DynamoDB table
 
 For example:
 
