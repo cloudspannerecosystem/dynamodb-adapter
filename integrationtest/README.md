@@ -29,25 +29,25 @@ Running the integration tests will require the files present in the [staging](./
 
 ```json
 {
-    "employee":{
-        "partitionKey":"emp_id",
+    "employee": {
+        "partitionKey": "emp_id",
         "sortKey": "",
         "attributeTypes": {
             "emp_id": "N",
-            "first_name":"S",
-            "last_name":"S",
-            "address":"S",
-            "age":"N"
+            "first_name": "S",
+            "last_name": "S",
+            "address": "S",
+            "age": "N"
         },
         "indices": {}
     },
-    "department":{
-        "partitionKey":"d_id",
+    "department": {
+        "partitionKey": "d_id",
         "sortKey": "",
         "attributeTypes": {
             "d_id": "N",
-            "d_name":"S",
-            "d_specialization":"S"
+            "d_name": "S",
+            "d_specialization": "S"
         },
         "indices": {}
     }

@@ -49,7 +49,7 @@ By default there are two folders **production** and **staging** in [config-files
 
 ### dynamodb_adapter_table_ddl
 
-`dynamodb_adapter_table_ddl` stores the metadata for all DynamoDB tables now stored in Cloud Spanner. It is used when the adapter starts up to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required by because DynamoDB supports the special characters in column names while Cloud Spanner only supports underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
+`dynamodb_adapter_table_ddl` stores the metadata for all DynamoDB tables now stored in Cloud Spanner. It is used when the adapter starts up to create a map for all the columns names present in Spanner tables with the columns of tables present in DynamoDB. This mapping is required because DynamoDB supports the special characters in column names while Cloud Spanner only supports underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
 
 ```sql
 CREATE TABLE 
@@ -134,8 +134,8 @@ For example:
 
 ```json
 {
-    "tableName":{
-        "partitionKey":"primary key or Partition key",
+    "tableName": {
+        "partitionKey": "primary key or Partition key",
         "sortKey": "sorting key of dynamoDB adapter",
         "attributeTypes": {
             "column_a": "N",
