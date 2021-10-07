@@ -120,7 +120,7 @@ func TestChangeTableNameForSP(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := changeTableNameForSP(tc.tableName)
+		got := changeTableNameForSpanner(tc.tableName)
 		assert.Equal(t, got, tc.want)
 	}
 }

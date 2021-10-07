@@ -64,12 +64,6 @@ func RouteRequest(c *gin.Context) {
 	}
 }
 
-func enrichSpan(c *gin.Context, span opentracing.Span, query models.Query) opentracing.Span {
-	span = span.SetTag("table", query.TableName)
-	span = span.SetTag("index", query.IndexName)
-	return span
-}
-
 func addParentSpanID(c *gin.Context, span opentracing.Span) opentracing.Span {
 	parentSpanID := c.Request.Header.Get("X-B3-Spanid")
 	traceID := c.Request.Header.Get("X-B3-Traceid")
@@ -101,7 +95,7 @@ func UpdateMeta(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var meta models.Meta
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -150,7 +144,7 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	}
 	sKey := tableConf.SortKey
 	pKey := tableConf.PartitionKey
-	var oldResp = map[string]interface{}{}
+	var oldResp map[string]interface{}
 
 	oldResp, err = storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
 	if err != nil {
@@ -223,7 +217,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
 	if hash != "" {
-		span = span.SetTag("qHash", hash)
+		span.SetTag("qHash", hash)
 	}
 }
 
@@ -248,7 +242,7 @@ func QueryTable(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var query models.Query
 	if err := c.ShouldBindJSON(&query); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
@@ -412,7 +406,7 @@ func DeleteItem(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var deleteItem models.Delete
 	if err := c.ShouldBindJSON(&deleteItem); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
@@ -470,7 +464,7 @@ func Scan(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var meta models.ScanMeta
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -540,7 +534,7 @@ func Update(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var updateAttr models.UpdateAttr
 	if err := c.ShouldBindJSON(&updateAttr); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
@@ -589,7 +583,7 @@ func BatchWriteItem(c *gin.Context) {
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
-	span = addParentSpanID(c, span)
+	addParentSpanID(c, span)
 	var batchWriteItem models.BatchWriteItem
 	if err1 := c.ShouldBindJSON(&batchWriteItem); err1 != nil {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
