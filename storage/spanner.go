@@ -52,16 +52,16 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 	}
 	if len(projectionCols) == 0 {
 		var ok bool
-		projectionCols, ok = models.TableColumnMap[changeTableNameForSP(tableName)]
+		projectionCols, ok = models.TableColumnMap[utils.ChangeTableNameForSpanner(tableName)]
 		if !ok {
 			return nil, errors.New("ResourceNotFoundException", tableName)
 		}
 	}
-	colDLL, ok := models.TableDDL[changeTableNameForSP(tableName)]
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", tableName)
 	}
-	tableName = changeTableNameForSP(tableName)
+	tableName = utils.ChangeTableNameForSpanner(tableName)
 	client := s.getSpannerClient(tableName)
 	itr := client.Single().Read(ctx, tableName, spanner.KeySets(keySet...), projectionCols)
 	defer itr.Stop()
@@ -294,16 +294,16 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 	}
 	if len(projectionCols) == 0 {
 		var ok bool
-		projectionCols, ok = models.TableColumnMap[changeTableNameForSP(tableName)]
+		projectionCols, ok = models.TableColumnMap[utils.ChangeTableNameForSpanner(tableName)]
 		if !ok {
 			return nil, errors.New("ResourceNotFoundException", tableName)
 		}
 	}
-	colDLL, ok := models.TableDDL[changeTableNameForSP(tableName)]
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", tableName)
 	}
-	tableName = changeTableNameForSP(tableName)
+	tableName = utils.ChangeTableNameForSpanner(tableName)
 	client := s.getSpannerClient(tableName)
 	row, err := client.Single().ReadRow(ctx, tableName, key, projectionCols)
 	if err := errors.AssignError(err); err != nil {
@@ -315,7 +315,7 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 
 // ExecuteSpannerQuery - this will execute query on spanner database
 func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []string, isCountQuery bool, stmt spanner.Statement) ([]map[string]interface{}, error) {
-	colDLL, ok := models.TableDDL[changeTableNameForSP(table)]
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
@@ -367,7 +367,7 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 				return errors.New("ConditionalCheckFailedException", eval, expr)
 			}
 		}
-		table = changeTableNameForSP(table)
+		table = utils.ChangeTableNameForSpanner(table)
 		for k, v := range tmpMap {
 			update[k] = v
 		}
@@ -378,7 +378,7 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 }
 
 func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
-	colDDL, ok := models.TableDDL[changeTableNameForSP(table)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return false, errors.New("ResourceNotFoundException", table)
 	}
@@ -414,10 +414,10 @@ func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTran
 		cols = e.Cols
 	}
 
-	linq.From(cols).IntersectByT(linq.From(models.TableColumnMap[changeTableNameForSP(table)]), func(str string) string {
+	linq.From(cols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
 		return str
 	}).ToSlice(&cols)
-	r, err := t.ReadRow(ctx, changeTableNameForSP(table), key, cols)
+	r, err := t.ReadRow(ctx, utils.ChangeTableNameForSpanner(table), key, cols)
 	if e := errors.AssignError(err); e != nil {
 		return false, e
 	}
@@ -525,8 +525,8 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 // SpannerBatchPut - this insert or update data in batch
 func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[string]interface{}) error {
 	mutations := make([]*spanner.Mutation, len(m))
-	ddl := models.TableDDL[changeTableNameForSP(table)]
-	table = changeTableNameForSP(table)
+	ddl := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	table = utils.ChangeTableNameForSpanner(table)
 	for i := 0; i < len(m); i++ {
 		for k, v := range m[i] {
 			t, ok := ddl[k]
@@ -567,7 +567,7 @@ func (s Storage) SpannerDelete(ctx context.Context, table string, m map[string]i
 		if err != nil {
 			return err
 		}
-		table = changeTableNameForSP(table)
+		table = utils.ChangeTableNameForSpanner(table)
 
 		pKey := tableConf.PartitionKey
 		pValue, ok := tmpMap[pKey]
@@ -603,7 +603,7 @@ func (s Storage) SpannerBatchDelete(ctx context.Context, table string, keys []ma
 	if err != nil {
 		return err
 	}
-	table = changeTableNameForSP(table)
+	table = utils.ChangeTableNameForSpanner(table)
 
 	pKey := tableConf.PartitionKey
 	ms := make([]*spanner.Mutation, len(keys))
@@ -640,7 +640,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 	if err != nil {
 		return nil, err
 	}
-	colDLL, ok := models.TableDDL[changeTableNameForSP(table)]
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
@@ -684,7 +684,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 				return errors.New("ConditionalCheckFailedException")
 			}
 		}
-		table = changeTableNameForSP(table)
+		table = utils.ChangeTableNameForSpanner(table)
 
 		r, err := t.ReadRow(ctx, table, key, cols)
 		if err != nil {
@@ -804,7 +804,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 	if err != nil {
 		return err
 	}
-	colDLL, ok := models.TableDDL[changeTableNameForSP(table)]
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return errors.New("ResourceNotFoundException", table)
 	}
@@ -847,7 +847,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 				return errors.New("ConditionalCheckFailedException")
 			}
 		}
-		table = changeTableNameForSP(table)
+		table = utils.ChangeTableNameForSpanner(table)
 
 		r, err := t.ReadRow(ctx, table, key, cols)
 		if err != nil {
@@ -935,7 +935,7 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 		for _, col := range colsToRemove {
 			tmpMap[col] = null
 		}
-		table = changeTableNameForSP(table)
+		table = utils.ChangeTableNameForSpanner(table)
 		mutation := spanner.InsertOrUpdateMap(table, tmpMap)
 		err := t.BufferWrite([]*spanner.Mutation{mutation})
 		if err != nil {
@@ -944,11 +944,6 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 		return nil
 	})
 	return err
-}
-
-func changeTableNameForSP(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
 }
 
 var queryHash = make(map[string]string)

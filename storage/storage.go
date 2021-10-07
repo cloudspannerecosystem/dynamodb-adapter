@@ -26,6 +26,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 	"github.com/tidwall/gjson"
 )
 
@@ -87,5 +88,5 @@ func GetStorageInstance() *Storage {
 }
 
 func (s Storage) getSpannerClient(tableName string) *spanner.Client {
-	return s.spannerClient[models.SpannerTableMap[changeTableNameForSP(tableName)]]
+	return s.spannerClient[models.SpannerTableMap[utils.ChangeTableNameForSpanner(tableName)]]
 }

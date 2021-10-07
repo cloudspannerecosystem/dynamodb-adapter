@@ -49,7 +49,7 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 		}
 	}
 
-	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[changeTableNameForSP(table)]), func(str string) string {
+	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
 		return str
 	}).ToSlice(&projectionCols)
 	return projectionCols
@@ -328,7 +328,7 @@ func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]strin
 	if query.OnlyCount {
 		return []string{"count"}, "COUNT(" + pKey + ") AS count", true, nil
 	}
-	table := changeTableNameForSP(query.TableName)
+	table := utils.ChangeTableNameForSpanner(query.TableName)
 	var cols []string
 	if query.ProjectionExpression != "" {
 		cols = getSpannerProjections(query.ProjectionExpression, query.TableName, query.ExpressionAttributeNames)
@@ -380,13 +380,8 @@ func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]strin
 	return cols, colStr, false, nil
 }
 
-func changeTableNameForSP(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
-}
-
 func parseSpannerTableName(query *models.Query) string {
-	tableName := changeTableNameForSP(query.TableName)
+	tableName := utils.ChangeTableNameForSpanner(query.TableName)
 	if query.IndexName != "" {
 		tableName += "@{FORCE_INDEX=" + query.IndexName + "}"
 	}

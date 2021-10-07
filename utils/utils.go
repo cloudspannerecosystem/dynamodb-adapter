@@ -165,3 +165,10 @@ func ParseBeginsWith(rangeExpression string) (string, string, string) {
 
 	return "", "", rangeExpression
 }
+
+// ChangeTableNameForSpanner - ReplaceAll the hyphens (-) with underscore for given table name
+// https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions
+func ChangeTableNameForSpanner(tableName string) string {
+	tableName = strings.ReplaceAll(tableName, "-", "_")
+	return tableName
+}
