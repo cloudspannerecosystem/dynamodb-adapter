@@ -557,38 +557,6 @@ func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}
 	return rs, err
 }
 
-func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[string]interface{}, error) {
-
-	var startFrom map[string]interface{}
-	var result []map[string]interface{}
-	query := models.Query{}
-	query.TableName = tableName
-	var originalLimit int64 = config.ConfigurationMap.QueryLimit
-	query.Limit = originalLimit + 1
-	for {
-		query.StartFrom = startFrom
-		stmt, cols, isCountQuery, offset, _, err := createSpannerQuery(&query, pKey, pKey, sKey)
-		if err != nil {
-			return nil, err
-		}
-		resp, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, query.TableName, cols, isCountQuery, stmt)
-		if err != nil {
-			return nil, err
-		}
-		lastIndex := len(resp) - 1
-		pVal, ok := resp[lastIndex][pKey]
-		if !ok {
-			return nil, errors.New("ResourceNotFoundException")
-		}
-		startFrom = map[string]interface{}{pKey: pVal, "offset": originalLimit + offset}
-		result = append(result, resp...)
-		if len(resp) < int(originalLimit) {
-			break
-		}
-	}
-	return result, nil
-}
-
 // Remove for remove operation in update
 func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr, actionValue string, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}) (map[string]interface{}, error) {
 	actionValue = strings.ReplaceAll(actionValue, " ", "")

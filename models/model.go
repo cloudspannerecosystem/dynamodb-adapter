@@ -231,12 +231,6 @@ type UpdateExpressionCondition struct {
 	AddValues map[string]float64
 }
 
-type dynamodbAdapterTableDdl struct {
-	Table    string
-	Column   string
-	DataType string
-}
-
 // ConfigControllerModel for Config controller
 type ConfigControllerModel struct {
 	Mux               sync.RWMutex

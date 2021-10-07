@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integrationtest
+package main
 
 import (
 	"context"
@@ -34,108 +34,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	apiURL           = "http://127.0.0.1:9050"
-	version          = "v1"
-	expectedRowCount = 18
-)
-
 // database name used in all the test cases
 var databaseName string
-
-var (
-	InitialSetupParamsName = "0: InitialSetup"
-	InitialSetupParams = models.BatchWriteItem{
-		RequestItems: map[string][]models.BatchWriteSubItems{
-			"employee": {
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":     {N: aws.String("1")},
-							"age":        {N: aws.String("10")},
-							"address":    {S: aws.String("Shamli")},
-							"first_name": {S: aws.String("Marc")},
-							"last_name":  {S: aws.String("Richards")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":     {N: aws.String("2")},
-							"age":        {N: aws.String("20")},
-							"address":    {S: aws.String("Ney York")},
-							"first_name": {S: aws.String("Catalina")},
-							"last_name":  {S: aws.String("Smith")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":     {N: aws.String("3")},
-							"age":        {N: aws.String("30")},
-							"address":    {S: aws.String("Pune")},
-							"first_name": {S: aws.String("Alice")},
-							"last_name":  {S: aws.String("Trentor")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":     {N: aws.String("4")},
-							"age":        {N: aws.String("40")},
-							"address":    {S: aws.String("Silicon Valley")},
-							"first_name": {S: aws.String("Lea")},
-							"last_name":  {S: aws.String("Martin")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":     {N: aws.String("5")},
-							"age":        {N: aws.String("50")},
-							"address":    {S: aws.String("London")},
-							"first_name": {S: aws.String("David")},
-							"last_name":  {S: aws.String("Lomond")},
-						},
-					},
-				},
-			},
-			"department": {
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"d_id":             {N: aws.String("100")},
-							"d_name":           {S: aws.String("Engineering")},
-							"d_specialization": {S: aws.String("CSE, ECE, Civil")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"d_id":             {N: aws.String("200")},
-							"d_name":           {S: aws.String("Arts")},
-							"d_specialization": {S: aws.String("BA")},
-						},
-					},
-				},
-				{
-					PutReq: models.BatchPutItem{
-						Item: map[string]*dynamodb.AttributeValue{
-							"d_id":             {N: aws.String("300")},
-							"d_name":           {S: aws.String("Culture")},
-							"d_specialization": {S: aws.String("History")},
-						},
-					},
-				},
-			},
-		},
-	}
-)
 
 // params for TestGetItemAPI
 var (
@@ -542,33 +442,33 @@ var (
 		Limit:         4,
 	}
 
-	queryTestCaseOutput1 = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput1 = `{"Count":5,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
-	queryTestCaseOutput2 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput2 = `{"Count":5,"Items":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"}}]}`
 
-	queryTestCaseOutput3 = `{"Count":5,"Items":{"L":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput3 = `{"Count":5,"Items":[{"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
-	queryTestCaseOutput4 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput4 = `{"Count":1,"Items":[{"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}}]}`
 
-	queryTestCaseOutput6 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput6 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
-	queryTestCaseOutput8 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput8 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
-	queryTestCaseOutput9 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput9 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
-	queryTestCaseOutput10 = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput10 = `{"Count":5,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
-	queryTestCaseOutput11 = `{"Count":4,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}]},"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
+	queryTestCaseOutput11 = `{"Count":4,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}],"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
 
-	queryTestCaseOutput12 = `{"Count":4,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}]},"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
+	queryTestCaseOutput12 = `{"Count":4,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}}],"LastEvaluatedKey":{"emp_id":{"N":"4"},"offset":{"N":"4"}}}`
 
-	queryTestCaseOutput13 = `{"Count":5,"Items":{"L":[]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput13 = `{"Count":5,"Items":[]}`
 
-	queryTestCaseOutput14 = `{"Count":1,"Items":{"L":[]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput14 = `{"Count":1,"Items":[]}`
 
-	queryTestCaseOutput15 = `{"Count":1,"Items":{"L":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput15 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
-	queryTestCaseOutput16 = `{"Count":1,"Items":{"L":[]},"LastEvaluatedKey":null}`
+	queryTestCaseOutput16 = `{"Count":1,"Items":[]}`
 )
 
 //Test Data for Scan API
@@ -582,21 +482,21 @@ var (
 	ScanTestCase2     = models.ScanMeta{
 		TableName: "employee",
 	}
-	ScanTestCase2Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase2Output = `{"Count":5,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
 	ScanTestCase3Name = "3: With Limit Attribute"
 	ScanTestCase3     = models.ScanMeta{
 		TableName: "employee",
 		Limit:     3,
 	}
-	ScanTestCase3Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
+	ScanTestCase3Output = `{"Count":3,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}],"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	ScanTestCase4Name = "4: With Projection Expression"
 	ScanTestCase4     = models.ScanMeta{
 		TableName:            "employee",
 		ProjectionExpression: "address, emp_id, first_name",
 	}
-	ScanTestCase4Output = `{"Count":5,"Items":{"L":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase4Output = `{"Count":5,"Items":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}},{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"}}]}`
 
 	ScanTestCase5Name = "5: With Projection Expression & limit"
 	ScanTestCase5     = models.ScanMeta{
@@ -604,7 +504,7 @@ var (
 		Limit:                3,
 		ProjectionExpression: "address, emp_id, first_name",
 	}
-	ScanTestCase5Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
+	ScanTestCase5Output = `{"Count":3,"Items":[{"address":{"S":"Shamli"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"}},{"address":{"S":"Ney York"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"}},{"address":{"S":"Pune"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"}}],"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	ScanTestCase6Name = "6: Projection Expression without ExpressionAttributeNames"
 	ScanTestCase6     = models.ScanMeta{
@@ -616,7 +516,7 @@ var (
 		},
 		ProjectionExpression: "address, #ag, emp_id, first_name, last_name",
 	}
-	ScanTestCase6Output = `{"Count":2,"Items":{"L":[{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase6Output = `{"Count":2,"Items":[{"address":{"S":"Silicon Valley"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
 	ScanTestCase7Name = "7: Projection Expression with ExpressionAttributeNames"
 	ScanTestCase7     = models.ScanMeta{
@@ -625,7 +525,7 @@ var (
 		Limit:                    3,
 		ProjectionExpression:     "address, #ag, emp_id, first_name, last_name",
 	}
-	ScanTestCase7Output = `{"Count":3,"Items":{"L":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]},"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
+	ScanTestCase7Output = `{"Count":3,"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}},{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}],"LastEvaluatedKey":{"emp_id":{"N":"3"},"offset":{"N":"3"}}}`
 
 	//400 Bad request
 	ScanTestCase8Name = "8: Filter Expression without ExpressionAttributeValues"
@@ -646,7 +546,7 @@ var (
 		},
 		FilterExpression: "age > :val1",
 	}
-	ScanTestCase9Output = `{"Count":4,"Items":{"L":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase9Output = `{"Count":4,"Items":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
 	//400 bad request
 	ScanTestCase10Name = "10: FilterExpression & ExpressionAttributeValues without ExpressionAttributeNames"
@@ -667,7 +567,7 @@ var (
 		},
 		FilterExpression: "age > :val1",
 	}
-	ScanTestCase11Output = `{"Count":4,"Items":{"L":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase11Output = `{"Count":4,"Items":[{"address":{"S":"Ney York"},"age":{"N":"20"},"emp_id":{"N":"2"},"first_name":{"S":"Catalina"},"last_name":{"S":"Smith"}},{"address":{"S":"Pune"},"age":{"N":"30"},"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}},{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
 	ScanTestCase12Name = "12: With ExclusiveStartKey"
 	ScanTestCase12     = models.ScanMeta{
@@ -678,7 +578,7 @@ var (
 		},
 		Limit: 3,
 	}
-	ScanTestCase12Output = `{"Count":2,"Items":{"L":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]},"LastEvaluatedKey":null}`
+	ScanTestCase12Output = `{"Count":2,"Items":[{"address":{"S":"Silicon Valley"},"age":{"N":"40"},"emp_id":{"N":"4"},"first_name":{"S":"Lea"},"last_name":{"S":"Martin"}},{"address":{"S":"London"},"age":{"N":"50"},"emp_id":{"N":"5"},"first_name":{"S":"David"},"last_name":{"S":"Lomond"}}]}`
 
 	ScanTestCase13Name = "13: With Count"
 	ScanTestCase13     = models.ScanMeta{
@@ -686,7 +586,7 @@ var (
 		Limit:     3,
 		Select:    "COUNT",
 	}
-	ScanTestCase13Output = `{"Count":5,"Items":{"L":[]},"LastEvaluatedKey":null}`
+	ScanTestCase13Output = `{"Count":5,"Items":[]}`
 )
 
 //Test Data for UpdateItem API
@@ -747,14 +647,13 @@ var (
 		},
 	}
 
-	//400 Bad request
 	UpdateItemTestCase6Name = "6: UpdateExpression,ExpressionAttributeValues without ExpressionAttributeNames"
 	UpdateItemTestCase6     = models.UpdateAttr{
 		TableName: "employee",
 		Key: map[string]*dynamodb.AttributeValue{
 			"emp_id": {N: aws.String("1")},
 		},
-		UpdateExpression: "SET #ag = :age",
+		UpdateExpression: "SET age = :age",
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":age": {N: aws.String("10")},
 		},
@@ -831,27 +730,11 @@ var (
 
 //Test Data for PutItem API
 var (
-	PutItemTestCase = models.Meta{
-		TableName: "employee",
-		Item: map[string]*dynamodb.AttributeValue{
-			"emp_id": {N: aws.String("1")},
-		},
-		ConditionExpression: "#ag > :val2",
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":age":  {N: aws.String("10")},
-			":val2": {N: aws.String("9")},
-		},
-		ExpressionAttributeNames: map[string]string{
-			"#ag": "age",
-		},
-	}
-
-	//200 status check
+	//400 bad request
 	PutItemTestCase1Name = "1: only tablename passed"
 	PutItemTestCase1     = models.Meta{
 		TableName: "employe",
 	}
-	PutItemTestCase1Output = ``
 
 	PutItemTestCase2Name = "2: Item Value to be updated"
 	PutItemTestCase2     = models.Meta{
@@ -1560,7 +1443,7 @@ func testGetItemAPI(t *testing.T) {
 			},
 			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1" },
 			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
-				return getItemTest1
+				return getItemTest1_1
 			},
 			ExpHTTPStatus: http.StatusBadRequest,
 		},
@@ -1781,6 +1664,7 @@ func testUpdateItemAPI(t *testing.T) {
 	tests := []apitesting.APITestCase{
 		createStatusCheckPostTestCase(UpdateItemTestCase1Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase1),
 		createStatusCheckPostTestCase(UpdateItemTestCase4Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase4),
+		createStatusCheckPostTestCase(UpdateItemTestCase6Name, "/v1", "UpdateItem", http.StatusOK, UpdateItemTestCase6),
 		createStatusCheckPostTestCase(UpdateItemTestCase5Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase5),
 		createStatusCheckPostTestCase(UpdateItemTestCase8Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase8),
 		createStatusCheckPostTestCase(UpdateItemTestCase9Name, "/v1", "UpdateItem", http.StatusBadRequest, UpdateItemTestCase9),
@@ -1855,6 +1739,10 @@ func testBatchWriteItemAPI(t *testing.T) {
 }
 
 func TestApi(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
 	// this is done to maintain the order of the test cases
 	var testNames = []string{
 		"GetItemAPI",

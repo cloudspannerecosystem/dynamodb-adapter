@@ -78,19 +78,19 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 		if err != nil {
 			return nil, err
 		}
-		if singleRow != nil && len(singleRow) > 0 {
+		if len(singleRow) > 0 {
 			allRows = append(allRows, singleRow)
 		}
 	}
 	return allRows, nil
 }
 
-func createRowMap(r *spanner.Row, colDDL map[string]string, cols []string) (map[string]interface{}, error) {
+func createRowMap(r *spanner.Row, colDDL map[string]string) (map[string]interface{}, error) {
 	singleRow := make(map[string]interface{})
 	if r == nil {
 		return singleRow, nil
 	}
-	cols = r.ColumnNames()
+	cols := r.ColumnNames()
 	for i, k := range cols {
 		if k == "" {
 			continue
@@ -112,7 +112,10 @@ func createRowMap(r *spanner.Row, colDDL map[string]string, cols []string) (map[
 			err := r.Column(i, &s)
 			if err == nil {
 				var m interface{}
-				json.Unmarshal(s, &m)
+				err = json.Unmarshal(s, &m)
+				if err != nil {
+					logger.LogError(err, string(s))
+				}
 				singleRow[k] = m
 			}
 		case "INT64":
@@ -138,13 +141,14 @@ func createRowMap(r *spanner.Row, colDDL map[string]string, cols []string) (map[
 	return singleRow, nil
 }
 
+//nolint:staticcheck
 func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (map[string]interface{}, error) {
 	singleRow := make(map[string]interface{})
 	if r == nil {
 		return singleRow, nil
 	}
 
-	cols = r.ColumnNames()
+	cols = r.ColumnNames() //nolint:staticcheck
 	for i, k := range cols {
 		if k == "" || k == "commit_timestamp" {
 			continue
@@ -282,7 +286,7 @@ func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (m
 
 // SpannerGet - get with spanner
 func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error) {
-	key := spanner.Key{}
+	var key spanner.Key
 	if sKeys == nil {
 		key = spanner.Key{pKeys}
 	} else {
@@ -316,8 +320,7 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
 	go captureQueryHash(table, stmt.SQL)
-	var itr *spanner.RowIterator
-	itr = s.getSpannerClient(table).Single().WithTimestampBound(spanner.ExactStaleness(time.Second*10)).Query(ctx, stmt)
+	itr := s.getSpannerClient(table).Single().WithTimestampBound(spanner.ExactStaleness(time.Second*10)).Query(ctx, stmt)
 	defer itr.Stop()
 	allRows := []map[string]interface{}{}
 	for {
@@ -418,7 +421,7 @@ func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTran
 	if e := errors.AssignError(err); e != nil {
 		return false, e
 	}
-	rowMap, err := createRowMap(r, colDDL, cols)
+	rowMap, err := createRowMap(r, colDDL)
 	if err != nil {
 		return false, err
 	}
@@ -485,20 +488,14 @@ func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap m
 			return true
 		}
 		_, ok := rowMap[colName]
-		if ok {
-			return false
-		}
-		return true
+		return !ok 
 	}
 	if strings.HasPrefix(conditionalExpression, "attribute_exists") || strings.HasPrefix(conditionalExpression, "if_exists") {
 		if len(rowMap) == 0 {
 			return false
 		}
 		_, ok := rowMap[colName]
-		if ok {
-			return true
-		}
-		return false
+		return ok
 	}
 	return rowMap[conditionalExpression]
 }
@@ -748,7 +745,10 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 					var ifaces1 []interface{}
 					ba, ok := v.([]byte)
 					if ok {
-						json.Unmarshal(ba, &ifaces1)
+						err = json.Unmarshal(ba, &ifaces1)
+						if err != nil {
+							logger.LogError(err, string(ba))
+						}
 					} else {
 						ifaces1 = v.([]interface{})
 					}
@@ -865,8 +865,10 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 					var ifaces1 []interface{}
 					ba, ok := v.([]byte)
 					if ok {
-
-						json.Unmarshal(ba, &ifaces1)
+						err = json.Unmarshal(ba, &ifaces1)
+						if err != nil {
+							logger.LogError(err, string(ba))
+						}
 					} else {
 						ifaces1 = v.([]interface{})
 					}
@@ -945,7 +947,6 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 }
 
 var queryHash = make(map[string]string)
-var pushFlag bool
 var mux = new(sync.Mutex)
 
 func captureQueryHash(table string, query string) {
@@ -953,7 +954,6 @@ func captureQueryHash(table string, query string) {
 	defer mux.Unlock()
 	_, ok := queryHash[query]
 	if !ok {
-		pushFlag = true
 		queryHash[query] = table
 	}
 }

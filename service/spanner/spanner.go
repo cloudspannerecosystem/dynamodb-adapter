@@ -16,7 +16,6 @@ package spanner
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
@@ -24,11 +23,6 @@ import (
 
 	"cloud.google.com/go/spanner"
 )
-
-var colNameRg = regexp.MustCompile("^[a-zA-Z0-9_]*$")
-var chars = []string{"]", "^", "\\\\", "/", "[", ".", "(", ")", "-"}
-var ss = strings.Join(chars, "")
-var specialCharRg = regexp.MustCompile("[" + ss + "]+")
 
 // ParseDDL - this will parse DDL of spannerDB and set all the table configs in models
 // This fetches the spanner schema config from dynamodb_adapter_table_ddl table and stored it in

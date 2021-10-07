@@ -103,10 +103,6 @@ func main() {
 	}
 }
 
-func createInstance(instance string) error {
-	return nil
-}
-
 func createDatabase(w io.Writer, db string) error {
 	matches := regexp.MustCompile("^(.*)/databases/(.*)$").FindStringSubmatch(db)
 	if matches == nil || len(matches) != 3 {
@@ -313,7 +309,10 @@ func initData(w io.Writer, db string) error {
 		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
 		return err
 	})
-
+	if err != nil {
+		return err
+	}
+	
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT department (d_id, d_name, d_specialization) VALUES
