@@ -74,7 +74,7 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 			}
 			return nil, errors.New("ValidationException", err)
 		}
-		singleRow, err := parseRowForNull(r, colDLL, projectionCols)
+		singleRow, err := parseRow(r, colDLL)
 		if err != nil {
 			return nil, err
 		}
@@ -83,205 +83,6 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 		}
 	}
 	return allRows, nil
-}
-
-func createRowMap(r *spanner.Row, colDDL map[string]string) (map[string]interface{}, error) {
-	singleRow := make(map[string]interface{})
-	if r == nil {
-		return singleRow, nil
-	}
-	cols := r.ColumnNames()
-	for i, k := range cols {
-		if k == "" {
-			continue
-		}
-		k = strings.TrimSpace(k)
-		v, ok := colDDL[k]
-		if !ok {
-			return nil, errors.New("ResourceNotFoundException", k)
-		}
-		switch v {
-		case "STRING(MAX)":
-			var s string
-			err := r.Column(i, &s)
-			if err == nil {
-				singleRow[k] = s
-			}
-		case "BYTES(MAX)":
-			var s []byte
-			err := r.Column(i, &s)
-			if err == nil {
-				var m interface{}
-				err = json.Unmarshal(s, &m)
-				if err != nil {
-					logger.LogError(err, string(s))
-				}
-				singleRow[k] = m
-			}
-		case "INT64":
-			var s int64
-			err := r.Column(i, &s)
-			if err == nil {
-				singleRow[k] = s
-			}
-		case "FLOAT64":
-			var s float64
-			err := r.Column(i, &s)
-			if err == nil {
-				singleRow[k] = s
-			}
-		case "BOOL":
-			var s bool
-			err := r.Column(i, &s)
-			if err == nil {
-				singleRow[k] = s
-			}
-		}
-	}
-	return singleRow, nil
-}
-
-//nolint:staticcheck
-func parseRowForNull(r *spanner.Row, colDDL map[string]string, cols []string) (map[string]interface{}, error) {
-	singleRow := make(map[string]interface{})
-	if r == nil {
-		return singleRow, nil
-	}
-
-	cols = r.ColumnNames() //nolint:staticcheck
-	for i, k := range cols {
-		if k == "" || k == "commit_timestamp" {
-			continue
-		}
-		v, ok := colDDL[k]
-		if !ok {
-			return nil, errors.New("ResourceNotFoundException", k)
-		}
-		switch v {
-		case "STRING(MAX)":
-			var s spanner.NullString
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-			}
-			if !s.IsNull() {
-				singleRow[k] = s.StringVal
-			}
-		case "BYTES(MAX)":
-			var s []byte
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-			}
-			if len(s) > 0 {
-				var m interface{}
-				err := json.Unmarshal(s, &m)
-				if err != nil {
-					logger.LogError(err, string(s))
-					singleRow[k] = string(s)
-					continue
-				}
-				val1, ok := m.(string)
-				if ok {
-					if base64Regexp.MatchString(val1) {
-						ba, err := base64.StdEncoding.DecodeString(val1)
-						if err == nil {
-							var sample interface{}
-							err = json.Unmarshal(ba, &sample)
-							if err == nil {
-								singleRow[k] = sample
-								continue
-							} else {
-								singleRow[k] = string(s)
-								continue
-							}
-						}
-					}
-				}
-
-				if mp, ok := m.(map[string]interface{}); ok {
-					for k, v := range mp {
-						if val, ok := v.(string); ok {
-							if base64Regexp.MatchString(val) {
-								ba, err := base64.StdEncoding.DecodeString(val)
-								if err == nil {
-									var sample interface{}
-									err = json.Unmarshal(ba, &sample)
-									if err == nil {
-										mp[k] = sample
-										m = mp
-									}
-								}
-							}
-						}
-					}
-				}
-				singleRow[k] = m
-			}
-		case "INT64":
-			var s spanner.NullInt64
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-			}
-			if !s.IsNull() {
-				singleRow[k] = s.Int64
-			}
-		case "FLOAT64":
-			var s spanner.NullFloat64
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-
-			}
-			if !s.IsNull() {
-				singleRow[k] = s.Float64
-			}
-		case "NUMERIC":
-			var s spanner.NullNumeric
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-			}
-			if !s.IsNull() {
-				if s.Numeric.IsInt() {
-					tmp, _ := s.Numeric.Float64()
-					singleRow[k] = int64(tmp)
-				} else {
-					singleRow[k], _ = s.Numeric.Float64()
-				}
-			}
-		case "BOOL":
-			var s spanner.NullBool
-			err := r.Column(i, &s)
-			if err != nil {
-				if strings.Contains(err.Error(), "ambiguous column name") {
-					continue
-				}
-				return nil, errors.New("ValidationException", err, k)
-
-			}
-			if !s.IsNull() {
-				singleRow[k] = s.Bool
-			}
-		}
-	}
-	return singleRow, nil
 }
 
 // SpannerGet - get with spanner
@@ -310,7 +111,7 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 		return nil, errors.New("ResourceNotFoundException", tableName, key, err)
 	}
 
-	return parseRowForNull(row, colDLL, projectionCols)
+	return parseRow(row, colDLL)
 }
 
 // ExecuteSpannerQuery - this will execute query on spanner database
@@ -341,7 +142,7 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 			allRows = append(allRows, singleRow)
 			break
 		}
-		singleRow, err := parseRowForNull(r, colDLL, cols)
+		singleRow, err := parseRow(r, colDLL)
 		if err != nil {
 			return nil, err
 		}
@@ -375,176 +176,6 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 	})
 
 	return update, err
-}
-
-func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
-	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
-	if !ok {
-		return false, errors.New("ResourceNotFoundException", table)
-	}
-	tableConf, err := config.GetTableConf(table)
-	if err != nil {
-		return false, err
-	}
-
-	pKey := tableConf.PartitionKey
-	pValue, ok := m[pKey]
-	if !ok {
-		return false, errors.New("ValidationException", pKey)
-	}
-	var key spanner.Key
-	sKey := tableConf.SortKey
-	if sKey != "" {
-		sValue, ok := m[sKey]
-		if !ok {
-			return false, errors.New("ValidationException", sKey)
-		}
-		key = spanner.Key{pValue, sValue}
-
-	} else {
-		key = spanner.Key{pValue}
-	}
-	var cols []string
-	if expr != nil {
-		cols = append(e.Cols, expr.Field...)
-		for k := range expr.AddValues {
-			cols = append(e.Cols, k)
-		}
-	} else {
-		cols = e.Cols
-	}
-
-	linq.From(cols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
-		return str
-	}).ToSlice(&cols)
-	r, err := t.ReadRow(ctx, utils.ChangeTableNameForSpanner(table), key, cols)
-	if e := errors.AssignError(err); e != nil {
-		return false, e
-	}
-	rowMap, err := createRowMap(r, colDDL)
-	if err != nil {
-		return false, err
-	}
-	if expr != nil {
-		for index := 0; index < len(expr.Field); index++ {
-			status := evaluateStatementFromRowMap(expr.Condition[index], expr.Field[index], rowMap)
-			tmp, ok := status.(bool)
-			if !ok || !tmp {
-				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
-
-					tmp, ok := rowMap[expr.Field[index]].(float64)
-					if ok {
-						m[expr.Field[index]] = tmp + v1
-						err = checkInifinty(m[expr.Field[index]].(float64), expr)
-						if err != nil {
-							return false, err
-						}
-					}
-				} else {
-					delete(m, expr.Field[index])
-				}
-			} else {
-				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
-					tmp, ok := m[expr.Field[index]].(float64)
-					if ok {
-						m[expr.Field[index]] = tmp + v1
-						err = checkInifinty(m[expr.Field[index]].(float64), expr)
-						if err != nil {
-							return false, err
-						}
-					}
-				}
-			}
-			delete(expr.AddValues, expr.Field[index])
-		}
-		for k, v := range expr.AddValues {
-			val, ok := rowMap[k].(float64)
-			if ok {
-				m[k] = val + v
-				err = checkInifinty(m[k].(float64), expr)
-				if err != nil {
-					return false, err
-				}
-
-			} else {
-				m[k] = v
-			}
-		}
-	}
-	for i := 0; i < len(e.Attributes); i++ {
-		e.ValueMap[e.Tokens[i]] = evaluateStatementFromRowMap(e.Attributes[i], e.Cols[i], rowMap)
-	}
-
-	status, err := utils.EvaluateExpression(e)
-	if err != nil {
-		return false, err
-	}
-	return status, nil
-}
-
-func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap map[string]interface{}) interface{} {
-	if strings.HasPrefix(conditionalExpression, "attribute_not_exists") || strings.HasPrefix(conditionalExpression, "if_not_exists") {
-		if len(rowMap) == 0 {
-			return true
-		}
-		_, ok := rowMap[colName]
-		return !ok 
-	}
-	if strings.HasPrefix(conditionalExpression, "attribute_exists") || strings.HasPrefix(conditionalExpression, "if_exists") {
-		if len(rowMap) == 0 {
-			return false
-		}
-		_, ok := rowMap[colName]
-		return ok
-	}
-	return rowMap[conditionalExpression]
-}
-
-func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}) error {
-	ddl := models.TableDDL[table]
-	for k, v := range m {
-		t, ok := ddl[k]
-		if t == "BYTES(MAX)" && ok {
-			ba, err := json.Marshal(v)
-			if err != nil {
-				return errors.New("ValidationException", err)
-			}
-			m[k] = ba
-		}
-	}
-
-	mutation := spanner.InsertOrUpdateMap(table, m)
-	mutations := []*spanner.Mutation{mutation}
-	err := t.BufferWrite(mutations)
-	if e := errors.AssignError(err); e != nil {
-		return e
-	}
-	return nil
-}
-
-// SpannerBatchPut - this insert or update data in batch
-func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[string]interface{}) error {
-	mutations := make([]*spanner.Mutation, len(m))
-	ddl := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
-	table = utils.ChangeTableNameForSpanner(table)
-	for i := 0; i < len(m); i++ {
-		for k, v := range m[i] {
-			t, ok := ddl[k]
-			if t == "BYTES(MAX)" && ok {
-				ba, err := json.Marshal(v)
-				if err != nil {
-					return errors.New("ValidationException", err)
-				}
-				m[i][k] = ba
-			}
-		}
-		mutations[i] = spanner.InsertOrUpdateMap(table, m[i])
-	}
-	_, err := s.getSpannerClient(table).Apply(ctx, mutations)
-	if err != nil {
-		return errors.New("ResourceNotFoundException", err.Error())
-	}
-	return nil
 }
 
 // SpannerDelete - this will delete the data
@@ -690,7 +321,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 		if err != nil {
 			return errors.New("ResourceNotFoundException", err)
 		}
-		rs, err := parseRowForNull(r, colDLL, cols)
+		rs, err := parseRow(r, colDLL)
 		if err != nil {
 			return err
 		}
@@ -853,7 +484,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 		if err != nil {
 			return errors.New("ResourceNotFoundException", err)
 		}
-		rs, err := parseRowForNull(r, colDLL, cols)
+		rs, err := parseRow(r, colDLL)
 		if err != nil {
 			return err
 		}
@@ -944,6 +575,319 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 		return nil
 	})
 	return err
+}
+
+// SpannerBatchPut - this insert or update data in batch
+func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[string]interface{}) error {
+	mutations := make([]*spanner.Mutation, len(m))
+	ddl := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	table = utils.ChangeTableNameForSpanner(table)
+	for i := 0; i < len(m); i++ {
+		for k, v := range m[i] {
+			t, ok := ddl[k]
+			if t == "BYTES(MAX)" && ok {
+				ba, err := json.Marshal(v)
+				if err != nil {
+					return errors.New("ValidationException", err)
+				}
+				m[i][k] = ba
+			}
+		}
+		mutations[i] = spanner.InsertOrUpdateMap(table, m[i])
+	}
+	_, err := s.getSpannerClient(table).Apply(ctx, mutations)
+	if err != nil {
+		return errors.New("ResourceNotFoundException", err.Error())
+	}
+	return nil
+}
+
+func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}) error {
+	ddl := models.TableDDL[table]
+	for k, v := range m {
+		t, ok := ddl[k]
+		if t == "BYTES(MAX)" && ok {
+			ba, err := json.Marshal(v)
+			if err != nil {
+				return errors.New("ValidationException", err)
+			}
+			m[k] = ba
+		}
+	}
+
+	mutation := spanner.InsertOrUpdateMap(table, m)
+	mutations := []*spanner.Mutation{mutation}
+	err := t.BufferWrite(mutations)
+	if e := errors.AssignError(err); e != nil {
+		return e
+	}
+	return nil
+}
+
+func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	if !ok {
+		return false, errors.New("ResourceNotFoundException", table)
+	}
+	tableConf, err := config.GetTableConf(table)
+	if err != nil {
+		return false, err
+	}
+
+	pKey := tableConf.PartitionKey
+	pValue, ok := m[pKey]
+	if !ok {
+		return false, errors.New("ValidationException", pKey)
+	}
+	var key spanner.Key
+	sKey := tableConf.SortKey
+	if sKey != "" {
+		sValue, ok := m[sKey]
+		if !ok {
+			return false, errors.New("ValidationException", sKey)
+		}
+		key = spanner.Key{pValue, sValue}
+
+	} else {
+		key = spanner.Key{pValue}
+	}
+	var cols []string
+	if expr != nil {
+		cols = append(e.Cols, expr.Field...)
+		for k := range expr.AddValues {
+			cols = append(e.Cols, k)
+		}
+	} else {
+		cols = e.Cols
+	}
+
+	linq.From(cols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
+		return str
+	}).ToSlice(&cols)
+	r, err := t.ReadRow(ctx, utils.ChangeTableNameForSpanner(table), key, cols)
+	if e := errors.AssignError(err); e != nil {
+		return false, e
+	}
+	rowMap, err := parseRow(r, colDDL)
+	if err != nil {
+		return false, err
+	}
+	if expr != nil {
+		for index := 0; index < len(expr.Field); index++ {
+			status := evaluateStatementFromRowMap(expr.Condition[index], expr.Field[index], rowMap)
+			tmp, ok := status.(bool)
+			if !ok || !tmp {
+				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
+
+					tmp, ok := rowMap[expr.Field[index]].(float64)
+					if ok {
+						m[expr.Field[index]] = tmp + v1
+						err = checkInifinty(m[expr.Field[index]].(float64), expr)
+						if err != nil {
+							return false, err
+						}
+					}
+				} else {
+					delete(m, expr.Field[index])
+				}
+			} else {
+				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
+					tmp, ok := m[expr.Field[index]].(float64)
+					if ok {
+						m[expr.Field[index]] = tmp + v1
+						err = checkInifinty(m[expr.Field[index]].(float64), expr)
+						if err != nil {
+							return false, err
+						}
+					}
+				}
+			}
+			delete(expr.AddValues, expr.Field[index])
+		}
+		for k, v := range expr.AddValues {
+			val, ok := rowMap[k].(float64)
+			if ok {
+				m[k] = val + v
+				err = checkInifinty(m[k].(float64), expr)
+				if err != nil {
+					return false, err
+				}
+
+			} else {
+				m[k] = v
+			}
+		}
+	}
+	for i := 0; i < len(e.Attributes); i++ {
+		e.ValueMap[e.Tokens[i]] = evaluateStatementFromRowMap(e.Attributes[i], e.Cols[i], rowMap)
+	}
+
+	status, err := utils.EvaluateExpression(e)
+	if err != nil {
+		return false, err
+	}
+	return status, nil
+}
+
+func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap map[string]interface{}) interface{} {
+	if strings.HasPrefix(conditionalExpression, "attribute_not_exists") || strings.HasPrefix(conditionalExpression, "if_not_exists") {
+		if len(rowMap) == 0 {
+			return true
+		}
+		_, ok := rowMap[colName]
+		return !ok 
+	}
+	if strings.HasPrefix(conditionalExpression, "attribute_exists") || strings.HasPrefix(conditionalExpression, "if_exists") {
+		if len(rowMap) == 0 {
+			return false
+		}
+		_, ok := rowMap[colName]
+		return ok
+	}
+	return rowMap[conditionalExpression]
+}
+
+//parseRow - Converts Spanner row and datatypes to a map removing null columns from the result.
+func parseRow(r *spanner.Row, colDDL map[string]string) (map[string]interface{}, error) {
+	singleRow := make(map[string]interface{})
+	if r == nil {
+		return singleRow, nil
+	}
+
+	cols := r.ColumnNames()
+	for i, k := range cols {
+		if k == "" || k == "commit_timestamp" {
+			continue
+		}
+		v, ok := colDDL[k]
+		if !ok {
+			return nil, errors.New("ResourceNotFoundException", k)
+		}
+		switch v {
+		case "STRING(MAX)":
+			var s spanner.NullString
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+			}
+			if !s.IsNull() {
+				singleRow[k] = s.StringVal
+			}
+		case "BYTES(MAX)":
+			var s []byte
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+			}
+			if len(s) > 0 {
+				var m interface{}
+				err := json.Unmarshal(s, &m)
+				if err != nil {
+					logger.LogError(err, string(s))
+					singleRow[k] = string(s)
+					continue
+				}
+				val1, ok := m.(string)
+				if ok {
+					if base64Regexp.MatchString(val1) {
+						ba, err := base64.StdEncoding.DecodeString(val1)
+						if err == nil {
+							var sample interface{}
+							err = json.Unmarshal(ba, &sample)
+							if err == nil {
+								singleRow[k] = sample
+								continue
+							} else {
+								singleRow[k] = string(s)
+								continue
+							}
+						}
+					}
+				}
+
+				if mp, ok := m.(map[string]interface{}); ok {
+					for k, v := range mp {
+						if val, ok := v.(string); ok {
+							if base64Regexp.MatchString(val) {
+								ba, err := base64.StdEncoding.DecodeString(val)
+								if err == nil {
+									var sample interface{}
+									err = json.Unmarshal(ba, &sample)
+									if err == nil {
+										mp[k] = sample
+										m = mp
+									}
+								}
+							}
+						}
+					}
+				}
+				singleRow[k] = m
+			}
+		case "INT64":
+			var s spanner.NullInt64
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+			}
+			if !s.IsNull() {
+				singleRow[k] = s.Int64
+			}
+		case "FLOAT64":
+			var s spanner.NullFloat64
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+
+			}
+			if !s.IsNull() {
+				singleRow[k] = s.Float64
+			}
+		case "NUMERIC":
+			var s spanner.NullNumeric
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+			}
+			if !s.IsNull() {
+				if s.Numeric.IsInt() {
+					tmp, _ := s.Numeric.Float64()
+					singleRow[k] = int64(tmp)
+				} else {
+					singleRow[k], _ = s.Numeric.Float64()
+				}
+			}
+		case "BOOL":
+			var s spanner.NullBool
+			err := r.Column(i, &s)
+			if err != nil {
+				if strings.Contains(err.Error(), "ambiguous column name") {
+					continue
+				}
+				return nil, errors.New("ValidationException", err, k)
+
+			}
+			if !s.IsNull() {
+				singleRow[k] = s.Bool
+			}
+		}
+	}
+	return singleRow, nil
 }
 
 var queryHash = make(map[string]string)
