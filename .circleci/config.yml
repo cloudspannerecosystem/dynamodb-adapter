@@ -20,7 +20,7 @@ jobs:
 
   md_lint:
     docker:
-      - image: cimg/ruby:2.7
+      - image: circleci/ruby:2.7
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
