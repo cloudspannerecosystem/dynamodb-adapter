@@ -1,6 +1,7 @@
 # Integration Tests
 
-Running the integration tests will require the files present in the [staging](./config-files/staging) folder to be configured as below:
+Running the integration tests will require the files present in the
+[staging](./config-files/staging) folder to be configured as below:
 
 ## Config Files
 
@@ -11,7 +12,7 @@ Running the integration tests will require the files present in the [staging](./
     "GoogleProjectID": "<your-project-id>",
     "SpannerDb": "<any-db-name>",
     "QueryLimit": 5000
-}       
+}
 ```
 
 `config-files/staging/spanner.json`
