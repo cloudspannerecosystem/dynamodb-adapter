@@ -45,14 +45,14 @@ func StreamDataToThirdParty(oldImage, newImage map[string]interface{}, tableName
 	if !IsStreamEnabled(tableName) {
 		return
 	}
-	if (oldImage == nil || len(oldImage) == 0) && newImage == nil || len(newImage) == 0 {
+	if len(oldImage) == 0 && len(newImage) == 0 {
 		return
 	}
 	streamObj := models.StreamDataModel{}
 	tableConf, err := config.GetTableConf(tableName)
 	if err == nil {
 		streamObj.Keys = map[string]interface{}{}
-		if oldImage != nil && len(oldImage) > 0 {
+		if len(oldImage) > 0 {
 			streamObj.Keys[tableConf.PartitionKey] = oldImage[tableConf.PartitionKey]
 			if tableConf.SortKey != "" {
 				streamObj.Keys[tableConf.SortKey] = oldImage[tableConf.SortKey]
@@ -71,9 +71,9 @@ func StreamDataToThirdParty(oldImage, newImage map[string]interface{}, tableName
 	streamObj.Timestamp = time.Now().UnixNano()
 	streamObj.SequenceNumber = streamObj.Timestamp
 	streamObj.Table = tableName
-	if oldImage == nil || len(oldImage) == 0 {
+	if len(oldImage) == 0 {
 		streamObj.EventName = "INSERT"
-	} else if newImage == nil || len(newImage) == 0 {
+	} else if len(newImage) == 0 {
 		streamObj.EventName = "REMOVE"
 	} else {
 		streamObj.EventName = "MODIFY"

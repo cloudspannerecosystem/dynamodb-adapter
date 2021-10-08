@@ -19,7 +19,6 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -27,28 +26,9 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 	"github.com/tidwall/gjson"
 )
-
-var serviceName string = "DYNAMODB-ADAPTER"
-
-var hostName, _ = os.Hostname()
-
-func init() {
-	hostName = strings.ReplaceAll(hostName, ".", "-")
-	tokens := strings.Split(hostName, "-")
-	if len(tokens) >= 3 {
-		sb := strings.Builder{}
-		length := len(tokens) - 2
-		for i := 0; i < length; i++ {
-			sb.WriteString(tokens[i])
-			if i != length-1 {
-				sb.WriteString("-")
-			}
-		}
-		serviceName = sb.String()
-	}
-}
 
 // Storage object for intracting with storage package
 type Storage struct {
@@ -85,7 +65,7 @@ func InitializeDriver() {
 // Close - This gracefully returns the session pool objects, when driver gets exit signal
 func (s Storage) Close() {
 	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	<-shutdown
 	logger.LogDebug("Connection Shutdown start")
 	for _, v := range s.spannerClient {
@@ -108,5 +88,5 @@ func GetStorageInstance() *Storage {
 }
 
 func (s Storage) getSpannerClient(tableName string) *spanner.Client {
-	return s.spannerClient[models.SpannerTableMap[changeTableNameForSP(tableName)]]
+	return s.spannerClient[models.SpannerTableMap[utils.ChangeTableNameForSpanner(tableName)]]
 }

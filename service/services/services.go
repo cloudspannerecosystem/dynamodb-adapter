@@ -49,7 +49,7 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 		}
 	}
 
-	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[changeTableNameForSP(table)]), func(str string) string {
+	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
 		return str
 	}).ToSlice(&projectionCols)
 	return projectionCols
@@ -328,7 +328,7 @@ func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]strin
 	if query.OnlyCount {
 		return []string{"count"}, "COUNT(" + pKey + ") AS count", true, nil
 	}
-	table := changeTableNameForSP(query.TableName)
+	table := utils.ChangeTableNameForSpanner(query.TableName)
 	var cols []string
 	if query.ProjectionExpression != "" {
 		cols = getSpannerProjections(query.ProjectionExpression, query.TableName, query.ExpressionAttributeNames)
@@ -380,13 +380,8 @@ func parseSpannerColumns(query *models.Query, tPkey, pKey, sKey string) ([]strin
 	return cols, colStr, false, nil
 }
 
-func changeTableNameForSP(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
-}
-
 func parseSpannerTableName(query *models.Query) string {
-	tableName := changeTableNameForSP(query.TableName)
+	tableName := utils.ChangeTableNameForSpanner(query.TableName)
 	if query.IndexName != "" {
 		tableName += "@{FORCE_INDEX=" + query.IndexName + "}"
 	}
@@ -560,38 +555,6 @@ func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}
 
 	rs, _, err := QueryAttributes(ctx, query)
 	return rs, err
-}
-
-func scanSpanerTable(ctx context.Context, tableName, pKey, sKey string) ([]map[string]interface{}, error) {
-
-	var startFrom map[string]interface{}
-	var result []map[string]interface{}
-	query := models.Query{}
-	query.TableName = tableName
-	var originalLimit int64 = config.ConfigurationMap.QueryLimit
-	query.Limit = originalLimit + 1
-	for {
-		query.StartFrom = startFrom
-		stmt, cols, isCountQuery, offset, _, err := createSpannerQuery(&query, pKey, pKey, sKey)
-		if err != nil {
-			return nil, err
-		}
-		resp, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, query.TableName, cols, isCountQuery, stmt)
-		if err != nil {
-			return nil, err
-		}
-		lastIndex := len(resp) - 1
-		pVal, ok := resp[lastIndex][pKey]
-		if !ok {
-			return nil, errors.New("ResourceNotFoundException")
-		}
-		startFrom = map[string]interface{}{pKey: pVal, "offset": originalLimit + offset}
-		result = append(result, resp...)
-		if len(resp) < int(originalLimit) {
-			break
-		}
-	}
-	return result, nil
 }
 
 // Remove for remove operation in update

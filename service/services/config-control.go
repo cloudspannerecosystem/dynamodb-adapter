@@ -16,8 +16,6 @@ package services
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -29,20 +27,9 @@ import (
 	"github.com/robfig/cron"
 )
 
-var serviceName = "DYNAMODB-ADAPTER"
-
-func init() {
-	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if credFile != "" {
-		credFile = filepath.Base(credFile)
-		serviceName = strings.TrimSuffix(credFile, ".json")
-	}
-}
-
 var percentMap = make(map[string]int64)
 var counterTableIndex = make(map[string]int)
 var counters []int64
-var max int64 = 100
 var ctx = context.Background()
 
 var c *cron.Cron
@@ -50,7 +37,10 @@ var c *cron.Cron
 // StartConfigManager starts config mangager for fetching the config manager data after certain time
 func StartConfigManager() {
 	c = cron.New()
-	c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
+	err := c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
+	if err != nil {
+		logger.LogError(err)
+	}
 	c.Start()
 	fetchConfigData()
 }
@@ -134,7 +124,6 @@ func fetchConfigData() {
 
 		count++
 	}
-	return
 }
 
 func parseConfig(table string, config string, count int) {

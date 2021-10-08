@@ -38,7 +38,12 @@ func init() {
 		log.Fatal(err)
 	}
 	logger = tmp.Sugar()
-	defer logger.Sync()
+	defer func() {
+		err = logger.Sync()
+	}()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // LogError - This is error level log

@@ -3,12 +3,33 @@
 # Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
 jobs:
-  build_and_test:
+  build:
     docker:
       - image: circleci/golang:1.13
-
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    steps:
+      - checkout
+      - run: go build
 
+  lint:
+    docker:
+      - image: golangci/golangci-lint:latest-alpine
+    steps:
+      - checkout
+      - run: golangci-lint run --timeout 5m
+
+  unit_test:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    steps:
+      - checkout
+      - run: go test -v -short ./...
+
+  integration_test:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
       - run:
@@ -16,9 +37,6 @@ jobs:
           command: |
             echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
             echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
-      - run:
-          name: lint
-          command: golint
       - run:
           name: integration tests
           command: |
@@ -72,7 +90,15 @@ workflows:
 
   commit:  # Run on every commit.
     jobs:
-      - build_and_test
+      - build
+      - lint
+      - unit_test
+      - integration_test:
+          filters:
+            branches:
+              only:
+                  - master
+                  - baseline
 
   nightly:  # Run every night.
     triggers:
@@ -83,4 +109,7 @@ workflows:
               only:
                   - master
     jobs:
-      - build_and_test
+      - build
+      - lint
+      - unit_test
+      - integration_test

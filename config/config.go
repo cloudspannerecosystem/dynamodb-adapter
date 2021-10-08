@@ -26,6 +26,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
 
 // Configuration struct
@@ -87,7 +88,7 @@ func InitConfig(box *rice.Box) {
 			logger.LogFatal(err)
 		}
 		for k, v := range tmp {
-			models.SpannerTableMap[changeTableNameForSpanner(k)] = v
+			models.SpannerTableMap[utils.ChangeTableNameForSpanner(k)] = v
 		}
 	})
 }
@@ -108,11 +109,4 @@ func GetTableConf(tableName string) (models.TableConfig, error) {
 		return tableConf, nil
 	}
 	return models.TableConfig{}, errors.New("ResourceNotFoundException", tableName)
-}
-
-// changeTableNameForSpanner - ReplaceAll the hyphens (-) with underscore for given table name
-// https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions
-func changeTableNameForSpanner(tableName string) string {
-	tableName = strings.ReplaceAll(tableName, "-", "_")
-	return tableName
 }
