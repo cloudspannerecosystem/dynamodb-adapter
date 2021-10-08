@@ -11,12 +11,20 @@ jobs:
       - checkout
       - run: go build
 
-  lint:
+  go_lint:
     docker:
       - image: golangci/golangci-lint:latest-alpine
     steps:
       - checkout
       - run: golangci-lint run --timeout 5m
+
+  md_lint:
+    docker:
+      - image: markdownlint/markdownlint@latest
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    steps:
+      - checkout
+      - run: ..
 
   unit_test:
     docker:
@@ -91,7 +99,8 @@ workflows:
   commit:  # Run on every commit.
     jobs:
       - build
-      - lint
+      - go_lint
+      - md_lint
       - unit_test
       - integration_test:
           filters:
@@ -110,6 +119,7 @@ workflows:
                   - master
     jobs:
       - build
-      - lint
+      - go_lint
+      - md_lint
       - unit_test
       - integration_test
