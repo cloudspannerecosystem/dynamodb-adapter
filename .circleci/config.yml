@@ -11,12 +11,20 @@ jobs:
       - checkout
       - run: go build
 
-  lint:
+  lint_golang:
     docker:
       - image: golangci/golangci-lint:latest-alpine
     steps:
       - checkout
       - run: golangci-lint run --timeout 5m
+
+  lint_markdown:
+    docker:
+      - image: circleci/ruby:2.7
+    steps:
+      - checkout
+      - run: gem install mdl
+      - run: mdl .
 
   unit_test:
     docker:
@@ -91,7 +99,8 @@ workflows:
   commit:  # Run on every commit.
     jobs:
       - build
-      - lint
+      - lint_golang
+      - lint_markdown
       - unit_test
       - integration_test:
           filters:
@@ -110,6 +119,7 @@ workflows:
                   - master
     jobs:
       - build
-      - lint
+      - lint_golang
+      - lint_markdown
       - unit_test
       - integration_test
