@@ -24,7 +24,8 @@ jobs:
     #working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
-      - run: bundle exec mdl .
+      - run: gem install mdl
+      - run: mdl .
 
   unit_test:
     docker:
