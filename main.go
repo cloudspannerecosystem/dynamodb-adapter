@@ -40,7 +40,7 @@ func main() {
 
 	// This will pack config-files folder inside binary
 	// you need rice utility for it
-	box := rice.MustFindBox("config-files")
+	box := rice.MustFindBox("examples/adapter/config-files")
 
 	initErr := initializer.InitAll(box)
 	if initErr != nil {

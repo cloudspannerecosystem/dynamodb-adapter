@@ -54,6 +54,9 @@ func main() {
 
 	fmt.Println("\nDynamo Index Query")
 	getProductsByCategory(svc)
+
+	fmt.Println("\nDynamo UpdateItem")
+  updateCustomerContactDetails(svc)
 }
 
 func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
@@ -227,6 +230,38 @@ func getProductsByCategory(svc *dynamodb.DynamoDB) {
 		}
 		printElectronic(electronic)
 	}
+}
+
+
+func updateCustomerContactDetails(svc *dynamodb.DynamoDB) {
+	result, err := svc.GetItem(&dynamodb.UpdateItemInput{
+		TableName: aws.String("Customer_Order"),
+		KeyConditionExpression: aws.String("PK = :customer_id and SK = :email_id"),
+    ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+    			":customer_id": {
+    				S: aws.String("CUST#0000000000"),
+    			},
+    			":email_id": {
+    				S: aws.String("EMAIL#homer@email.com"),
+    			},
+    		},
+    UpdateExpression: aws.String("EMAIL#homer1@email.com")
+	})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if result.Item == nil {
+		fmt.Printf("No record found")
+	}
+
+	customer := Customer{}
+	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+	}
+
+	printCustomer(customer)
 }
 
 func printCustomer(c Customer) {
