@@ -43,17 +43,17 @@ func main() {
 	fmt.Println("Dynamo GetItem:")
 	getCustomerContactDetails(svc)
 
-	fmt.Println("\nDynamo PK/SK Query:")
-	getCustomerOrderDetails(svc)
-
-	fmt.Println("\nDynamo Index Query:")
-	getCustomerMostRecentOrder(svc)
-
-	fmt.Println("\nDynamo PK Query:")
-	getOrderLineItemDetails(svc)
-
-	fmt.Println("\nDynamo Index Query")
-	getProductsByCategory(svc)
+// 	fmt.Println("\nDynamo PK/SK Query:")
+// 	getCustomerOrderDetails(svc)
+//
+// 	fmt.Println("\nDynamo Index Query:")
+// 	getCustomerMostRecentOrder(svc)
+//
+// 	fmt.Println("\nDynamo PK Query:")
+// 	getOrderLineItemDetails(svc)
+//
+// 	fmt.Println("\nDynamo Index Query")
+// 	getProductsByCategory(svc)
 
 	fmt.Println("\nDynamo UpdateItem")
   updateCustomerContactDetails(svc)
@@ -234,18 +234,39 @@ func getProductsByCategory(svc *dynamodb.DynamoDB) {
 
 
 func updateCustomerContactDetails(svc *dynamodb.DynamoDB) {
-	result, err := svc.GetItem(&dynamodb.UpdateItemInput{
+	_, err := svc.UpdateItem(&dynamodb.UpdateItemInput{
 		TableName: aws.String("Customer_Order"),
-		KeyConditionExpression: aws.String("PK = :customer_id and SK = :email_id"),
-    ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-    			":customer_id": {
+		Key: map[string]*dynamodb.AttributeValue{
+    			"PK": {
     				S: aws.String("CUST#0000000000"),
     			},
-    			":email_id": {
+    			"SK": {
     				S: aws.String("EMAIL#homer@email.com"),
     			},
     		},
-    UpdateExpression: aws.String("EMAIL#homer1@email.com")
+    ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+            ":number_of_items": {
+                S: aws.String("2"),
+            },
+        },
+    ReturnValues: aws.String("UPDATED_NEW"),
+    UpdateExpression: aws.String("SET number_of_items = :number_of_items"),
+	})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	//fmt.Print(result)
+	result, err := svc.GetItem(&dynamodb.GetItemInput{
+		TableName: aws.String("Customer_Order"),
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String("CUST#0000000000"),
+			},
+			"SK": {
+				S: aws.String("EMAIL#homer@email.com"),
+			},
+		},
 	})
 
 	if err != nil {
@@ -262,7 +283,9 @@ func updateCustomerContactDetails(svc *dynamodb.DynamoDB) {
 	}
 
 	printCustomer(customer)
+
 }
+
 
 func printCustomer(c Customer) {
 	fmt.Println("Customer Info:")
@@ -271,6 +294,7 @@ func printCustomer(c Customer) {
 	fmt.Println("\tFname:     ", c.Fname)
 	fmt.Println("\tLname:     ", c.Lname)
 	fmt.Println("\tAddresses: ", c.Addresses)
+	fmt.Println("\tItems: ",c.Items)
 }
 
 func printOrder(o Order) {

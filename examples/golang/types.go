@@ -23,6 +23,7 @@ type Customer struct {
 	Lname     string      `dynamodbav:"customer_lname"`
 	Email     string      `dynamodbav:"customer_email"`
 	Addresses interface{} `dynamodbav:"customer_addresses"`
+	Items     string      `dynamodbav:"number_of_items"`
 }
 
 type Order struct {
