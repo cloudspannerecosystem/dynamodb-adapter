@@ -56,7 +56,11 @@ func main() {
 // 	getProductsByCategory(svc)
 
 	fmt.Println("\nDynamo UpdateItem")
-  updateCustomerContactDetails(svc)
+  updateCustomerDetails(svc)
+
+	fmt.Println("\nDynamo PutItem")
+  addNewCustomer(svc)
+
 }
 
 func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
@@ -233,7 +237,7 @@ func getProductsByCategory(svc *dynamodb.DynamoDB) {
 }
 
 
-func updateCustomerContactDetails(svc *dynamodb.DynamoDB) {
+func updateCustomerDetails(svc *dynamodb.DynamoDB) {
 	_, err := svc.UpdateItem(&dynamodb.UpdateItemInput{
 		TableName: aws.String("Customer_Order"),
 		Key: map[string]*dynamodb.AttributeValue{
@@ -285,6 +289,74 @@ func updateCustomerContactDetails(svc *dynamodb.DynamoDB) {
 	printCustomer(customer)
 
 }
+
+
+func addNewCustomer(svc *dynamodb.DynamoDB) {
+
+  type ItemToPut struct {
+      PK                 string
+      SK                 string
+      Addresses          interface{} `dynamodbav:"customer_addresses"`
+      Email              string      `dynamodbav:"customer_email"`
+      Fname              string      `dynamodbav:"customer_fname"`
+      Id                 string      `dynamodbav:"customer_id"`
+      Lname              string      `dynamodbav:"customer_lname"`
+
+  }
+
+  itemtoput := ItemToPut{
+      PK:  "CUST#9922885566",
+      SK:  "EMAIL#mosby@gmail.com",
+      Addresses:  "{Shipping:  Maclarens pub, 240 W 55th St, New York, NY}",
+      Email:  "mosby@gmail.com",
+      Fname:  "Ted",
+      Id:  "9922885566",
+      Lname:  "Mosby",
+  }
+
+  av, err := dynamodbattribute.MarshalMap(itemtoput)
+  if err != nil {
+      fmt.Println(err.Error())
+  }
+
+	_, error := svc.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String("Customer_Order"),
+		Item: av,
+	})
+
+	if error != nil {
+		fmt.Println(error.Error())
+	}
+
+	result, err := svc.GetItem(&dynamodb.GetItemInput{
+		TableName: aws.String("Customer_Order"),
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String("CUST#9922885566"),
+			},
+			"SK": {
+				S: aws.String("EMAIL#mosby@gmail.com"),
+			},
+		},
+	})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if result.Item == nil {
+		fmt.Printf("No record found")
+	}
+
+	customer := Customer{}
+	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+	}
+
+	printCustomer(customer)
+
+}
+
 
 
 func printCustomer(c Customer) {
