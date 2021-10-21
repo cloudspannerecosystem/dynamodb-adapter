@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 func main() {
@@ -41,40 +42,43 @@ func main() {
 	svc := dynamodb.New(sess)
 
 	fmt.Println("Dynamo GetItem:")
-	getCustomerContactDetails(svc)
+	getCustomerContactDetails(svc,"CUST#0000000000","EMAIL#homer@email.com")
 
-// 	fmt.Println("\nDynamo PK/SK Query:")
-// 	getCustomerOrderDetails(svc)
-//
-// 	fmt.Println("\nDynamo Index Query:")
-// 	getCustomerMostRecentOrder(svc)
-//
-// 	fmt.Println("\nDynamo PK Query:")
-// 	getOrderLineItemDetails(svc)
-//
-// 	fmt.Println("\nDynamo Index Query")
-// 	getProductsByCategory(svc)
+	fmt.Println("\nDynamo PK/SK Query:")
+	getCustomerOrderDetails(svc)
 
-	fmt.Println("\nDynamo UpdateItem")
+	fmt.Println("\nDynamo Index Query:")
+	getCustomerMostRecentOrder(svc)
+
+	fmt.Println("\nDynamo PK Query:")
+	getOrderLineItemDetails(svc)
+
+	fmt.Println("\nDynamo Index Query")
+	getProductsByCategory(svc)
+
+ 	fmt.Println("\nDynamo UpdateItem")
   updateCustomerDetails(svc)
 
-	fmt.Println("\nDynamo PutItem")
+ 	fmt.Println("\nDynamo PutItem")
   addNewCustomer(svc)
 
   fmt.Println("\nDynamo DeleteItem")
   deleteCustomer(svc)
 
+  fmt.Println("\nDynamo ScanItem")
+  getCustomerWithSameId(svc)
+
 }
 
-func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
+func getCustomerContactDetails(svc *dynamodb.DynamoDB,pk string,sk string) {
 	result, err := svc.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String("Customer_Order"),
 		Key: map[string]*dynamodb.AttributeValue{
 			"PK": {
-				S: aws.String("CUST#0000000000"),
+				S: aws.String(pk),
 			},
 			"SK": {
-				S: aws.String("EMAIL#homer@email.com"),
+				S: aws.String(sk),
 			},
 		},
 	})
@@ -82,7 +86,7 @@ func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	if result.Item == nil {
+	if len(result.Item) == 0 {
 		fmt.Printf("No record found")
 	}
 
@@ -253,7 +257,7 @@ func updateCustomerDetails(svc *dynamodb.DynamoDB) {
     		},
     ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
             ":number_of_items": {
-                S: aws.String("2"),
+                S: aws.String("4"),
             },
         },
     ReturnValues: aws.String("UPDATED_NEW"),
@@ -263,33 +267,8 @@ func updateCustomerDetails(svc *dynamodb.DynamoDB) {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	//fmt.Print(result)
-	result, err := svc.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String("Customer_Order"),
-		Key: map[string]*dynamodb.AttributeValue{
-			"PK": {
-				S: aws.String("CUST#0000000000"),
-			},
-			"SK": {
-				S: aws.String("EMAIL#homer@email.com"),
-			},
-		},
-	})
+	getCustomerContactDetails(svc,"CUST#0000000000","EMAIL#homer@email.com")
 
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	if result.Item == nil {
-		fmt.Printf("No record found")
-	}
-
-	customer := Customer{}
-	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
-	}
-
-	printCustomer(customer)
 
 }
 
@@ -321,7 +300,7 @@ func addNewCustomer(svc *dynamodb.DynamoDB) {
   if err != nil {
       fmt.Println(err.Error())
   }
-
+  fmt.Println("Adding new customer with PK=CUST#9922885566 and SK=EMAIL#mosby@gmail.com")
 	_, error := svc.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String("Customer_Order"),
 		Item: av,
@@ -331,33 +310,7 @@ func addNewCustomer(svc *dynamodb.DynamoDB) {
 		fmt.Println(error.Error())
 	}
 
-	result, err := svc.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String("Customer_Order"),
-		Key: map[string]*dynamodb.AttributeValue{
-			"PK": {
-				S: aws.String("CUST#9922885566"),
-			},
-			"SK": {
-				S: aws.String("EMAIL#mosby@gmail.com"),
-			},
-		},
-	})
-
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	if result.Item == nil {
-		fmt.Printf("No record found")
-	}
-
-	customer := Customer{}
-	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
-	}
-
-	printCustomer(customer)
-
+	getCustomerContactDetails(svc,"CUST#9922885566","EMAIL#mosby@gmail.com")
 }
 
 func deleteCustomer(svc *dynamodb.DynamoDB) {
@@ -382,34 +335,55 @@ func deleteCustomer(svc *dynamodb.DynamoDB) {
   }
 
   fmt.Println("Verifying the customer has been deleted")
-	result, err := svc.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String("Customer_Order"),
-		Key: map[string]*dynamodb.AttributeValue{
-			"PK": {
-				S: aws.String("CUST#9922885566"),
-			},
-			"SK": {
-				S: aws.String("EMAIL#mosby@gmail.com"),
-			},
-		},
+  getCustomerContactDetails(svc,"CUST#9922885566","EMAIL#mosby@gmail.com")
+
+}
+
+func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
+
+  fmt.Println("Running a scan operation to find customers with Id 0000000000 who has number_of_items greater than 3")
+  type Item struct {
+      Fname              string      `dynamodbav:"customer_fname"`
+      Id                 string      `dynamodbav:"customer_id"`
+      Lname              string      `dynamodbav:"customer_lname"`
+      Items              int         `dynamodbav:"number_of_items"`
+
+  }
+
+  filt := expression.Name("customer_id").Equal(expression.Value("0000000000"))
+  proj := expression.NamesList(expression.Name("customer_fname"), expression.Name("customer_lname"), expression.Name("number_of_items"))
+  expr, err := expression.NewBuilder().WithFilter(filt).WithProjection(proj).Build()
+
+  if err != nil {
+      fmt.Println(err.Error())
+  }
+	result, err := svc.Scan(&dynamodb.ScanInput{
+		  TableName: aws.String("Customer_Order"),
+		  ExpressionAttributeNames:  expr.Names(),
+      ExpressionAttributeValues: expr.Values(),
+      FilterExpression:          expr.Filter(),
+      ProjectionExpression:      expr.Projection(),
 	})
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	if len(result.Item) == 0 {
-		fmt.Println("SUCCESS.No record found for customer PK=CUST#9922885566 and SK=EMAIL#mosby@gmail.com")
-	}
 
-	customer := Customer{}
-	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
-	}
+  for _, i := range result.Items {
+      item := Item{}
 
-	printCustomer(customer)
+      err = dynamodbattribute.UnmarshalMap(i, &item)
+
+      if err != nil {
+          fmt.Println(err.Error())
+      }
+
+      if item.Items > 3 && item.Fname!= "" && item.Lname!="" {
+          fmt.Println("Customer Name: ", item.Fname, item.Lname)
+          //fmt.Println("Last Name:", item.Lname)
+      }
+  }
 }
-
 
 func printCustomer(c Customer) {
 	fmt.Println("Customer Info:")
