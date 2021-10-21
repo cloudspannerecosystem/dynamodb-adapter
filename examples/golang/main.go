@@ -61,6 +61,9 @@ func main() {
 	fmt.Println("\nDynamo PutItem")
   addNewCustomer(svc)
 
+  fmt.Println("\nDynamo DeleteItem")
+  deleteCustomer(svc)
+
 }
 
 func getCustomerContactDetails(svc *dynamodb.DynamoDB) {
@@ -357,6 +360,55 @@ func addNewCustomer(svc *dynamodb.DynamoDB) {
 
 }
 
+func deleteCustomer(svc *dynamodb.DynamoDB) {
+
+  fmt.Println("Deleting the customer with PK=CUST#9922885566 and SK=EMAIL#mosby@gmail.com")
+	_, err := svc.DeleteItem(&dynamodb.DeleteItemInput{
+		TableName: aws.String("Customer_Order"),
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String("CUST#9922885566"),
+			},
+			"SK": {
+				S: aws.String("EMAIL#mosby@gmail.com"),
+			},
+		},
+	})
+
+	if err != nil {
+      fmt.Println(err.Error())
+  }  else {
+      fmt.Println("Deleted the customer with PK=CUST#9922885566 and SK=EMAIL#mosby@gmail.com")
+  }
+
+  fmt.Println("Verifying the customer has been deleted")
+	result, err := svc.GetItem(&dynamodb.GetItemInput{
+		TableName: aws.String("Customer_Order"),
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String("CUST#9922885566"),
+			},
+			"SK": {
+				S: aws.String("EMAIL#mosby@gmail.com"),
+			},
+		},
+	})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if len(result.Item) == 0 {
+		fmt.Println("SUCCESS.No record found for customer PK=CUST#9922885566 and SK=EMAIL#mosby@gmail.com")
+	}
+
+	customer := Customer{}
+	err = dynamodbattribute.UnmarshalMap(result.Item, &customer)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+	}
+
+	printCustomer(customer)
+}
 
 
 func printCustomer(c Customer) {
