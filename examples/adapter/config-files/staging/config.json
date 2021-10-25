@@ -1,5 +1,5 @@
 {
-    "GoogleProjectID"   : "machette-gushob",
+    "GoogleProjectID"   : "YOUR_PROJECT_HERE",
     "SpannerDb"         : "ecommerce",
     "QueryLimit"        : 5000
 }
