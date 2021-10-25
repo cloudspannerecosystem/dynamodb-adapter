@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -33,7 +34,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 )
 
-var operations = []string{" SET ", " DELETE ", " ADD ", " REMOVE "}
+var operations = map[string]string{"SET": " [sS]{1}[eE]{1}[tT]{1} ", "DELETE": " [dD]{1}[eE]{1}[lL]{1}[eE]{1}[tT]{1}[eE]{1} ", "ADD": " [aA]{1}[dD]{2} ", "REMOVE": " [rR]{1}[eE]{1}[mM]{1}[oO]{1}[vV]{1}[eE]{1} "}
 var byteSliceType = reflect.TypeOf([]byte(nil))
 
 func between(value string, a string, b string) string {
@@ -321,12 +322,14 @@ func extractOperations(updateExpression string) map[string]string {
 	updateExpression = " " + updateExpression
 	opsIndex := []int{}
 	opsSeq := map[int]string{}
-	for _, k := range operations {
-		if index := strings.Index(updateExpression, k); index > -1 {
-			opsSeq[index] = k
-			updateExpression = strings.Replace(updateExpression, k, "%", 1)
-			opsIndex = append(opsIndex, index)
+	for op, regex := range operations {
+		re := regexp.MustCompile(regex)
+		indexes := re.FindAllStringIndex(updateExpression, -1)
+		for _, index := range indexes {
+			opsSeq[index[0]] = op
+			opsIndex = append(opsIndex, index[0])
 		}
+		updateExpression = re.ReplaceAllString(updateExpression, "%")
 	}
 
 	sort.Ints(opsIndex)
