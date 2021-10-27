@@ -34,7 +34,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 )
 
-var operations = map[string]string{"SET": " [sS]{1}[eE]{1}[tT]{1} ", "DELETE": " [dD]{1}[eE]{1}[lL]{1}[eE]{1}[tT]{1}[eE]{1} ", "ADD": " [aA]{1}[dD]{2} ", "REMOVE": " [rR]{1}[eE]{1}[mM]{1}[oO]{1}[vV]{1}[eE]{1} "}
+var operations = map[string]string{"SET": "(?i) SET ", "DELETE": "(?i) DELETE ", "ADD": "(?i) ADD ", "REMOVE": "(?i) REMOVE "}
 var byteSliceType = reflect.TypeOf([]byte(nil))
 
 func between(value string, a string, b string) string {
