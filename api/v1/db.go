@@ -585,6 +585,8 @@ func BatchWriteItem(c *gin.Context) {
 	defer span.Finish()
 	addParentSpanID(c, span)
 	var batchWriteItem models.BatchWriteItem
+	var unprocessedBatchWriteItems models.BatchWriteItemResponse
+
 	if err1 := c.ShouldBindJSON(&batchWriteItem); err1 != nil {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
 	} else {
@@ -612,20 +614,27 @@ func BatchWriteItem(c *gin.Context) {
 			if putData.DynamoObject != nil {
 				err = batchUpdateItems(c.Request.Context(), putData)
 				if err != nil {
-					c.JSON(errors.HTTPResponse(err, batchWriteItem))
-					return
+					for _, v := range value {
+						if v.PutReq.Item != nil {
+							unprocessedBatchWriteItems.UnprocessedItems[key] = append(unprocessedBatchWriteItems.UnprocessedItems[key], v)
+						}
+					}
 				}
 			}
 
 			if deleteData.DynamoObject != nil {
 				err = batchDeleteItems(c.Request.Context(), deleteData)
 				if err != nil {
-					c.JSON(errors.HTTPResponse(err, batchWriteItem))
-					return
+					for _, v := range value {
+						if v.DelReq.Key != nil {
+							unprocessedBatchWriteItems.UnprocessedItems[key] = append(unprocessedBatchWriteItems.UnprocessedItems[key], v)
+						}
+					}
 				}
 			}
 		}
-		c.JSON(http.StatusOK, []gin.H{})
+
+		c.JSON(http.StatusOK, unprocessedBatchWriteItems)
 	}
 }
 

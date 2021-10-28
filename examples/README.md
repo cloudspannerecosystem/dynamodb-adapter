@@ -43,7 +43,8 @@ harbourbridge -driver=dynamodb -instance=dynamodb-migration -dbname=ecommerce
 ```
 
 Create the indexes:
-```
+
+```sql
 CREATE INDEX By_customer
   ON Customer_Order (customer_id, order_ts ASC);
 
@@ -97,12 +98,12 @@ cd examples/adapter
 Should see output similar to:
 
 ```shell
-2021-09-14T23:16:45.994-0600	DEBUG	logger/logger.go:66	[Fetching starts]
+2021-09-14T23:16:45.994-0600  DEBUG logger/logger.go:66 [Fetching starts]
 [GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
 
 [GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
- - using env:	export GIN_MODE=release
- - using code:	gin.SetMode(gin.ReleaseMode)
+ - using env: export GIN_MODE=release
+ - using code:  gin.SetMode(gin.ReleaseMode)
 
 [GIN-debug] GET    /debug/pprof/             --> github.com/gin-contrib/pprof.pprofHandler.func1 (3 handlers)
 [GIN-debug] GET    /debug/pprof/cmdline      --> github.com/gin-contrib/pprof.pprofHandler.func1 (3 handlers)

@@ -193,8 +193,22 @@ func Test_extractOperations(t *testing.T) {
 			},
 		},
 		{
+			"Lowercase set Operation",
+			"set name = :val1, age = :val2",
+			map[string]string{
+				"SET": "name = :val1, age = :val2",
+			},
+		},
+		{
 			"Only ADD Operation",
 			"ADD age :val1",
+			map[string]string{
+				"ADD": "age :val1",
+			},
+		},
+		{
+			"Title case Add Operation",
+			"Add age :val1",
 			map[string]string{
 				"ADD": "age :val1",
 			},
@@ -207,8 +221,22 @@ func Test_extractOperations(t *testing.T) {
 			},
 		},
 		{
+			"Mixed case ReMoVe Operation",
+			"ReMoVe address",
+			map[string]string{
+				"REMOVE": "address",
+			},
+		},
+		{
 			"Only DELETE Operation",
 			"DELETE Color :p",
+			map[string]string{
+				"DELETE": "Color :p",
+			},
+		},
+		{
+			"Lower case delete Operation",
+			"delete Color :p",
 			map[string]string{
 				"DELETE": "Color :p",
 			},
