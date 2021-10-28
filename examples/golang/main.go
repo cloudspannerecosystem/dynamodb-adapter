@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+  "github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 func main() {
@@ -68,6 +69,11 @@ func main() {
   fmt.Println("\nDynamo ScanItem")
   getCustomerWithSameId(svc)
 
+  fmt.Println("\nDynamo BatchGetItem")
+  getProductManufacturer(svc)
+
+  fmt.Println("\nDynamo BatchWriteItem")
+  addNewCustomerBatch(svc)
 }
 
 func getCustomerContactDetails(svc *dynamodb.DynamoDB,pk string,sk string) {
@@ -257,11 +263,11 @@ func updateCustomerDetails(svc *dynamodb.DynamoDB) {
     		},
     ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
             ":number_of_items": {
-                S: aws.String("4"),
+                S: aws.String("10"),
             },
         },
     ReturnValues: aws.String("UPDATED_NEW"),
-    UpdateExpression: aws.String("SET number_of_items = :number_of_items"),
+    UpdateExpression: aws.String("seT number_of_items = :number_of_items"),
 	})
 
 	if err != nil {
@@ -380,10 +386,268 @@ func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
 
       if item.Items > 3 && item.Fname!= "" && item.Lname!="" {
           fmt.Println("Customer Name: ", item.Fname, item.Lname)
-          //fmt.Println("Last Name:", item.Lname)
       }
   }
 }
+
+func getProductManufacturer(svc *dynamodb.DynamoDB) {
+
+  fmt.Println("Running a BatchGetItem operation to find manufacturer based on the model of the product")
+	result, err := svc.BatchGetItem(&dynamodb.BatchGetItemInput{
+		  RequestItems: map[string]*dynamodb.KeysAndAttributes{
+		    "Product": {
+          Keys: []map[string]*dynamodb.AttributeValue{
+             {
+               "PK": &dynamodb.AttributeValue{
+                   S: aws.String("1003003"),
+                },
+               "SK": &dynamodb.AttributeValue{
+                   S: aws.String("Software#Musical Instruments#Recording Equipment#Hard Rock TrackPak - Mac"),
+                },
+             },
+             {
+               "PK": &dynamodb.AttributeValue{
+                   S: aws.String("1003012"),
+                },
+               "SK": &dynamodb.AttributeValue{
+                   S: aws.String("HardGood#Toys, Games & Drones#TV, Movie & Character Toys#Aquarius - Fender Playing Cards Gift Tin - Red/Black"),
+                },
+             },
+             {
+               "PK": &dynamodb.AttributeValue{
+                   S: aws.String("1003021"),
+                },
+               "SK": &dynamodb.AttributeValue{
+                   S: aws.String("HardGood#Musical Instruments#Musical Instrument Accessories#LoDuca Bros Inc - Deluxe Keyboard Bench - Black"),
+                },
+             },
+             {
+               "PK": &dynamodb.AttributeValue{
+                   S: aws.String("1003049"),
+                },
+               "SK": &dynamodb.AttributeValue{
+                   S: aws.String("HardGood#Toys, Games & Drones#TV, Movie & Character Toys#Trumpet Multimedia - Trumpets That Work 2015 Calendar - Black"),
+                },
+             },
+             },
+          ProjectionExpression: aws.String("manufacturer"),
+          },
+        },
+	})
+
+  if err != nil {
+      if aerr, ok := err.(awserr.Error); ok {
+          switch aerr.Code() {
+          case dynamodb.ErrCodeProvisionedThroughputExceededException:
+              fmt.Println(dynamodb.ErrCodeProvisionedThroughputExceededException, aerr.Error())
+          case dynamodb.ErrCodeResourceNotFoundException:
+              fmt.Println(dynamodb.ErrCodeResourceNotFoundException, aerr.Error())
+          case dynamodb.ErrCodeRequestLimitExceeded:
+              fmt.Println(dynamodb.ErrCodeRequestLimitExceeded, aerr.Error())
+          case dynamodb.ErrCodeInternalServerError:
+              fmt.Println(dynamodb.ErrCodeInternalServerError, aerr.Error())
+          default:
+              fmt.Println(aerr.Error())
+          }
+      } else {
+          fmt.Println(err.Error())
+      }
+      return
+  }
+
+  type Manufacturers struct {
+  	Manufacturer        string      `dynamodbav:"manufacturer"`
+  }
+  manufacturers := Manufacturers{}
+  for _, i := range result.Responses   {
+           for _,j := range i {
+              //fmt.Println(j)
+              err = dynamodbattribute.UnmarshalMap(j, &manufacturers)
+              fmt.Println("Manufacturer:", manufacturers.Manufacturer)
+
+           }
+    }
+}
+
+func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
+
+  fmt.Println("Running a BatchWriteItem operation to add customers")
+	result, err := svc.BatchWriteItem(&dynamodb.BatchWriteItemInput{
+		  RequestItems: map[string][]*dynamodb.WriteRequest{
+              "Customer_Order": {
+                  {
+                      PutRequest: &dynamodb.PutRequest{
+                          Item: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("CUST#0070070070"),
+                              },
+                              "SK": {
+                                  S: aws.String("EMAL#bond@gmail.com"),
+                              },
+                              "customer_fname": {
+                                  S: aws.String("James"),
+                              },
+                              "customer_lname": {
+                                  S: aws.String("Bond"),
+                              },
+                              "customer_email": {
+                                  S: aws.String("bond@gmail.com"),
+                              },
+                              "customer_id": {
+                                  S: aws.String("0070070070"),
+                              },
+                              "customer_addresses": {
+                                  S: aws.String("{Shipping:  Casino Royal, Las Vegas, NY}"),
+                              },
+                              "item_quantity": {
+                                  S: aws.String("10"),
+                              },
+
+                          },
+                      },
+                  },
+                  {
+                      PutRequest: &dynamodb.PutRequest{
+                          Item: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("CUST#1111111111"),
+                              },
+                              "SK": {
+                                  S: aws.String("EMAIL#johns@email.com"),
+                              },
+                              "item_quantity": {
+                                  S: aws.String("100"),
+                              },
+
+                          },
+                      },
+                  },
+                  {
+                      PutRequest: &dynamodb.PutRequest{
+                          Item: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("CUST#987654321"),
+                              },
+                              "SK": {
+                                  S: aws.String("EMAIL#noone@email.com"),
+                              },
+
+                          },
+                      },
+                  },
+                  {
+                      DeleteRequest: &dynamodb.DeleteRequest{
+                          Key: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("CUST#987654321"),
+                               },
+                               "SK": {
+                                  S: aws.String("EMAIL#noone@email.com"),
+                               },
+                          },
+                      },
+                  },
+
+              },
+              "Product": {
+                  {
+                      PutRequest: &dynamodb.PutRequest{
+                          Item: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("1002651"),
+                              },
+                              "SK": {
+                                  S: aws.String("HardGood#Car Electronics & GPS#Car Audio#Polk Audio - 12\" Single-Voice-Coil 4-Ohm Subwoofer - Black"),
+                              },
+                              "manufacturer": {
+                                  S: aws.String("Polk Audio - changed"),
+                              },
+                              "price": {
+                                  S: aws.String("89.99"),
+                              },
+                              "shipping_amount": {
+                                  S: aws.String("10"),
+                              },
+                              "product_category": {
+                                  S: aws.String("HardGood#Car Electronics & GPS#Car Audio"),
+                              },
+                               "product_id": {
+                                   S: aws.String("1002651"),
+                               },
+                          },
+                      },
+                  },
+                  {
+                      PutRequest: &dynamodb.PutRequest{
+                          Item: map[string]*dynamodb.AttributeValue{
+                              "PK": {
+                                  S: aws.String("1003003"),
+                              },
+                              "SK": {
+                                  S: aws.String("Software#Musical Instruments#Recording Equipment#Hard Rock TrackPak - Mac"),
+                              },
+                              "manufacturer": {
+                                  S: aws.String("Hal Leonard - changed"),
+                              },
+                              "price": {
+                                  S: aws.String("19.99"),
+                              },
+                              "shipping_amount": {
+                                  S: aws.String("8.49"),
+                              },
+                              "product_category": {
+                                  S: aws.String("HardGood#Car Electronics & GPS#Car Audio"),
+                              },
+                               "product_id": {
+                                   S: aws.String("1002651"),
+                               },
+                          },
+                      },
+                  },
+
+
+              },
+      },
+	})
+  if err != nil {
+    if aerr, ok := err.(awserr.Error); ok {
+        switch aerr.Code() {
+        case dynamodb.ErrCodeProvisionedThroughputExceededException:
+            fmt.Println(dynamodb.ErrCodeProvisionedThroughputExceededException, aerr.Error())
+        case dynamodb.ErrCodeResourceNotFoundException:
+            fmt.Println(dynamodb.ErrCodeResourceNotFoundException, aerr.Error())
+        case dynamodb.ErrCodeItemCollectionSizeLimitExceededException:
+            fmt.Println(dynamodb.ErrCodeItemCollectionSizeLimitExceededException, aerr.Error())
+        case dynamodb.ErrCodeRequestLimitExceeded:
+            fmt.Println(dynamodb.ErrCodeRequestLimitExceeded, aerr.Error())
+        case dynamodb.ErrCodeInternalServerError:
+            fmt.Println(dynamodb.ErrCodeInternalServerError, aerr.Error())
+        default:
+            fmt.Println(aerr.Error())
+        }
+    } else {
+        // Print the error, cast err to awserr.Error to get the Code and
+        // Message from an error.
+        fmt.Println(err.Error())
+    }
+    return
+  }
+  fmt.Println(result)
+
+//   type Manufacturers struct {
+//   	Manufacturer        string      `dynamodbav:"manufacturer"`
+//   }
+//   manufacturers := Manufacturers{}
+//   for _, i := range result.Responses   {
+//            for _,j := range i {
+//               //fmt.Println(j)
+//               err = dynamodbattribute.UnmarshalMap(j, &manufacturers)
+//               fmt.Println("Manufacturer:", manufacturers.Manufacturer)
+//
+//            }
+//     }
+}
+
 
 func printCustomer(c Customer) {
 	fmt.Println("Customer Info:")
