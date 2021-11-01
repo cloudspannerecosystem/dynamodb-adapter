@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 	"os"
-
+  "strconv"
 	"github.com/aws/aws-sdk-go/aws"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -315,7 +315,7 @@ func addNewCustomer(svc *dynamodb.DynamoDB) {
 	if error != nil {
 		fmt.Println(error.Error())
 	}
-
+  fmt.Println("Verifying the customer has been added")
 	getCustomerContactDetails(svc,"CUST#9922885566","EMAIL#mosby@gmail.com")
 }
 
@@ -352,7 +352,7 @@ func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
       Fname              string      `dynamodbav:"customer_fname"`
       Id                 string      `dynamodbav:"customer_id"`
       Lname              string      `dynamodbav:"customer_lname"`
-      Items              int         `dynamodbav:"number_of_items"`
+      Items              string      `dynamodbav:"number_of_items"`
 
   }
 
@@ -383,8 +383,11 @@ func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
       if err != nil {
           fmt.Println(err.Error())
       }
-
-      if item.Items > 3 && item.Fname!= "" && item.Lname!="" {
+      intItem,err := strconv.Atoi(item.Items)
+      if err != nil {
+                fmt.Println(err.Error())
+      }
+      if intItem > 3 && item.Fname!= "" && item.Lname!="" {
           fmt.Println("Customer Name: ", item.Fname, item.Lname)
       }
   }
@@ -392,7 +395,7 @@ func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
 
 func getProductManufacturer(svc *dynamodb.DynamoDB) {
 
-  fmt.Println("Running a BatchGetItem operation to find manufacturer based on the model of the product")
+  fmt.Println("Running a BatchGetItem operation to find manufacturer based on the model of the product and customer first name based on their PK and SK")
 	result, err := svc.BatchGetItem(&dynamodb.BatchGetItemInput{
 		  RequestItems: map[string]*dynamodb.KeysAndAttributes{
 		    "Product": {
@@ -432,6 +435,19 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
              },
           ProjectionExpression: aws.String("manufacturer"),
           },
+        "Customer_Order" : {
+            Keys: []map[string]*dynamodb.AttributeValue{
+              {
+                "PK": &dynamodb.AttributeValue{
+                    S: aws.String("CUST#6666666666"),
+                },
+                "SK": &dynamodb.AttributeValue{
+                    S: aws.String("EMAIL#august@email.com"),
+                },
+              },
+            },
+            ProjectionExpression: aws.String("customer_fname"),
+          },
         },
 	})
 
@@ -457,13 +473,28 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
 
   type Manufacturers struct {
   	Manufacturer        string      `dynamodbav:"manufacturer"`
+
   }
-  manufacturers := Manufacturers{}
+  type Firstnames struct {
+    	Firstname        string      `dynamodbav:"customer_fname"`
+  }
   for _, i := range result.Responses   {
+           manufacturers := Manufacturers{}
            for _,j := range i {
-              //fmt.Println(j)
               err = dynamodbattribute.UnmarshalMap(j, &manufacturers)
-              fmt.Println("Manufacturer:", manufacturers.Manufacturer)
+              if len(manufacturers.Manufacturer)>0 {
+                fmt.Println("Product Manufacturers:", manufacturers.Manufacturer)
+               }
+
+           }
+    }
+  for _, i := range result.Responses   {
+           firstnames := Firstnames{}
+           for _,j := range i {
+              err = dynamodbattribute.UnmarshalMap(j, &firstnames)
+              if len(firstnames.Firstname) > 0 {
+                fmt.Println("Customer First Names:", firstnames.Firstname)
+               }
 
            }
     }
@@ -500,7 +531,7 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                                   S: aws.String("{Shipping:  Casino Royal, Las Vegas, NY}"),
                               },
                               "item_quantity": {
-                                  S: aws.String("10"),
+                                  S: aws.String("100"),
                               },
 
                           },
@@ -516,7 +547,7 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                                   S: aws.String("EMAIL#johns@email.com"),
                               },
                               "item_quantity": {
-                                  S: aws.String("100"),
+                                  S: aws.String("10"),
                               },
 
                           },
@@ -529,7 +560,7 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                                   S: aws.String("CUST#987654321"),
                               },
                               "SK": {
-                                  S: aws.String("EMAIL#noone@email.com"),
+                                  S: aws.String("EMAIL#reallynoone@email.com"),
                               },
 
                           },
@@ -539,10 +570,10 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                       DeleteRequest: &dynamodb.DeleteRequest{
                           Key: map[string]*dynamodb.AttributeValue{
                               "PK": {
-                                  S: aws.String("CUST#987654321"),
+                                        S: aws.String("CUST#2222222222"),
                                },
                                "SK": {
-                                  S: aws.String("EMAIL#noone@email.com"),
+                                  S: aws.String("EMAIL#alices@email.com"),
                                },
                           },
                       },
@@ -560,7 +591,7 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                                   S: aws.String("HardGood#Car Electronics & GPS#Car Audio#Polk Audio - 12\" Single-Voice-Coil 4-Ohm Subwoofer - Black"),
                               },
                               "manufacturer": {
-                                  S: aws.String("Polk Audio - changed"),
+                                  S: aws.String("Polk Audio"),
                               },
                               "price": {
                                   S: aws.String("89.99"),
@@ -587,19 +618,19 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                                   S: aws.String("Software#Musical Instruments#Recording Equipment#Hard Rock TrackPak - Mac"),
                               },
                               "manufacturer": {
-                                  S: aws.String("Hal Leonard - changed"),
+                                  S: aws.String("Hal Leonard"),
                               },
                               "price": {
                                   S: aws.String("19.99"),
                               },
                               "shipping_amount": {
-                                  S: aws.String("8.49"),
+                                  S: aws.String("8.50"),
                               },
                               "product_category": {
                                   S: aws.String("HardGood#Car Electronics & GPS#Car Audio"),
                               },
                                "product_id": {
-                                   S: aws.String("1002651"),
+                                   S: aws.String("1003003"),
                                },
                           },
                       },
@@ -626,26 +657,15 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
             fmt.Println(aerr.Error())
         }
     } else {
-        // Print the error, cast err to awserr.Error to get the Code and
-        // Message from an error.
         fmt.Println(err.Error())
     }
     return
+  } else {
+    fmt.Println("An empty map or an empty unprocessed key in a map indicates a successful operation below")
+    fmt.Println(result)
   }
-  fmt.Println(result)
 
-//   type Manufacturers struct {
-//   	Manufacturer        string      `dynamodbav:"manufacturer"`
-//   }
-//   manufacturers := Manufacturers{}
-//   for _, i := range result.Responses   {
-//            for _,j := range i {
-//               //fmt.Println(j)
-//               err = dynamodbattribute.UnmarshalMap(j, &manufacturers)
-//               fmt.Println("Manufacturer:", manufacturers.Manufacturer)
-//
-//            }
-//     }
+
 }
 
 
