@@ -36,7 +36,7 @@ func main() {
 		sess = createAdapterSession()
 	case "dynamo":
 		sess = createSession("")
-  }
+	}
 
 	svc := dynamodb.New(sess)
 
