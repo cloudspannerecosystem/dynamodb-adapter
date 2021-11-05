@@ -56,10 +56,10 @@ func main() {
 	getProductsByCategory(svc)
 
  	fmt.Println("\nDynamo UpdateItem")
-  updateCustomerDetails(svc)
+	updateCustomerDetails(svc)
 
  	fmt.Println("\nDynamo PutItem")
-  addNewCustomer(svc)
+	addNewCustomer(svc)
 
   fmt.Println("\nDynamo DeleteItem")
   deleteCustomer(svc)
