@@ -61,17 +61,17 @@ func main() {
  	fmt.Println("\nDynamo PutItem")
 	addNewCustomer(svc)
 
-  fmt.Println("\nDynamo DeleteItem")
-  deleteCustomer(svc)
+	fmt.Println("\nDynamo DeleteItem")
+	deleteCustomer(svc)
 
-  fmt.Println("\nDynamo ScanItem")
-  getCustomerWithSameId(svc)
+	fmt.Println("\nDynamo ScanItem")
+	getCustomerWithSameId(svc)
 
-  fmt.Println("\nDynamo BatchGetItem")
-  getProductManufacturer(svc)
+	fmt.Println("\nDynamo BatchGetItem")
+	getProductManufacturer(svc)
 
-  fmt.Println("\nDynamo BatchWriteItem")
-  addNewCustomerBatch(svc)
+	fmt.Println("\nDynamo BatchWriteItem")
+	addNewCustomerBatch(svc)
 }
 
 func getCustomerContactDetails(svc *dynamodb.DynamoDB,pk string,sk string) {
