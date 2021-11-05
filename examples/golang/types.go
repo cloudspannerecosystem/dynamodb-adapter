@@ -69,20 +69,19 @@ type Electronic struct {
 }
 
 type Manufacturers struct {
-  Manufacturer        string      `dynamodbav:"manufacturer"`
+	Manufacturer string `dynamodbav:"manufacturer"`
 }
 
 type Firstnames struct {
-  Firstname        string      `dynamodbav:"customer_fname"`
+	Firstname string `dynamodbav:"customer_fname"`
 }
 
 type ItemToPut struct {
-      PK                 string
-      SK                 string
-      Addresses          interface{} `dynamodbav:"customer_addresses"`
-      Email              string      `dynamodbav:"customer_email"`
-      Fname              string      `dynamodbav:"customer_fname"`
-      Id                 string      `dynamodbav:"customer_id"`
-      Lname              string      `dynamodbav:"customer_lname"`
-
+	PK        string
+	SK        string
+	Addresses interface{} `dynamodbav:"customer_addresses"`
+	Email     string      `dynamodbav:"customer_email"`
+	Fname     string      `dynamodbav:"customer_fname"`
+	Id        string      `dynamodbav:"customer_id"`
+	Lname     string      `dynamodbav:"customer_lname"`
 }
