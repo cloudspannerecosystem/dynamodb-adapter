@@ -23,6 +23,7 @@ type Customer struct {
 	Lname     string      `dynamodbav:"customer_lname"`
 	Email     string      `dynamodbav:"customer_email"`
 	Addresses interface{} `dynamodbav:"customer_addresses"`
+	Items     string      `dynamodbav:"number_of_items"`
 }
 
 type Order struct {
@@ -65,4 +66,22 @@ type Electronic struct {
 	Model          string  `dynamodbav:"model"`
 	Price          float32 `dynamodbav:"price"`
 	ShippingAmount float32 `dynamodbav:"shipping_amount"`
+}
+
+type Manufacturers struct {
+	Manufacturer string `dynamodbav:"manufacturer"`
+}
+
+type Firstnames struct {
+	Firstname string `dynamodbav:"customer_fname"`
+}
+
+type ItemToPut struct {
+	PK        string
+	SK        string
+	Addresses interface{} `dynamodbav:"customer_addresses"`
+	Email     string      `dynamodbav:"customer_email"`
+	Fname     string      `dynamodbav:"customer_fname"`
+	Id        string      `dynamodbav:"customer_id"`
+	Lname     string      `dynamodbav:"customer_lname"`
 }

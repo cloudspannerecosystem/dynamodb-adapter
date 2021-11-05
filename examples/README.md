@@ -80,6 +80,10 @@ cd ..
 
 ```shell
 cd ..
+Replace config-files with config-files under example dir
+
+sed -i 's#rice\.MustFindBox("config-files")#rice\.MustFindBox("examples/adapter/config-files")'#g main.go
+
 go build
 cp dyanmodb-adapter examples/adpater/
 ```
