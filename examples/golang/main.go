@@ -32,13 +32,12 @@ import (
 
 func main() {
 	var sess *session.Session
-
 	switch cmd := os.Args[1]; cmd {
 	case "spanner":
 		sess = createAdapterSession()
 	case "dynamo":
 		sess = createSession("")
-	}
+  }
 
 	svc := dynamodb.New(sess)
 
@@ -218,6 +217,7 @@ func getOrderLineItemDetails(svc *dynamodb.DynamoDB) {
 		}
 		printLineItem(lineItem)
 	}
+
 }
 
 func getProductsByCategory(svc *dynamodb.DynamoDB) {
@@ -249,7 +249,6 @@ func getProductsByCategory(svc *dynamodb.DynamoDB) {
 	}
 }
 
-
 func updateCustomerDetails(svc *dynamodb.DynamoDB) {
 	_, err := svc.UpdateItem(&dynamodb.UpdateItemInput{
 		TableName: aws.String("Customer_Order"),
@@ -263,7 +262,7 @@ func updateCustomerDetails(svc *dynamodb.DynamoDB) {
     		},
     ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
             ":number_of_items": {
-                S: aws.String("10"),
+                S: aws.String("100"),
             },
         },
     ReturnValues: aws.String("UPDATED_NEW"),
@@ -281,27 +280,15 @@ func updateCustomerDetails(svc *dynamodb.DynamoDB) {
 
 func addNewCustomer(svc *dynamodb.DynamoDB) {
 
-  type ItemToPut struct {
-      PK                 string
-      SK                 string
-      Addresses          interface{} `dynamodbav:"customer_addresses"`
-      Email              string      `dynamodbav:"customer_email"`
-      Fname              string      `dynamodbav:"customer_fname"`
-      Id                 string      `dynamodbav:"customer_id"`
-      Lname              string      `dynamodbav:"customer_lname"`
-
-  }
-
   itemtoput := ItemToPut{
-      PK:  "CUST#9922885566",
-      SK:  "EMAIL#mosby@gmail.com",
-      Addresses:  "{Shipping:  Maclarens pub, 240 W 55th St, New York, NY}",
-      Email:  "mosby@gmail.com",
-      Fname:  "Ted",
-      Id:  "9922885566",
-      Lname:  "Mosby",
-  }
-
+        PK:  "CUST#9922885566",
+        SK:  "EMAIL#mosby@gmail.com",
+        Addresses:  "{Shipping:  Maclarens pub, 240 W 55th St, New York, NY}",
+        Email:  "mosby@gmail.com",
+        Fname:  "Ted",
+        Id:  "9922885566",
+        Lname:  "Mosby",
+    }
   av, err := dynamodbattribute.MarshalMap(itemtoput)
   if err != nil {
       fmt.Println(err.Error())
@@ -348,14 +335,6 @@ func deleteCustomer(svc *dynamodb.DynamoDB) {
 func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
 
   fmt.Println("Running a scan operation to find customers with Id 0000000000 who has number_of_items greater than 3")
-  type Item struct {
-      Fname              string      `dynamodbav:"customer_fname"`
-      Id                 string      `dynamodbav:"customer_id"`
-      Lname              string      `dynamodbav:"customer_lname"`
-      Items              string      `dynamodbav:"number_of_items"`
-
-  }
-
   filt := expression.Name("customer_id").Equal(expression.Value("0000000000"))
   proj := expression.NamesList(expression.Name("customer_fname"), expression.Name("customer_lname"), expression.Name("number_of_items"))
   expr, err := expression.NewBuilder().WithFilter(filt).WithProjection(proj).Build()
@@ -376,21 +355,22 @@ func getCustomerWithSameId(svc *dynamodb.DynamoDB) {
 	}
 
   for _, i := range result.Items {
-      item := Item{}
+      customer := Customer{}
 
-      err = dynamodbattribute.UnmarshalMap(i, &item)
+      err = dynamodbattribute.UnmarshalMap(i, &customer)
 
       if err != nil {
           fmt.Println(err.Error())
       }
-      intItem,err := strconv.Atoi(item.Items)
+      intItem,err := strconv.Atoi(customer.Items)
       if err != nil {
                 fmt.Println(err.Error())
       }
-      if intItem > 3 && item.Fname!= "" && item.Lname!="" {
-          fmt.Println("Customer Name: ", item.Fname, item.Lname)
+      if intItem > 3 && customer.Fname!= "" && customer.Lname!="" {
+          fmt.Println("Customer Name: ", customer.Fname, customer.Lname)
       }
   }
+
 }
 
 func getProductManufacturer(svc *dynamodb.DynamoDB) {
@@ -432,7 +412,7 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
                    S: aws.String("HardGood#Toys, Games & Drones#TV, Movie & Character Toys#Trumpet Multimedia - Trumpets That Work 2015 Calendar - Black"),
                 },
              },
-             },
+            },
           ProjectionExpression: aws.String("manufacturer"),
           },
         "Customer_Order" : {
@@ -471,13 +451,6 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
       return
   }
 
-  type Manufacturers struct {
-  	Manufacturer        string      `dynamodbav:"manufacturer"`
-
-  }
-  type Firstnames struct {
-    	Firstname        string      `dynamodbav:"customer_fname"`
-  }
   for _, i := range result.Responses   {
            manufacturers := Manufacturers{}
            for _,j := range i {
@@ -485,7 +458,6 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
               if len(manufacturers.Manufacturer)>0 {
                 fmt.Println("Product Manufacturers:", manufacturers.Manufacturer)
                }
-
            }
     }
   for _, i := range result.Responses   {
@@ -495,7 +467,6 @@ func getProductManufacturer(svc *dynamodb.DynamoDB) {
               if len(firstnames.Firstname) > 0 {
                 fmt.Println("Customer First Names:", firstnames.Firstname)
                }
-
            }
     }
 }
@@ -533,7 +504,6 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                               "item_quantity": {
                                   S: aws.String("100"),
                               },
-
                           },
                       },
                   },
@@ -549,7 +519,6 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                               "item_quantity": {
                                   S: aws.String("10"),
                               },
-
                           },
                       },
                   },
@@ -562,7 +531,6 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                               "SK": {
                                   S: aws.String("EMAIL#reallynoone@email.com"),
                               },
-
                           },
                       },
                   },
@@ -635,8 +603,6 @@ func addNewCustomerBatch(svc *dynamodb.DynamoDB) {
                           },
                       },
                   },
-
-
               },
       },
 	})
