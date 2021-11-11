@@ -44,18 +44,18 @@ jobs:
           name: set credentials
           command: |
             echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
-            echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json
       - run:
           name: integration tests
           command: |
-            cat <<EOF > $HOME/config-files/staging/config.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/config.json
             {
                 "GoogleProjectID": "$SPANNER_PROJECT",
                 "SpannerDb": "dynamodb-adapter-int",
                 "QueryLimit": 5000
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/spanner.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/spanner.json
             {
                 "dynamodb_adapter_table_ddl": "dynamodb-adapter",
                 "dynamodb_adapter_config_manager": "dynamodb-adapter",
@@ -63,7 +63,7 @@ jobs:
                 "employee": "dynamodb-adapter"
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/tables.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/tables.json
             {
                 "employee":{
                     "partitionKey":"emp_id",
@@ -108,6 +108,7 @@ workflows:
               only:
                   - master
                   - baseline
+                  - int-test-fix
 
   nightly:  # Run every night.
     triggers:
