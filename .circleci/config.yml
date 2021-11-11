@@ -3,28 +3,111 @@
 # Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
 jobs:
-  build_and_test:
+  build:
     docker:
       - image: circleci/golang:1.13
-
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
-
     steps:
       - checkout
+      - run: go build
 
+  lint_golang:
+    docker:
+      - image: golangci/golangci-lint:latest-alpine
+    steps:
+      - checkout
+      - run: golangci-lint run --timeout 5m
+
+  lint_markdown:
+    docker:
+      - image: circleci/ruby:2.7
+    steps:
+      - checkout
+      - run: gem install mdl
+      - run: mdl .
+
+  unit_test:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    steps:
+      - checkout
+      - run: go test -v -short ./...
+
+  integration_test:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    steps:
+      - checkout
       - run:
           name: set credentials
           command: |
             echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
             echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
-      - run: go test -v ./...
+      - run:
+          name: integration tests
+          command: |
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/config.json
+            {
+                "GoogleProjectID": "$SPANNER_PROJECT",
+                "SpannerDb": "dynamodb-adapter-int",
+                "QueryLimit": 5000
+            }
+            EOF
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/spanner.json
+            {
+                "dynamodb_adapter_table_ddl": "$SPANNER_INSTANCE",
+                "dynamodb_adapter_config_manager": "$SPANNER_INSTANCE",
+                "department": "$SPANNER_INSTANCE",
+                "employee": "$SPANNER_INSTANCE"
+            }
+            EOF
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/tables.json
+            {
+                "employee":{
+                    "partitionKey":"emp_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "emp_id": "N",
+                        "first_name":"S",
+                        "last_name":"S",
+                        "address":"S",
+                        "age":"N"
+                    },
+                    "indices": {}
+                },
+                "department":{
+                    "partitionKey":"d_id",
+                    "sortKey": "",
+                    "attributeTypes": {
+                        "d_id": "N",
+                        "d_name":"S",
+                        "d_specialization":"S"
+                    },
+                    "indices": {}
+                }
+            }
+            EOF
+            go run integrationtest/setup.go setup
+            go test integrationtest/api_test.go
+            go run integrationtest/setup.go teardown
 
 workflows:
   version: 2
 
   commit:  # Run on every commit.
     jobs:
-      - build_and_test
+      - build
+      - lint_golang
+      - lint_markdown
+      - unit_test
+      - integration_test:
+          filters:
+            branches:
+              only:
+                  - master
+                  - baseline
 
   nightly:  # Run every night.
     triggers:
@@ -35,4 +118,8 @@ workflows:
               only:
                   - master
     jobs:
-      - build_and_test
+      - build
+      - lint_golang
+      - lint_markdown
+      - unit_test
+      - integration_test
