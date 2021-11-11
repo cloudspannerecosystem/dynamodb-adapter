@@ -102,13 +102,7 @@ workflows:
       - lint_golang
       - lint_markdown
       - unit_test
-      - integration_test:
-          filters:
-            branches:
-              only:
-                  - master
-                  - baseline
-                  - int-test-fix
+      - integration_test
 
   nightly:  # Run every night.
     triggers:
