@@ -44,7 +44,7 @@ jobs:
           name: set credentials
           command: |
             echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
-            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json
+            echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
       - run:
           name: integration tests
           command: |
@@ -57,10 +57,10 @@ jobs:
             EOF
             cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/spanner.json
             {
-                "dynamodb_adapter_table_ddl": "dynamodb-adapter",
-                "dynamodb_adapter_config_manager": "dynamodb-adapter",
-                "department": "dynamodb-adapter",
-                "employee": "dynamodb-adapter"
+                "dynamodb_adapter_table_ddl": "$SPANNER_INSTANCE",
+                "dynamodb_adapter_config_manager": "$SPANNER_INSTANCE",
+                "department": "$SPANNER_INSTANCE",
+                "employee": "$SPANNER_INSTANCE"
             }
             EOF
             cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/tables.json
@@ -102,7 +102,12 @@ workflows:
       - lint_golang
       - lint_markdown
       - unit_test
-      - integration_test
+      - integration_test:
+          filters:
+            branches:
+              only:
+                  - master
+                  - baseline
 
   nightly:  # Run every night.
     triggers:
