@@ -48,22 +48,22 @@ jobs:
       - run:
           name: integration tests
           command: |
-            cat <<EOF > $HOME/config-files/staging/config.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/config.json
             {
                 "GoogleProjectID": "$SPANNER_PROJECT",
                 "SpannerDb": "dynamodb-adapter-int",
                 "QueryLimit": 5000
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/spanner.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/spanner.json
             {
-                "dynamodb_adapter_table_ddl": "dynamodb-adapter",
-                "dynamodb_adapter_config_manager": "dynamodb-adapter",
-                "department": "dynamodb-adapter",
-                "employee": "dynamodb-adapter"
+                "dynamodb_adapter_table_ddl": "$SPANNER_INSTANCE",
+                "dynamodb_adapter_config_manager": "$SPANNER_INSTANCE",
+                "department": "$SPANNER_INSTANCE",
+                "employee": "$SPANNER_INSTANCE"
             }
             EOF
-            cat <<EOF > $HOME/config-files/staging/tables.json
+            cat <<EOF > $CIRCLE_WORKING_DIRECTORY/config-files/staging/tables.json
             {
                 "employee":{
                     "partitionKey":"emp_id",
