@@ -22,7 +22,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/gin-swagger v1.3.1
 	github.com/swaggo/swag v1.7.1
-	github.com/tidwall/gjson v1.9.0
+	github.com/tidwall/gjson v1.9.3
 	github.com/valyala/fasthttp v1.15.1 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.uber.org/zap v1.19.1
@@ -65,7 +65,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
-	github.com/tidwall/match v1.0.3 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/ugorji/go/codec v1.2.6 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
