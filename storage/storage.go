@@ -27,7 +27,6 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
-	"github.com/tidwall/gjson"
 )
 
 // Storage object for intracting with storage package
@@ -38,7 +37,7 @@ type Storage struct {
 // storage - global instance of storage
 var storage *Storage
 
-func initSpannerDriver(instance string, m map[string]*gjson.Result) *spanner.Client {
+func initSpannerDriver(instance string) *spanner.Client {
 	conf := spanner.ClientConfig{}
 
 	str := "projects/" + config.ConfigurationMap.GoogleProjectID + "/instances/" + instance + "/databases/" + config.ConfigurationMap.SpannerDb
@@ -54,10 +53,9 @@ func InitializeDriver() {
 
 	storage = new(Storage)
 	storage.spannerClient = make(map[string]*spanner.Client)
-	config := map[string]*gjson.Result{}
 	for _, v := range models.SpannerTableMap {
 		if _, ok := storage.spannerClient[v]; !ok {
-			storage.spannerClient[v] = initSpannerDriver(v, config)
+			storage.spannerClient[v] = initSpannerDriver(v)
 		}
 	}
 }
