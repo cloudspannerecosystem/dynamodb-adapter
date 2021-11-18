@@ -23,7 +23,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
@@ -120,7 +119,6 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
-	go captureQueryHash(table, stmt.SQL)
 	itr := s.getSpannerClient(table).Single().WithTimestampBound(spanner.ExactStaleness(time.Second*10)).Query(ctx, stmt)
 	defer itr.Stop()
 	allRows := []map[string]interface{}{}
@@ -888,18 +886,6 @@ func parseRow(r *spanner.Row, colDDL map[string]string) (map[string]interface{},
 		}
 	}
 	return singleRow, nil
-}
-
-var queryHash = make(map[string]string)
-var mux = new(sync.Mutex)
-
-func captureQueryHash(table string, query string) {
-	mux.Lock()
-	defer mux.Unlock()
-	_, ok := queryHash[query]
-	if !ok {
-		queryHash[query] = table
-	}
 }
 
 func checkInifinty(value float64, logData interface{}) error {
