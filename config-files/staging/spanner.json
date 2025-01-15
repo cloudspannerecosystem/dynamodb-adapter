@@ -1,5 +1,6 @@
 {
-    "dynamodb_adapter_table_ddl": "instance-ID of dynamodb_adapter_table_ddl table",
-    "dynamodb_adapter_config_manager": "instance-ID of dynamodb_adapter_config_manager table",
-    "tableName": "instance-ID of Table"
+    "dynamodb_adapter_table_ddl": "spanner-instance-dev",
+    "dynamodb_adapter_config_manager": "spanner-instance-dev",
+    "test_table_for_demo": "spanner-instance-dev",
+     "test_table": "spanner-instance-dev"
 }

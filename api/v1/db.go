@@ -24,12 +24,15 @@ import (
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+
+	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/opentracing/opentracing-go"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // InitDBAPI - routes for apis
@@ -59,7 +62,7 @@ func RouteRequest(c *gin.Context) {
 	case "UpdateItem":
 		Update(c)
 	default:
-		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of" + amzTarget).
+		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of"+amzTarget).
 			HTTPResponse("X-Amz-Target Header not supported"))
 	}
 }
@@ -232,23 +235,40 @@ func queryResponse(query models.Query, c *gin.Context) {
 // @Router /query/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func QueryTable(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "GetItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "GetItem", startTime, err)
 	var query models.Query
 	if err := c.ShouldBindJSON(&query); err != nil {
+		otelgo.AddAnnotation(ctx, "Query Validation failed")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
 	} else {
+		otelgo.AddAnnotation(ctx, "Query validation passed, processing query")
 		logger.LogInfo(query)
 		queryResponse(query, c)
+		otelgo.AddAnnotation(ctx, "Successfully processed query")
 	}
 }
 
@@ -263,36 +283,75 @@ func QueryTable(c *gin.Context) {
 // @Router /getWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func GetItemMeta(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "GetItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "GetItem", startTime, err)
+
+	// Add annotation for the GetItemMeta function start
+	otelgo.AddAnnotation(ctx, "Processing GetItemMeta Request")
+
 	var getItemMeta models.GetItemMeta
 	if err := c.ShouldBindJSON(&getItemMeta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(getItemMeta))
 	} else {
-		span.SetTag("table", getItemMeta.TableName)
+		// Add annotation for binding the JSON request
+		otelgo.AddAnnotation(ctx, "Binding GetItemMeta JSON Request")
+
+		// Set the table name as a tag for better observability
+		//span.SetTag("table", getItemMeta.TableName)
 		logger.LogDebug(getItemMeta)
+
+		// Check permissions for reading or writing
 		if allow := services.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
+
+		// Add annotation for converting DynamoDB key to map
+		otelgo.AddAnnotation(ctx, "Converting Dynamo to Map for Primary Key")
 		getItemMeta.PrimaryKeyMap, err = ConvertDynamoToMap(getItemMeta.TableName, getItemMeta.Key)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(getItemMeta))
 			return
 		}
+
+		// Add annotation for changing expression attribute names
+		otelgo.AddAnnotation(ctx, "Changing Column Names to Spanner Expression Names")
 		getItemMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getItemMeta.TableName, getItemMeta.ExpressionAttributeNames)
+
+		// Add annotation before calling the Get service
+		otelgo.AddAnnotation(ctx, "Calling GetWithProjection Service")
 		res, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
+
+		// Process the response
 		if rowErr == nil {
+			// Add annotation for processing the response
+			otelgo.AddAnnotation(ctx, "Changing Response Columns to Original Format")
 			changedColumns := ChangeResponseToOriginalColumns(getItemMeta.TableName, res)
+
+			// Convert changed columns to DynamoDB map
 			output, err := ChangeMaptoDynamoMap(changedColumns)
 			if err != nil {
 				c.JSON(errors.HTTPResponse(err, "OutputChangedError"))
@@ -318,45 +377,71 @@ func GetItemMeta(c *gin.Context) {
 // @Router /batchGetWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func BatchGetItem(c *gin.Context) {
-	start := time.Now()
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	span = addParentSpanID(c, span)
-
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "Batch GetItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "Batch GetItem", startTime, err)
+	otelgo.AddAnnotation(ctx, "Starting BatchGetItem processing")
 	var batchGetMeta models.BatchGetMeta
 	if err1 := c.ShouldBindJSON(&batchGetMeta); err1 != nil {
+		otelgo.AddAnnotation(ctx, "BatchGetMeta validation failed")
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchGetMeta))
 	} else {
+
+		otelgo.AddAnnotation(ctx, "BatchGetMeta validation succeeded")
 		output := make(map[string]interface{})
 
 		for k, v := range batchGetMeta.RequestItems {
 			batchGetWithProjectionMeta := v
 			batchGetWithProjectionMeta.TableName = k
 			logger.LogDebug(batchGetWithProjectionMeta)
+
+			otelgo.AddAnnotation(ctx, fmt.Sprintf("Processing table: %s", k))
+
 			if allow := services.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
+
+				otelgo.AddAnnotation(ctx, fmt.Sprintf("Permission denied for table: %s", k))
 				c.JSON(http.StatusOK, []gin.H{})
 				return
 			}
 			var singleOutput interface{}
 			singleOutput, span, err = batchGetDataSingleTable(c.Request.Context(), batchGetWithProjectionMeta, span)
 			if err != nil {
+				otelgo.AddAnnotation(ctx, fmt.Sprintf("Error fetching data for table: %s", k))
 				c.JSON(errors.HTTPResponse(err, batchGetWithProjectionMeta))
 			}
 			currOutput, err := ChangeMaptoDynamoMap(singleOutput)
 			if err != nil {
+				otelgo.AddAnnotation(ctx, fmt.Sprintf("Error transforming data for table: %s", k))
 				c.JSON(errors.HTTPResponse(err, batchGetWithProjectionMeta))
 			}
 			output[k] = currOutput["L"]
+
+			otelgo.AddAnnotation(ctx, fmt.Sprintf("Successfully processed table: %s", k))
 		}
 
+		otelgo.AddAnnotation(ctx, "BatchGetItem processing completed")
 		c.JSON(http.StatusOK, map[string]interface{}{"Responses": output})
 
 		if time.Since(start) > time.Second*1 {
@@ -396,33 +481,62 @@ func batchGetDataSingleTable(ctx context.Context, batchGetWithProjectionMeta mod
 // @Router /deleteItem/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func DeleteItem(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "GetItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "GetItem", startTime, err)
+
+	otelgo.AddAnnotation(ctx, "Starting DeleteItem processing")
 	var deleteItem models.Delete
 	if err := c.ShouldBindJSON(&deleteItem); err != nil {
+
+		otelgo.AddAnnotation(ctx, "Validation failed for DeleteItem request")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 	} else {
+
+		otelgo.AddAnnotation(ctx, "Validation succeeded for DeleteItem request")
 		logger.LogDebug(deleteItem)
 		if allow := services.MayIReadOrWrite(deleteItem.TableName, true, "DeleteItem"); !allow {
+
+			otelgo.AddAnnotation(ctx, fmt.Sprintf("Permission denied for table: %s", deleteItem.TableName))
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
+
+		otelgo.AddAnnotation(ctx, fmt.Sprintf("Converting primary key map for table: %s", deleteItem.TableName))
 		deleteItem.PrimaryKeyMap, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.Key)
 		if err != nil {
+
+			otelgo.AddAnnotation(ctx, "Error converting primary key map")
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 			return
 		}
+
+		otelgo.AddAnnotation(ctx, "Converting expression attribute values")
 		deleteItem.ExpressionAttributeMap, err = ConvertDynamoToMap(deleteItem.TableName, deleteItem.ExpressionAttributeValues)
 		if err != nil {
+			otelgo.AddAnnotation(ctx, "Error converting expression attribute values")
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 			return
 		}
@@ -431,13 +545,17 @@ func DeleteItem(c *gin.Context) {
 			deleteItem.ConditionExpression = strings.ReplaceAll(deleteItem.ConditionExpression, k, v)
 		}
 
+		otelgo.AddAnnotation(ctx, "Fetching current item for deletion")
 		oldRes, _ := services.GetWithProjection(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
+		otelgo.AddAnnotation(ctx, "Attempting to delete item")
 		err := services.Delete(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionExpression, deleteItem.ExpressionAttributeMap, nil)
 		if err == nil {
+			otelgo.AddAnnotation(ctx, "Item deleted successfully")
 			output, _ := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
 			c.JSON(http.StatusOK, map[string]interface{}{"Attributes": output})
 			go services.StreamDataToThirdParty(oldRes, nil, deleteItem.TableName)
 		} else {
+			otelgo.AddAnnotation(ctx, "Failed to delete item")
 			c.JSON(errors.HTTPResponse(err, deleteItem))
 		}
 	}
@@ -454,17 +572,33 @@ func DeleteItem(c *gin.Context) {
 // @Router /scan/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func Scan(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "Scan", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "Scan", startTime, err)
+
+	otelgo.AddAnnotation(ctx, "Decoding Bytes To Spanner Column Type")
 	var meta models.ScanMeta
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -473,13 +607,13 @@ func Scan(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-
+		otelgo.AddAnnotation(ctx, "Converting Dynamo to Map for ExclusiveStartKey")
 		meta.StartFrom, err = ConvertDynamoToMap(meta.TableName, meta.ExclusiveStartKey)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 			return
 		}
-
+		otelgo.AddAnnotation(ctx, "Converting Dynamo to Map for ExpressionAttributeValues")
 		meta.ExpressionAttributeMap, err = ConvertDynamoToMap(meta.TableName, meta.ExpressionAttributeValues)
 		if err != nil {
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
@@ -490,9 +624,11 @@ func Scan(c *gin.Context) {
 		}
 
 		logger.LogDebug(meta)
+		otelgo.AddAnnotation(ctx, "Calling Scan Service")
 		res, err := services.Scan(c.Request.Context(), meta)
 		if err == nil {
 			changedOutput := ChangeQueryResponseColumn(meta.TableName, res)
+			otelgo.AddAnnotation(ctx, "Changing Items to Dynamo Map")
 			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
 				if err != nil {
@@ -500,6 +636,7 @@ func Scan(c *gin.Context) {
 				}
 				changedOutput["Items"] = itemsOutput["L"]
 			}
+			otelgo.AddAnnotation(ctx, "Changing LastEvaluatedKey to Dynamo Map")
 			if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
 				changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
 				if err != nil {
@@ -524,39 +661,71 @@ func Scan(c *gin.Context) {
 // @Router /update/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func Update(c *gin.Context) {
+
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
+
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "UpdateItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	// Add annotation for span
+	otelgo.AddAnnotation(ctx, "Started processing UpdateItem request")
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "UpdateItem", startTime, err)
+
 	var updateAttr models.UpdateAttr
 	if err := c.ShouldBindJSON(&updateAttr); err != nil {
+		// Add annotation on error
+		otelgo.AddAnnotation(ctx, "Failed to bind JSON")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
+		return
 	} else {
 		if allow := services.MayIReadOrWrite(updateAttr.TableName, true, "update"); !allow {
+			// Add annotation for permission check
+			otelgo.AddAnnotation(ctx, "Permission check failed")
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
+
 		updateAttr.PrimaryKeyMap, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.Key)
 		if err != nil {
+			otelgo.AddAnnotation(ctx, "Error converting DynamoDB key to map")
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
 			return
 		}
+
 		updateAttr.ExpressionAttributeMap, err = ConvertDynamoToMap(updateAttr.TableName, updateAttr.ExpressionAttributeValues)
 		if err != nil {
+			otelgo.AddAnnotation(ctx, "Error converting ExpressionAttributeValues")
 			c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
 			return
 		}
+
+		// Call UpdateExpression and capture response or error
 		resp, err := UpdateExpression(c.Request.Context(), updateAttr)
 		if err != nil {
+			otelgo.AddAnnotation(ctx, "Error during UpdateExpression")
 			c.JSON(errors.HTTPResponse(err, updateAttr))
 		} else {
+			otelgo.AddAnnotation(ctx, "Successfully updated item")
 			c.JSON(http.StatusOK, resp)
 		}
 	}
@@ -573,17 +742,32 @@ func Update(c *gin.Context) {
 // @Router /BatchWriteItem/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
 func BatchWriteItem(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
+	}
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
 	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
 	if err != nil || spanContext == nil {
 		logger.LogDebug(err)
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
-	addParentSpanID(c, span)
+	requestSpan, requestCtx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(requestCtx)
+	defer requestSpan.Finish()
+	addParentSpanID(c, requestSpan)
+	ctx, span := models.GlobalProxy.OtelInst.StartSpan(ctx, "GetItem", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "GetItem", startTime, err)
+
 	var batchWriteItem models.BatchWriteItem
 	var unprocessedBatchWriteItems models.BatchWriteItemResponse
 
@@ -662,4 +846,18 @@ func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdat
 		return err
 	}
 	return nil
+}
+
+func recordMetrics(ctx context.Context, o *otelgo.OpenTelemetry, method string, start time.Time, err error) {
+	status := "OK"
+	if err != nil {
+		status = "failure"
+	}
+	o.RecordRequestCountMetric(ctx, otelgo.Attributes{
+		Method: method,
+		Status: status,
+	})
+	o.RecordLatencyMetric(ctx, start, otelgo.Attributes{
+		Method: method,
+	})
 }

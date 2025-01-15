@@ -1,0 +1,17 @@
+spanner:
+  project_id: "cassandra-to-spanner"
+  instance_id: "spanner-instance-dev"
+  database_name: "cluster10"
+  query_limit: 5000
+otel:
+  enabled: true
+  enabledClientSideMetrics: true
+  serviceName: "dynamo-service-dev"
+  healthcheck:
+    enabled: true
+    endpoint: "0.0.0.0:13133"
+  metrics:
+    endpoint:  "0.0.0.0:4317"
+  traces:
+    endpoint:  "0.0.0.0:4317"
+    samplingRatio: 1

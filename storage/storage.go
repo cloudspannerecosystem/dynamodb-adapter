@@ -17,16 +17,20 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 // Storage object for intracting with storage package
@@ -37,27 +41,74 @@ type Storage struct {
 // storage - global instance of storage
 var storage *Storage
 
-func initSpannerDriver(instance string) *spanner.Client {
-	conf := spanner.ClientConfig{}
-
-	str := "projects/" + config.ConfigurationMap.GoogleProjectID + "/instances/" + instance + "/databases/" + config.ConfigurationMap.SpannerDb
-	Client, err := spanner.NewClientWithConfig(context.Background(), str, conf)
-	if err != nil {
-		logger.LogFatal(err)
+func InitializeDriver(ctx context.Context) error {
+	if models.GlobalConfig == nil {
+		return fmt.Errorf("GlobalConfig is not initialized")
 	}
-	return Client
-}
 
-// InitializeDriver - this will Initialize databases object in global map
-func InitializeDriver() {
+	storage = &Storage{
+		spannerClient: make(map[string]*spanner.Client),
+	}
 
-	storage = new(Storage)
-	storage.spannerClient = make(map[string]*spanner.Client)
-	for _, v := range models.SpannerTableMap {
-		if _, ok := storage.spannerClient[v]; !ok {
-			storage.spannerClient[v] = initSpannerDriver(v)
+	// OpenTelemetry configuration
+	otelConfig := otelgo.OTelConfig{
+		TracerEndpoint:   models.GlobalConfig.Otel.Traces.Endpoint,
+		MetricEndpoint:   models.GlobalConfig.Otel.Metrics.Endpoint,
+		ServiceName:      models.GlobalConfig.Otel.ServiceName,
+		OTELEnabled:      models.GlobalConfig.Otel.Enabled,
+		TraceSampleRatio: models.GlobalConfig.Otel.Traces.SamplingRatio,
+		Database:         models.GlobalConfig.Spanner.DatabaseName,
+		Instance:         models.GlobalConfig.Spanner.InstanceID,
+	}
+
+	otelInstance, shutdownOTel, err := otelgo.NewOpenTelemetry(ctx, &otelConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize OpenTelemetry: %w", err)
+	}
+	defer func() {
+		if err != nil && shutdownOTel != nil {
+			_ = shutdownOTel(ctx)
+		}
+	}()
+
+	// Spanner client initialization
+	database := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
+		models.GlobalConfig.Spanner.ProjectID,
+		models.GlobalConfig.Spanner.InstanceID,
+		models.GlobalConfig.Spanner.DatabaseName,
+	)
+	spannerClient, err := spanner.NewClientWithConfig(ctx, database, spanner.ClientConfig{
+		SessionPoolConfig:          spanner.DefaultSessionPoolConfig,
+		UserAgent:                  "dynamo-adapter/1",
+		OpenTelemetryMeterProvider: otelInstance.MeterProvider,
+	},
+		//	option.WithGRPCConnectionPool(models.GlobalConfig.Spanner.NumOfChannels),
+		option.WithGRPCDialOption(grpc.WithConnectParams(grpc.ConnectParams{
+			MinConnectTimeout: 10 * time.Second,
+		})),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Spanner client: %w", err)
+	}
+
+	storage.spannerClient[models.GlobalConfig.Spanner.InstanceID] = spannerClient
+	logger.LogInfo("Spanner client initialized successfully")
+
+	if models.GlobalConfig.Otel == nil {
+		models.GlobalConfig.Otel = &models.OtelConfig{
+			Enabled: false,
+		}
+	} else {
+		if models.GlobalConfig.Otel.Enabled {
+			if models.GlobalConfig.Otel.Traces.SamplingRatio < 0 || models.GlobalConfig.Otel.Traces.SamplingRatio > 1 {
+				fmt.Errorf("Sampling Ratio for Otel Traces should be between 0 and 1]")
+			}
 		}
 	}
+	models.GlobalProxy = &models.Proxy{}
+	models.GlobalProxy.OtelInst = otelInstance
+	models.GlobalProxy.OtelShutdown = shutdownOTel
+	return nil
 }
 
 // Close - This gracefully returns the session pool objects, when driver gets exit signal
@@ -78,7 +129,7 @@ var once sync.Once
 func GetStorageInstance() *Storage {
 	once.Do(func() {
 		if storage == nil {
-			InitializeDriver()
+			InitializeDriver(context.Background())
 		}
 	})
 

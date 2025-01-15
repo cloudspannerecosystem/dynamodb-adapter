@@ -16,11 +16,61 @@
 package models
 
 import (
+	"context"
 	"sync"
 
 	"github.com/antonmedv/expr/vm"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
 )
+
+type SpannerConfig struct {
+	ProjectID    string `yaml:"project_id"`
+	InstanceID   string `yaml:"instance_id"`
+	DatabaseName string `yaml:"database_name"`
+	QueryLimit   int64  `yaml:"query_limit"`
+}
+
+// OtelConfig defines the structure of the YAML configuration
+type OtelConfig struct {
+	Enabled                  bool   `yaml:"enabled"`
+	EnabledClientSideMetrics bool   `yaml:"enabledClientSideMetrics"`
+	ServiceName              string `yaml:"serviceName"`
+	HealthCheck              struct {
+		Enabled  bool   `yaml:"enabled"`
+		Endpoint string `yaml:"endpoint"`
+	} `yaml:"healthcheck"`
+	Metrics struct {
+		Endpoint string `yaml:"endpoint"`
+	} `yaml:"metrics"`
+	Traces struct {
+		Endpoint      string  `yaml:"endpoint"`
+		SamplingRatio float64 `yaml:"samplingRatio"`
+	} `yaml:"traces"`
+}
+
+type Config struct {
+	Spanner   SpannerConfig `yaml:"spanner"`
+	Otel      *OtelConfig   `yaml:"otel"`
+	UserAgent string
+}
+
+type Client struct {
+	ctx   context.Context
+	proxy *Proxy
+}
+
+type Proxy struct {
+	Context      context.Context
+	OtelInst     *otelgo.OpenTelemetry // Exported field (starts with uppercase)
+	OtelShutdown func(context.Context) error
+}
+
+var GlobalProxy *Proxy
+
+var GlobalConfig *Config
+
+var DbConfigMap map[string]TableConfig
 
 // Meta struct
 type Meta struct {
@@ -72,7 +122,7 @@ type GetItemMeta struct {
 	Key                      map[string]*dynamodb.AttributeValue `json:"Key"`
 }
 
-//BatchGetMeta struct
+// BatchGetMeta struct
 type BatchGetMeta struct {
 	RequestItems map[string]BatchGetWithProjectionMeta `json:"RequestItems"`
 }
@@ -135,7 +185,7 @@ type UpdateAttr struct {
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 }
 
-//ScanMeta for Scan request
+// ScanMeta for Scan request
 type ScanMeta struct {
 	TableName                 string                              `json:"TableName"`
 	IndexName                 string                              `json:"IndexName"`
@@ -165,28 +215,28 @@ type TableConfig struct {
 	ActualTable      string                 `json:"ActualTable,omitempty"`
 }
 
-//BatchWriteItem for Batch Operation
+// BatchWriteItem for Batch Operation
 type BatchWriteItem struct {
 	RequestItems map[string][]BatchWriteSubItems `json:"RequestItems"`
 }
 
-//BatchWriteItemResponse for Batch Operation
+// BatchWriteItemResponse for Batch Operation
 type BatchWriteItemResponse struct {
 	UnprocessedItems map[string][]BatchWriteSubItems `json:"UnprocessedItems"`
 }
 
-//BatchWriteSubItems is for BatchWriteItem
+// BatchWriteSubItems is for BatchWriteItem
 type BatchWriteSubItems struct {
 	DelReq BatchDeleteItem `json:"DeleteRequest"`
 	PutReq BatchPutItem    `json:"PutRequest"`
 }
 
-//BatchDeleteItem is for BatchWriteSubItems
+// BatchDeleteItem is for BatchWriteSubItems
 type BatchDeleteItem struct {
 	Key map[string]*dynamodb.AttributeValue `json:"Key"`
 }
 
-//BatchPutItem is for BatchWriteSubItems
+// BatchPutItem is for BatchWriteSubItems
 type BatchPutItem struct {
 	Item map[string]*dynamodb.AttributeValue `json:"Item"`
 }

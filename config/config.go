@@ -48,52 +48,36 @@ func init() {
 	ConfigurationMap = new(Configuration)
 }
 
+// Define a global variable for reading files (mockable for tests)
+var readFile = os.ReadFile
+
 // InitConfig loads ConfigurationMap and DbConfigMap in memory based on
 // ACTIVE_ENV. If ACTIVE_ENV is not set or and empty string the environment
 // is defaulted to staging.
-// 
+//
 // These config files are read from rice-box
-func InitConfig(box *rice.Box) {
-	once.Do(func() {
-		env := strings.ToLower(os.Getenv("ACTIVE_ENV"))
-		if env == "" {
-			env = "staging"
-		}
 
-		ConfigurationMap = new(Configuration)
-
-		ba, err := box.Bytes(env + "/tables.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		err = json.Unmarshal(ba, &DbConfigMap)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		ba, err = box.Bytes(env + "/config.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		err = json.Unmarshal(ba, ConfigurationMap)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		ba, err = box.Bytes(env + "/spanner.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		tmp := make(map[string]string)
-		err = json.Unmarshal(ba, &tmp)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		for k, v := range tmp {
-			models.SpannerTableMap[utils.ChangeTableNameForSpanner(k)] = v
-		}
-	})
+func InitConfig() {
+	GlobalConfig, err := loadConfig("config.yaml")
+	if err != nil {
+		fmt.Errorf("failed to read config file: %w", err)
+	}
+	models.GlobalConfig = GlobalConfig
 }
 
-//GetTableConf returns table configuration from global map object
+func loadConfig(filename string) (*models.Config, error) {
+	data, err := readFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+	var config models.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	return &config, nil
+}
+
+// GetTableConf returns table configuration from global map object
 func GetTableConf(tableName string) (models.TableConfig, error) {
 	tableConf, ok := DbConfigMap[tableName]
 	if !ok {

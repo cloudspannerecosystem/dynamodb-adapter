@@ -535,6 +535,7 @@ func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string
 
 // Scan service
 func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}, error) {
+
 	query := models.Query{}
 	query.TableName = scanData.TableName
 	query.Limit = scanData.Limit
