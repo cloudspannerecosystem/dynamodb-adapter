@@ -117,11 +117,11 @@ dynamodb_adapter_config_manager
 `config.json` contains the basic settings for DynamoDB Adapter; GCP Project,
 Cloud Spanner Database and query record limit.
 
-| Key               | Description
+| Key               | Description |
 | ----------------- | -----------
-| GoogleProjectID   | Your Google Project ID
-| SpannerDb         | Your Spanner Database Name
-| QueryLimit        | Default limit for the number of records returned in query
+| GoogleProjectID   | Your Google Project ID |
+| SpannerDb         | Your Spanner Database Name |
+| QueryLimit        | Default limit for the number of records returned in query |
 
 For example:
 
@@ -159,13 +159,13 @@ DynamoDB. This includes all table's primary key, columns and index information.
 This file supports the update and query operations by providing the primary
 key, sort key and any other indexes present.
 
-| Key               | Description
+| Key               | Description |
 | ----------------- | -----------
-| tableName         | Name of the table in DynamoDB
-| partitionKey      | Primary key of the table in DynamoDB
-| sortKey           | Sorting key of the table in DynamoDB
-| attributeTypes    | Key/Value list of column names and type
-| indices           | Collection of index objects that represent the indexes present in the DynamoDB table
+| tableName         | Name of the table in DynamoDB |
+| partitionKey      | Primary key of the table in DynamoDB |
+| sortKey           | Sorting key of the table in DynamoDB |
+| attributeTypes    | Key/Value list of column names and type |
+| indices           | Collection of index objects that represent the indexes present in the DynamoDB table |
 
 For example:
 
