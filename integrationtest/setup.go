@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,11 +26,13 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
+	"gopkg.in/yaml.v2"
 )
+
+var readFile = os.ReadFile
 
 const (
 	expectedRowCount = 18
@@ -45,32 +46,16 @@ var (
 )
 
 func main() {
-	box := rice.MustFindBox("../config-files")
-
-	// read the config variables
-	ba, err := box.Bytes("staging/config.json")
+	config, err := loadConfig("../config.yaml")
 	if err != nil {
-		log.Fatal("error reading staging config json: ", err.Error())
-	}
-	var conf = &config.Configuration{}
-	if err = json.Unmarshal(ba, &conf); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error loading configuration: %v", err)
 	}
 
-	// read the spanner table configurations
-	var m = make(map[string]string)
-	ba, err = box.Bytes("staging/spanner.json")
-	if err != nil {
-		log.Fatal("error reading spanner config json: ", err.Error())
-	}
-	if err = json.Unmarshal(ba, &m); err != nil {
-		log.Fatal(err)
-	}
-
-	var databaseName = fmt.Sprintf(
-		"projects/%s/instances/%s/databases/%s", conf.GoogleProjectID, m["dynamodb_adapter_table_ddl"], conf.SpannerDb,
+	// Build the Spanner database name
+	databaseName := fmt.Sprintf(
+		"projects/%s/instances/%s/databases/%s",
+		config.Spanner.ProjectID, config.Spanner.InstanceID, config.Spanner.DatabaseName,
 	)
-
 	switch cmd := os.Args[1]; cmd {
 	case "setup":
 		w := log.Writer()
@@ -101,6 +86,20 @@ func main() {
 	default:
 		log.Fatal("Unknown command: use 'setup', 'teardown'")
 	}
+}
+
+func loadConfig(filename string) (*models.Config, error) {
+	data, err := readFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config models.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return &config, nil
 }
 
 func createDatabase(w io.Writer, db string) error {
@@ -312,7 +311,7 @@ func initData(w io.Writer, db string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT department (d_id, d_name, d_specialization) VALUES

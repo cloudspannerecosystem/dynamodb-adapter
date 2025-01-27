@@ -471,7 +471,7 @@ var (
 	queryTestCaseOutput16 = `{"Count":1,"Items":[]}`
 )
 
-//Test Data for Scan API
+// Test Data for Scan API
 var (
 	ScanTestCase1Name = "1: Wrong URL"
 	ScanTestCase1     = models.ScanMeta{
@@ -589,7 +589,7 @@ var (
 	ScanTestCase13Output = `{"Count":5,"Items":[]}`
 )
 
-//Test Data for UpdateItem API
+// Test Data for UpdateItem API
 var (
 
 	//200 Status check
@@ -728,7 +728,7 @@ var (
 	}
 )
 
-//Test Data for PutItem API
+// Test Data for PutItem API
 var (
 	//400 bad request
 	PutItemTestCase1Name = "1: only tablename passed"
@@ -839,7 +839,7 @@ var (
 	}
 )
 
-//Test Data DeleteItem API
+// Test Data DeleteItem API
 var (
 	DeleteItemTestCase1Name = "1: Only TableName passed"
 	DeleteItemTestCase1     = models.Delete{
@@ -926,7 +926,7 @@ var (
 	}
 )
 
-//test Data for BatchWriteItem API
+// test Data for BatchWriteItem API
 var (
 	BatchWriteItemTestCase1Name = "1: Only Table name passed"
 	BatchWriteItemTestCase1     = models.BatchWriteItem{
@@ -1307,9 +1307,7 @@ var (
 )
 
 func handlerInitFunc() *gin.Engine {
-	box := rice.MustFindBox("../config-files")
-
-	initErr := initializer.InitAll(box)
+	initErr := initializer.InitAll()
 	if initErr != nil {
 		log.Fatalln(initErr)
 	}

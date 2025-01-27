@@ -172,3 +172,31 @@ func ChangeTableNameForSpanner(tableName string) string {
 	tableName = strings.ReplaceAll(tableName, "-", "_")
 	return tableName
 }
+
+// Convert DynamoDB data types to equivalent Spanner types
+func ConvertDynamoTypeToSpannerType(dynamoType string) string {
+	switch dynamoType {
+	case "S":
+		return "STRING(MAX)"
+	case "N":
+		return "FLOAT64"
+	case "B":
+		return "BYTES(MAX)"
+	case "BOOL":
+		return "BOOL"
+	case "NULL":
+		return "NULL"
+	case "SS":
+		return "ARRAY<STRING>"
+	case "NS":
+		return "ARRAY<INT64>"
+	case "BS":
+		return "ARRAY<BYTES>"
+	case "M":
+		return "JSON"
+	case "L":
+		return "JSON"
+	default:
+		return "STRING(MAX)"
+	}
+}

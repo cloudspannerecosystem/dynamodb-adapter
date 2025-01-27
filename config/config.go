@@ -17,16 +17,12 @@
 package config
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
-	"strings"
-	"sync"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // Configuration struct
@@ -39,63 +35,38 @@ type Configuration struct {
 // ConfigurationMap pointer
 var ConfigurationMap *Configuration
 
-// DbConfigMap dynamo to Spanner
-var DbConfigMap map[string]models.TableConfig
-
-var once sync.Once
-
 func init() {
 	ConfigurationMap = new(Configuration)
 }
 
-// InitConfig loads ConfigurationMap and DbConfigMap in memory based on
-// ACTIVE_ENV. If ACTIVE_ENV is not set or and empty string the environment
-// is defaulted to staging.
-// 
-// These config files are read from rice-box
-func InitConfig(box *rice.Box) {
-	once.Do(func() {
-		env := strings.ToLower(os.Getenv("ACTIVE_ENV"))
-		if env == "" {
-			env = "staging"
-		}
+var readFile = os.ReadFile
 
-		ConfigurationMap = new(Configuration)
-
-		ba, err := box.Bytes(env + "/tables.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		err = json.Unmarshal(ba, &DbConfigMap)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		ba, err = box.Bytes(env + "/config.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		err = json.Unmarshal(ba, ConfigurationMap)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		ba, err = box.Bytes(env + "/spanner.json")
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		tmp := make(map[string]string)
-		err = json.Unmarshal(ba, &tmp)
-		if err != nil {
-			logger.LogFatal(err)
-		}
-		for k, v := range tmp {
-			models.SpannerTableMap[utils.ChangeTableNameForSpanner(k)] = v
-		}
-	})
+func InitConfig() {
+	GlobalConfig, err := loadConfig("config.yaml")
+	if err != nil {
+		fmt.Errorf("failed to read config file: %w", err)
+	}
+	models.GlobalConfig = GlobalConfig
 }
 
-//GetTableConf returns table configuration from global map object
+func loadConfig(filename string) (*models.Config, error) {
+	data, err := readFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Unmarshal YAML data into config struct
+	var config models.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return &config, nil
+}
+
+// GetTableConf returns table configuration from global map object
 func GetTableConf(tableName string) (models.TableConfig, error) {
-	tableConf, ok := DbConfigMap[tableName]
+	tableConf, ok := models.DbConfigMap[tableName]
 	if !ok {
 		return models.TableConfig{}, errors.New("ResourceNotFoundException", tableName)
 	}
@@ -104,7 +75,7 @@ func GetTableConf(tableName string) (models.TableConfig, error) {
 		return tableConf, nil
 	} else if tableConf.ActualTable != "" {
 		actualTable := tableConf.ActualTable
-		tableConf = DbConfigMap[actualTable]
+		tableConf = models.DbConfigMap[actualTable]
 		tableConf.ActualTable = actualTable
 		return tableConf, nil
 	}

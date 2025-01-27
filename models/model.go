@@ -22,6 +22,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+type SpannerConfig struct {
+	ProjectID        string `yaml:"project_id"`
+	InstanceID       string `yaml:"instance_id"`
+	DatabaseName     string `yaml:"database_name"`
+	QueryLimit       int64  `yaml:"query_limit"`
+	DynamoQueryLimit int32  `yaml:"dynamo_query_limit"` //dynamo_query_limit
+}
+
+type Config struct {
+	Spanner SpannerConfig `yaml:"spanner"`
+}
+
+var GlobalConfig *Config
+
 // Meta struct
 type Meta struct {
 	TableName                 string                              `json:"TableName"`
@@ -72,7 +86,7 @@ type GetItemMeta struct {
 	Key                      map[string]*dynamodb.AttributeValue `json:"Key"`
 }
 
-//BatchGetMeta struct
+// BatchGetMeta struct
 type BatchGetMeta struct {
 	RequestItems map[string]BatchGetWithProjectionMeta `json:"RequestItems"`
 }
@@ -135,7 +149,7 @@ type UpdateAttr struct {
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 }
 
-//ScanMeta for Scan request
+// ScanMeta for Scan request
 type ScanMeta struct {
 	TableName                 string                              `json:"TableName"`
 	IndexName                 string                              `json:"IndexName"`
@@ -158,38 +172,40 @@ type TableConfig struct {
 	Indices          map[string]TableConfig `json:"Indices,omitempty"`
 	GCSSourcePath    string                 `json:"GcsSourcePath,omitempty"`
 	DDBIndexName     string                 `json:"DdbIndexName,omitempty"`
-	SpannerIndexName string                 `json:"Table,omitempty"`
+	SpannerIndexName string                 `json:"SpannerIndexName,omitempty"`
 	IsPadded         bool                   `json:"IsPadded,omitempty"`
 	IsComplement     bool                   `json:"IsComplement,omitempty"`
 	TableSource      string                 `json:"TableSource,omitempty"`
 	ActualTable      string                 `json:"ActualTable,omitempty"`
 }
 
-//BatchWriteItem for Batch Operation
+// BatchWriteItem for Batch Operation
 type BatchWriteItem struct {
 	RequestItems map[string][]BatchWriteSubItems `json:"RequestItems"`
 }
 
-//BatchWriteItemResponse for Batch Operation
+// BatchWriteItemResponse for Batch Operation
 type BatchWriteItemResponse struct {
 	UnprocessedItems map[string][]BatchWriteSubItems `json:"UnprocessedItems"`
 }
 
-//BatchWriteSubItems is for BatchWriteItem
+// BatchWriteSubItems is for BatchWriteItem
 type BatchWriteSubItems struct {
 	DelReq BatchDeleteItem `json:"DeleteRequest"`
 	PutReq BatchPutItem    `json:"PutRequest"`
 }
 
-//BatchDeleteItem is for BatchWriteSubItems
+// BatchDeleteItem is for BatchWriteSubItems
 type BatchDeleteItem struct {
 	Key map[string]*dynamodb.AttributeValue `json:"Key"`
 }
 
-//BatchPutItem is for BatchWriteSubItems
+// BatchPutItem is for BatchWriteSubItems
 type BatchPutItem struct {
 	Item map[string]*dynamodb.AttributeValue `json:"Item"`
 }
+
+var DbConfigMap map[string]TableConfig
 
 // TableDDL - this contains the DDL
 var TableDDL map[string]map[string]string
@@ -208,10 +224,10 @@ var OriginalColResponse map[string]string
 
 func init() {
 	TableDDL = make(map[string]map[string]string)
-	TableDDL["dynamodb_adapter_table_ddl"] = map[string]string{"tableName": "STRING(MAX)", "column": "STRING(MAX)", "dataType": "STRING(MAX)", "originalColumn": "STRING(MAX)"}
+	TableDDL["dynamodb_adapter_table_ddl"] = map[string]string{"tableName": "S", "column": "S", "dynamoDataType": "S", "originalColumn": "S", "partitionKey": "S", "sortKey": "S", "spannerIndexName": "S", "actualTable": "S", "spannerDataType": "S"}
 	TableDDL["dynamodb_adapter_config_manager"] = map[string]string{"tableName": "STRING(MAX)", "config": "STRING(MAX)", "cronTime": "STRING(MAX)", "uniqueValue": "STRING(MAX)", "enabledStream": "STRING(MAX)", "pubsubTopic": "STRING(MAX)"}
 	TableColumnMap = make(map[string][]string)
-	TableColumnMap["dynamodb_adapter_table_ddl"] = []string{"tableName", "column", "dataType", "originalColumn"}
+	TableColumnMap["dynamodb_adapter_table_ddl"] = []string{"tableName", "column", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"}
 	TableColumnMap["dynamodb_adapter_config_manager"] = []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream", "pubsubTopic"}
 	TableColChangeMap = make(map[string]struct{})
 	ColumnToOriginalCol = make(map[string]string)
