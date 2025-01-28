@@ -5,7 +5,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang
+      - image: cimg/go:1.22
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
@@ -37,7 +37,7 @@ jobs:
 
   unit_test:
     docker:
-      - image: circleci/golang
+      - image: cimg/go:1.22
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
@@ -45,7 +45,7 @@ jobs:
 
   integration_test:
     docker:
-      - image: circleci/golang
+      - image: cimg/go:1.22
     working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
     steps:
       - checkout
