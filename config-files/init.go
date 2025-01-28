@@ -200,7 +200,10 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 		}
 
 		// Migrate table metadata to Spanner
-		migrateDynamoTableToSpanner(ctx, databaseName, tableName, client)
+		err := migrateDynamoTableToSpanner(ctx, databaseName, tableName, client)
+		if err != nil {
+			log.Printf("Error migrating table %s: %v", tableName, err)
+		}
 	}
 
 	fmt.Println("Initial setup complete.")

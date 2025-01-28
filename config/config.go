@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
@@ -44,7 +45,7 @@ var readFile = os.ReadFile
 func InitConfig() {
 	GlobalConfig, err := loadConfig("config.yaml")
 	if err != nil {
-		fmt.Errorf("failed to read config file: %w", err)
+		log.Printf("failed to read config file: %v", err)
 	}
 	models.GlobalConfig = GlobalConfig
 }

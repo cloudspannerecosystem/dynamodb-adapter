@@ -454,7 +454,7 @@ func ChangeResponseColumn(obj map[string]interface{}) map[string]interface{} {
 // ChangeColumnToSpanner converts original column name to  spanner supported column names
 func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	rs := make(map[string]interface{})
-	
+
 	for k, v := range obj {
 
 		if k1, ok := models.ColumnToOriginalCol[k]; ok {
@@ -542,7 +542,7 @@ func ConvertFromMap(item map[string]*dynamodb.AttributeValue, v interface{}, tab
 			if e, ok := r.(runtime.Error); ok {
 				err = e
 			} else if s, ok := r.(string); ok {
-				err = fmt.Errorf(s)
+				err = fmt.Errorf("%s", s)
 			} else {
 				err = r.(error)
 			}
@@ -631,7 +631,7 @@ func ChangeQueryResponseColumn(tableName string, obj map[string]interface{}) map
 	return obj
 }
 
-//ChangeMaptoDynamoMap converts simple map into dynamo map
+// ChangeMaptoDynamoMap converts simple map into dynamo map
 func ChangeMaptoDynamoMap(in interface{}) (map[string]interface{}, error) {
 	if in == nil {
 		return nil, nil
