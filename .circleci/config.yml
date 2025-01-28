@@ -6,7 +6,7 @@ jobs:
   build:
     docker:
       - image: cimg/go:1.22
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    working_directory: ~/project
     steps:
       - checkout
       - restore_cache:
@@ -38,7 +38,7 @@ jobs:
   unit_test:
     docker:
       - image: cimg/go:1.22
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    working_directory: ~/project
     steps:
       - checkout
       - run: go test -v -short ./...
@@ -46,7 +46,7 @@ jobs:
   integration_test:
     docker:
       - image: cimg/go:1.22
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+    working_directory: ~/project
     steps:
       - checkout
       - run:
