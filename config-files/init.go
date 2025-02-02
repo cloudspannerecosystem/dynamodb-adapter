@@ -146,7 +146,7 @@ func generateTableDDL(tableName string, client *dynamodb.Client, limit int32) st
 	}())
 
 	return fmt.Sprintf(
-		"CREATE TABLE %s (\n\t%s\n) %s",
+		"CREATE TABLE %s (\n\t%s\n) %s;",
 		tableName, strings.Join(columns, ",\n\t"), primaryKey,
 	)
 }
