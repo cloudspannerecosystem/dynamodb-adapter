@@ -51,7 +51,7 @@ var (
 		spannerIndexName STRING(MAX),
 		actualTable STRING(MAX),
 		spannerDataType STRING(MAX)
-	) PRIMARY KEY (tableName, column)`
+	) PRIMARY KEY (tableName, column);`
 )
 
 // Entry point for the application
@@ -83,7 +83,7 @@ func main() {
 		runDryRun(config.Spanner.DynamoQueryLimit)
 	} else {
 		fmt.Println("-- Executing Setup on Spanner --")
-		executeSetup(ctx, adminClient, databaseName)
+		executeSetup(ctx, adminClient, databaseName, config.Spanner.DynamoQueryLimit)
 	}
 }
 
@@ -118,17 +118,17 @@ func runDryRun(limit int32) {
 		fmt.Printf("Processing table: %s\n", tableName)
 
 		// Generate and print table-specific DDL
-		ddl := generateTableDDL(tableName, client)
+		ddl := generateTableDDL(tableName, client, limit)
 		fmt.Printf("-- DDL for table: %s --\n%s\n", tableName, ddl)
 
 		// Generate and print insert queries
-		generateInsertQueries(tableName, client)
+		generateInsertQueries(tableName, client, limit)
 	}
 }
 
 // Generate DDL statement for a specific DynamoDB table
-func generateTableDDL(tableName string, client *dynamodb.Client) string {
-	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, models.GlobalConfig.Spanner.DynamoQueryLimit)
+func generateTableDDL(tableName string, client *dynamodb.Client, limit int32) string {
+	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, limit)
 	if err != nil {
 		log.Printf("Failed to fetch attributes for table %s: %v", tableName, err)
 		return ""
@@ -152,8 +152,8 @@ func generateTableDDL(tableName string, client *dynamodb.Client) string {
 }
 
 // Generate insert queries for a given DynamoDB table
-func generateInsertQueries(tableName string, client *dynamodb.Client) {
-	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, models.GlobalConfig.Spanner.DynamoQueryLimit)
+func generateInsertQueries(tableName string, client *dynamodb.Client, limit int32) {
+	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, limit)
 	if err != nil {
 		log.Printf("Failed to fetch attributes for table %s: %v", tableName, err)
 		return
@@ -163,7 +163,7 @@ func generateInsertQueries(tableName string, client *dynamodb.Client) {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
 		query := fmt.Sprintf(
 			`INSERT INTO dynamodb_adapter_table_ddl 
-			(column, tableName, dataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType) 
+			(column, tableName, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType) 
 			VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');`,
 			column, tableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType,
 		)
@@ -172,7 +172,7 @@ func generateInsertQueries(tableName string, client *dynamodb.Client) {
 }
 
 // Execute the setup process: create database, tables, and migrate data
-func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminClient, databaseName string) {
+func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminClient, databaseName string, limit int32) {
 
 	// Create the Spanner database if it doesn't exist
 	if err := createDatabase(ctx, adminClient, databaseName); err != nil {
@@ -193,7 +193,7 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 
 	for _, tableName := range tables {
 		// Generate and apply table-specific DDL
-		ddl := generateTableDDL(tableName, client)
+		ddl := generateTableDDL(tableName, client, limit)
 		if err := createTable(ctx, adminClient, databaseName, ddl); err != nil {
 			log.Printf("Failed to create table %s: %v", tableName, err)
 			continue
