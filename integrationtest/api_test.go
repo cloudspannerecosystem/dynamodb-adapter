@@ -16,26 +16,26 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"testing"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/api"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/apitesting"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/initializer"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v2"
 )
 
 // database name used in all the test cases
 var databaseName string
+var readConfigFile = os.ReadFile
 
 // params for TestGetItemAPI
 var (
@@ -1365,31 +1365,29 @@ func createStatusCheckPostTestCase(name, url, dynamoAction string, httpStatus in
 }
 
 func init() {
-	box := rice.MustFindBox("../config-files")
-
-	// read the config variables
-	ba, err := box.Bytes("staging/config.json")
+	config, err := LoadConfig("../config.yaml")
 	if err != nil {
-		log.Fatal("error reading staging config json: ", err.Error())
+		log.Fatalf("Error loading configuration: %v", err)
 	}
-	var conf = &config.Configuration{}
-	if err = json.Unmarshal(ba, &conf); err != nil {
-		log.Fatal(err)
-	}
-
-	// read the spanner table configurations
-	var m = make(map[string]string)
-	ba, err = box.Bytes("staging/spanner.json")
-	if err != nil {
-		log.Fatal("error reading spanner config json: ", err.Error())
-	}
-	if err = json.Unmarshal(ba, &m); err != nil {
-		log.Fatal(err)
-	}
-
+	// Build the Spanner database name
 	databaseName = fmt.Sprintf(
-		"projects/%s/instances/%s/databases/%s", conf.GoogleProjectID, m["dynamodb_adapter_table_ddl"], conf.SpannerDb,
+		"projects/%s/instances/%s/databases/%s",
+		config.Spanner.ProjectID, config.Spanner.InstanceID, config.Spanner.DatabaseName,
 	)
+}
+
+func LoadConfig(filename string) (*models.Config, error) {
+	data, err := readConfigFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config models.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return &config, nil
 }
 
 func testGetItemAPI(t *testing.T) {

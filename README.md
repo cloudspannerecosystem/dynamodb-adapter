@@ -60,23 +60,22 @@ DynamoDB Adapter currently supports the following DynamoDB data types
 ## Configuration
 
 ### config.yaml
+This file defines the necessary settings for the adapter. A sample configuration might look like this:
 
-This file defines the necessary settings for the adapter.
-A sample configuration might look like this:
 
-```yaml
     spanner:
         project_id: "my-project-id"
         instance_id: "my-instance-id"
         database_name: "my-database-name"
-        query_limit: "query-limit"
-        dynamo_query_limit: "dynamo-query-limit"
-```
+        query_limit: "query_limit"
+        dynamo_query_limit: "dynamo_query_limit"
 
 The fields are:
 project_id: The Google Cloud project ID.
 instance_id: The Spanner instance ID.
 database_name: The database name in Spanner.
+query_limit: Database query limit.
+dynamo_query_limit: DynamoDb query limit.
 
 ### dynamodb_adapter_table_ddl
 
@@ -87,121 +86,44 @@ present in DynamoDB. This mapping is required because DynamoDB supports the
 special characters in column names while Cloud Spanner only supports
 underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
 
-```sql
-CREATE TABLE
-dynamodb_adapter_table_ddl
-(
- column         STRING(MAX),
- tableName      STRING(MAX),
- dataType       STRING(MAX),
- originalColumn STRING(MAX),
-) PRIMARY KEY (tableName, column)
+### Initialization Modes
+DynamoDB Adapter supports two modes of initialization:
+
+#### Dry Run Mode
+This mode generates the Spanner queries required to:
+
+Create the dynamodb_adapter_table_ddl table in Spanner.
+Insert metadata for all DynamoDB tables into dynamodb_adapter_table_ddl.
+These queries are printed to the console without executing them on Spanner, allowing you to review them before making changes.
+
+```sh
+go run init.go --dry_run
 ```
 
-![dynamodb_adapter_table_ddl sample data](images/config_spanner.png)
+#### Execution Mode
+This mode executes the Spanner queries generated during the dry run on the Spanner instance. It will:
 
-### dynamodb_adapter_config_manager
+Create the dynamodb_adapter_table_ddl table in Spanner if it does not exist.
+Insert metadata for all DynamoDB tables into the dynamodb_adapter_table_ddl table.
 
-`dynamodb_adapter_config_manager` contains the Pub/Sub configuration used for
-DynamoDB Stream compatability. It is used to do some additional operation
-required on the change of data in tables. It can trigger New and Old data on
-given Pub/Sub topic.
-
-```sql
-CREATE TABLE
-dynamodb_adapter_config_manager
-(
- tableName      STRING(MAX),
- config         STRING(MAX),
- cronTime       STRING(MAX),
- enabledStream  STRING(MAX),
- pubsubTopic    STRING(MAX),
- uniqueValue    STRING(MAX),
-) PRIMARY KEY (tableName)
+```sh
+go run init.go
 ```
 
-### config-files/{env}/config.json
-
-`config.json` contains the basic settings for DynamoDB Adapter; GCP Project,
-Cloud Spanner Database and query record limit.
-
-| Key               | Description |
-| ----------------- | ----------- |
-| GoogleProjectID   | Your Google Project ID |
-| SpannerDb         | Your Spanner Database Name |
-| QueryLimit        | Default limit for the number of records returned in query |
-
-For example:
-
-```json
-{
-    "GoogleProjectID"   : "first-project",
-    "SpannerDb"         : "test-db",
-    "QueryLimit"        : 5000
-}
+### Prerequisites for Initialization
+AWS CLI:
+Configure AWS credentials:
+```sh
+aws configure set aws_access_key_id YOUR_ACCESS_KEY
+aws configure set aws_secret_access_key YOUR_SECRET_KEY
+aws configure set default.region YOUR_REGION
+aws configure set aws_session_token YOUR_SESSION_TOKEN
 ```
-
-### config-files/{env}/spanner.json
-
-`spanner.json` is a key/value mapping file for table names with a Cloud Spanner
-instance ids. This enables the adapter to query data for a particular table on
-different Cloud Spanner instances.
-
-For example:
-
-```json
-{
-    "dynamodb_adapter_table_ddl": "spanner-2 ",
-    "dynamodb_adapter_config_manager": "spanner-2",
-    "tableName1": "spanner-1",
-    "tableName2": "spanner-1"
-    ...
-    ...
-}
-```
-
-### config-files/{env}/tables.json
-
-`tables.json` contains the description of the tables as they appear in
-DynamoDB. This includes all table's primary key, columns and index information.
-This file supports the update and query operations by providing the primary
-key, sort key and any other indexes present.
-
-| Key               | Description |
-| ----------------- | ----------- |
-| tableName         | Name of the table in DynamoDB |
-| partitionKey      | Primary key of the table in DynamoDB |
-| sortKey           | Sorting key of the table in DynamoDB |
-| attributeTypes    | Key/Value list of column names and type |
-| indices           | Collection of index objects that represent the indexes present in the DynamoDB table |
-
-For example:
-
-```json
-{
-    "tableName": {
-        "partitionKey": "primary key or Partition key",
-        "sortKey": "sorting key of dynamoDB adapter",
-        "attributeTypes": {
-            "column_a": "N",
-            "column_b": "S",
-            "column_of_bytes": "B",
-            "my_boolean_column": "BOOL"
-        },
-        "indices": {
-            "indexName1": {
-                "sortKey": "sort key for indexName1",
-                "partitionKey": "partition key for indexName1"
-            },
-            "another_index": {
-                "sortKey": "sort key for another_index",
-                "partitionKey": "partition key for another_index"
-            }
-        }
-    },
-    .....
-    .....
-}
+Google Cloud CLI:
+Authenticate and set up your environment:
+```sh
+gcloud auth application-default login
+gcloud config set project [MY_PROJECT_NAME]
 ```
 
 ## Starting DynamoDB Adapter
@@ -229,6 +151,8 @@ gcloud config set project [MY_PROJECT NAME]
 ```sh
 go run main.go
 ```
+
+
 
 ```
 

@@ -43,7 +43,7 @@ func init() {
 var readFile = os.ReadFile
 
 func InitConfig() {
-	GlobalConfig, err := loadConfig("config.yaml")
+	GlobalConfig, err := loadConfig("../config.yaml")
 	if err != nil {
 		log.Printf("failed to read config file: %v", err)
 	}

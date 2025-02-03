@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -27,16 +26,11 @@ import (
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
-	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	"gopkg.in/yaml.v2"
 )
 
 var readFile = os.ReadFile
-
-const (
-	expectedRowCount = 18
-)
 
 var (
 	colNameRg     = regexp.MustCompile("^[a-zA-Z0-9_]*$")
@@ -46,7 +40,7 @@ var (
 )
 
 func main() {
-	config, err := loadConfig("../config.yaml")
+	config, err := loadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Error loading configuration: %v", err)
 	}
@@ -62,19 +56,6 @@ func main() {
 		if err := createDatabase(w, databaseName); err != nil {
 			log.Fatal(err)
 		}
-
-		if err := updateDynamodbAdapterTableDDL(w, databaseName); err != nil {
-			log.Fatal(err)
-		}
-
-		count, err := verifySpannerSetup(databaseName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if count != expectedRowCount {
-			log.Fatalf("Rows found: %d, exepected %d\n", count, expectedRowCount)
-		}
-
 		if err := initData(w, databaseName); err != nil {
 			log.Fatal(err)
 		}
@@ -105,7 +86,7 @@ func loadConfig(filename string) (*models.Config, error) {
 func createDatabase(w io.Writer, db string) error {
 	matches := regexp.MustCompile("^(.*)/databases/(.*)$").FindStringSubmatch(db)
 	if matches == nil || len(matches) != 3 {
-		return fmt.Errorf("Invalid database id %s", db)
+		return fmt.Errorf("invalid database id %s", db)
 	}
 
 	ctx := context.Background()
@@ -120,19 +101,16 @@ func createDatabase(w io.Writer, db string) error {
 		CreateStatement: "CREATE DATABASE `" + matches[2] + "`",
 		ExtraStatements: []string{
 			`CREATE TABLE dynamodb_adapter_table_ddl (
-				column	       STRING(MAX),
-				tableName      STRING(MAX),
-				dataType       STRING(MAX),
-				originalColumn STRING(MAX),
+				tableName STRING(MAX) NOT NULL,
+				column STRING(MAX) NOT NULL,
+				dynamoDataType STRING(MAX) NOT NULL,
+				originalColumn STRING(MAX) NOT NULL,
+				partitionKey STRING(MAX),
+				sortKey STRING(MAX),
+				spannerIndexName STRING(MAX),
+				actualTable STRING(MAX),
+				spannerDataType STRING(MAX)
 			) PRIMARY KEY (tableName, column)`,
-			`CREATE TABLE dynamodb_adapter_config_manager (
-				tableName     STRING(MAX),
-				config 	      STRING(MAX),
-				cronTime      STRING(MAX),
-				enabledStream STRING(MAX),
-				pubsubTopic   STRING(MAX),
-				uniqueValue   STRING(MAX),
-			) PRIMARY KEY (tableName)`,
 			`CREATE TABLE employee (
 				emp_id 	   FLOAT64,
 				address    STRING(MAX),
@@ -172,118 +150,6 @@ func deleteDatabase(w io.Writer, db string) error {
 	return nil
 }
 
-func updateDynamodbAdapterTableDDL(w io.Writer, db string) error {
-	stmt, err := readDatabaseSchema(db)
-	if err != nil {
-		return err
-	}
-
-	var mutations []*spanner.Mutation
-	for i := 0; i < len(stmt); i++ {
-		tokens := strings.Split(stmt[i], "\n")
-		if len(tokens) == 1 {
-			continue
-		}
-		var currentTable, colName, colType, originalColumn string
-
-		for j := 0; j < len(tokens); j++ {
-			if strings.Contains(tokens[j], "PRIMARY KEY") {
-				continue
-			}
-			if strings.Contains(tokens[j], "CREATE TABLE") {
-				currentTable = getTableName(tokens[j])
-				continue
-			}
-			colName, colType = getColNameAndType(tokens[j])
-			originalColumn = colName
-
-			if !colNameRg.MatchString(colName) {
-				colName = specialCharRg.ReplaceAllString(colName, "_")
-			}
-			colType = strings.Replace(colType, ",", "", 1)
-			var mut = spanner.InsertOrUpdateMap(
-				"dynamodb_adapter_table_ddl",
-				map[string]interface{}{
-					"tableName":      currentTable,
-					"column":         colName,
-					"dataType":       colType,
-					"originalColumn": originalColumn,
-				},
-			)
-			fmt.Fprintf(w, "[%s, %s, %s, %s]\n", currentTable, colName, colType, originalColumn)
-			mutations = append(mutations, mut)
-		}
-	}
-
-	return spannerBatchPut(context.Background(), db, mutations)
-}
-
-func readDatabaseSchema(db string) ([]string, error) {
-	ctx := context.Background()
-	cli, err := database.NewDatabaseAdminClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer cli.Close()
-
-	ddlResp, err := cli.GetDatabaseDdl(ctx, &adminpb.GetDatabaseDdlRequest{Database: db})
-	if err != nil {
-		return nil, err
-	}
-	return ddlResp.GetStatements(), nil
-}
-
-func getTableName(stmt string) string {
-	tokens := strings.Split(stmt, " ")
-	return tokens[2]
-}
-
-func getColNameAndType(stmt string) (string, string) {
-	stmt = strings.TrimSpace(stmt)
-	tokens := strings.Split(stmt, " ")
-	tokens[0] = strings.Trim(tokens[0], "`")
-	return tokens[0], tokens[1]
-}
-
-// spannerBatchPut - this insert or update data in batch
-func spannerBatchPut(ctx context.Context, db string, m []*spanner.Mutation) error {
-	client, err := spanner.NewClient(ctx, db)
-	if err != nil {
-		log.Fatalf("Failed to create client %v", err)
-		return err
-	}
-	defer client.Close()
-
-	if _, err = client.Apply(ctx, m); err != nil {
-		return errors.New("ResourceNotFoundException: " + err.Error())
-	}
-	return nil
-}
-
-func verifySpannerSetup(db string) (int, error) {
-	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, db)
-	if err != nil {
-		return 0, err
-	}
-	defer client.Close()
-
-	var iter = client.Single().Read(ctx, "dynamodb_adapter_table_ddl", spanner.AllKeys(),
-		[]string{"column", "tableName", "dataType", "originalColumn"})
-
-	var count int
-	for {
-		if _, err := iter.Next(); err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return 0, err
-		}
-		count++
-	}
-	return count, nil
-}
-
 func initData(w io.Writer, db string) error {
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, db)
@@ -291,6 +157,29 @@ func initData(w io.Writer, db string) error {
 		return err
 	}
 	defer client.Close()
+
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType) VALUES
+						('employee', 'emp_id', 'N', 'emp_id', 'emp_id','', 'emp_id','employee', 'FLOAT64'),
+						('employee', 'address', 'S', 'address', 'emp_id','', 'address','employee', 'STRING(MAX)'),
+						('employee', 'age', 'N', 'age', 'emp_id','', 'age','employee', 'FLOAT64'),
+						('employee', 'first_name', 'S', 'first_name', 'emp_id','', 'first_name','employee', 'STRING(MAX)'),
+						('employee', 'last_name', 'S', 'last_name', 'emp_id','', 'last_name','employee', 'STRING(MAX)'),
+						('department', 'd_id', 'N', 'd_id', 'd_id','', 'd_id','department', 'FLOAT64'),
+						('department', 'd_name', 'S', 'd_name', 'd_id','', 'd_name','department', 'STRING(MAX)'),
+						('department', 'd_specialization', 'S', 'd_specialization', 'd_id','', 'd_specialization','department', 'STRING(MAX)')`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
+	if err != nil {
+		return err
+	}
 
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
