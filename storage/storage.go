@@ -37,7 +37,6 @@ var storage *Storage
 
 func initSpannerDriver() *spanner.Client {
 	conf := spanner.ClientConfig{}
-
 	str := "projects/" + models.GlobalConfig.Spanner.ProjectID + "/instances/" + models.GlobalConfig.Spanner.InstanceID + "/databases/" + models.GlobalConfig.Spanner.DatabaseName
 	Client, err := spanner.NewClientWithConfig(context.Background(), str, conf)
 	if err != nil {

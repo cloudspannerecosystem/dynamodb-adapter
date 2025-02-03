@@ -61,7 +61,7 @@ func main() {
 	flag.Parse()
 
 	// Load configuration from a YAML file
-	config, err := loadConfig("../config.yaml")
+	config, err := loadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Error loading configuration: %v", err)
 	}
@@ -80,10 +80,10 @@ func main() {
 	// Decide execution mode based on the dry-run flag
 	if *dryRun {
 		fmt.Println("-- Dry Run Mode: Generating Spanner DDL and Insert Queries Only --")
-		runDryRun(config.Spanner.DynamoQueryLimit)
+		runDryRun(config)
 	} else {
 		fmt.Println("-- Executing Setup on Spanner --")
-		executeSetup(ctx, adminClient, databaseName, config.Spanner.DynamoQueryLimit)
+		executeSetup(ctx, adminClient, databaseName, config)
 	}
 }
 
@@ -103,9 +103,9 @@ func loadConfig(filename string) (*models.Config, error) {
 }
 
 // Run in dry-run mode to output DDL and insert queries without making changes
-func runDryRun(limit int32) {
+func runDryRun(config *models.Config) {
 	fmt.Println("-- Spanner DDL to create the adapter table --")
-	fmt.Println(adapterTableDDL)
+	fmt.Println(adapterTableDDL + ";")
 
 	client := createDynamoClient()
 	tables, err := listDynamoTables(client)
@@ -115,14 +115,14 @@ func runDryRun(limit int32) {
 
 	// Process each DynamoDB table
 	for _, tableName := range tables {
-		fmt.Printf("Processing table: %s\n", tableName)
+		fmt.Printf("-- Processing table: %s\n", tableName)
 
 		// Generate and print table-specific DDL
-		ddl := generateTableDDL(tableName, client, limit)
-		fmt.Printf("-- DDL for table: %s --\n%s\n", tableName, ddl)
+		ddl := generateTableDDL(tableName, client, config.Spanner.DynamoQueryLimit)
+		fmt.Printf("-- DDL for table: %s --\n%s\n", tableName, ddl+";")
 
 		// Generate and print insert queries
-		generateInsertQueries(tableName, client, limit)
+		generateInsertQueries(tableName, client, config.Spanner.DynamoQueryLimit)
 	}
 }
 
@@ -172,7 +172,7 @@ func generateInsertQueries(tableName string, client *dynamodb.Client, limit int3
 }
 
 // Execute the setup process: create database, tables, and migrate data
-func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminClient, databaseName string, limit int32) {
+func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminClient, databaseName string, config *models.Config) {
 
 	// Create the Spanner database if it doesn't exist
 	if err := createDatabase(ctx, adminClient, databaseName); err != nil {
@@ -193,14 +193,14 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 
 	for _, tableName := range tables {
 		// Generate and apply table-specific DDL
-		ddl := generateTableDDL(tableName, client, limit)
+		ddl := generateTableDDL(tableName, client, config.Spanner.DynamoQueryLimit)
 		if err := createTable(ctx, adminClient, databaseName, ddl); err != nil {
 			log.Printf("Failed to create table %s: %v", tableName, err)
 			continue
 		}
 
 		// Migrate table metadata to Spanner
-		err := migrateDynamoTableToSpanner(ctx, databaseName, tableName, client)
+		err := migrateDynamoTableToSpanner(ctx, databaseName, tableName, client, config)
 		if err != nil {
 			log.Printf("Error migrating table %s: %v", tableName, err)
 		}
@@ -210,12 +210,7 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 }
 
 // migrateDynamoTableToSpanner migrates a DynamoDB table schema and metadata to Spanner.
-func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, client *dynamodb.Client) error {
-	// Load configuration
-	config, err := loadConfig("../config.yaml")
-	if err != nil {
-		return fmt.Errorf("error loading configuration: %v", err)
-	}
+func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, client *dynamodb.Client, config *models.Config) error {
 	models.SpannerTableMap[tableName] = config.Spanner.InstanceID
 
 	// Fetch table attributes and keys from DynamoDB
@@ -264,10 +259,11 @@ func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, clie
 	// Prepare mutations to insert metadata into the adapter table
 	var mutations []*spanner.Mutation
 	for column, dataType := range attributes {
+		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
 		mutations = append(mutations, spanner.InsertOrUpdate(
 			"dynamodb_adapter_table_ddl",
-			[]string{"column", "tableName", "dataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"},
-			[]interface{}{column, tableName, dataType, column, partitionKey, sortKey, column, tableName},
+			[]string{"column", "tableName", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"},
+			[]interface{}{column, tableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType},
 		))
 	}
 

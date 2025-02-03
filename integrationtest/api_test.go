@@ -1307,7 +1307,7 @@ var (
 )
 
 func handlerInitFunc() *gin.Engine {
-	initErr := initializer.InitAll()
+	initErr := initializer.InitAll("../config.yaml")
 	if initErr != nil {
 		log.Fatalln(initErr)
 	}

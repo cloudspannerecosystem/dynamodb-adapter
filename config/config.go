@@ -42,8 +42,8 @@ func init() {
 
 var readFile = os.ReadFile
 
-func InitConfig() {
-	GlobalConfig, err := loadConfig("../config.yaml")
+func InitConfig(filepath string) {
+	GlobalConfig, err := loadConfig(filepath)
 	if err != nil {
 		log.Printf("failed to read config file: %v", err)
 	}
@@ -55,7 +55,6 @@ func loadConfig(filename string) (*models.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
-
 	// Unmarshal YAML data into config struct
 	var config models.Config
 	if err := yaml.Unmarshal(data, &config); err != nil {

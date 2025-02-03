@@ -97,7 +97,7 @@ Insert metadata for all DynamoDB tables into dynamodb_adapter_table_ddl.
 These queries are printed to the console without executing them on Spanner, allowing you to review them before making changes.
 
 ```sh
-go run init.go --dry_run
+go run config-files/init.go --dry_run
 ```
 
 #### Execution Mode
@@ -107,7 +107,7 @@ Create the dynamodb_adapter_table_ddl table in Spanner if it does not exist.
 Insert metadata for all DynamoDB tables into the dynamodb_adapter_table_ddl table.
 
 ```sh
-go run init.go
+go run config-files/init.go
 ```
 
 ### Prerequisites for Initialization
