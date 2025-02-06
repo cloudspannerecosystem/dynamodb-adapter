@@ -35,27 +35,27 @@ the adapter.
 
 DynamoDB Adapter currently supports the folowing operations:
 
-| DynamoDB Action
-|----------------
-| BatchGetItem
-| BatchWriteItem
-| DeleteItem
-| GetItem
-| PutItem
-| Query
-| Scan
-| UpdateItem
+| DynamoDB Action |
+|----------------|
+| BatchGetItem |
+| BatchWriteItem |
+| DeleteItem |
+| GetItem |
+| PutItem |
+| Query |
+| Scan |
+| UpdateItem |
 
 ### Supported Data Types
 
 DynamoDB Adapter currently supports the following DynamoDB data types
 
-| DynamoDB Data Type            | Spanner Data Types
-| ------------------------------| ------------------
-| `N` (number type)             | `INT64`, `FLOAT64`, `NUMERIC`
-| `BOOL` (boolean)              | `BOOL`
-| `B` (binary type)             | `BYTES(MAX)`
-| `S` (string and data values)  | `STRING(MAX)`
+| DynamoDB Data Type            | Spanner Data Types |
+| ------------------------------| ------------------ |
+| `N` (number type)             | `INT64`, `FLOAT64`, `NUMERIC` |
+| `BOOL` (boolean)              | `BOOL` |
+| `B` (binary type)             | `BYTES(MAX)` |
+| `S` (string and data values)  | `STRING(MAX)` |
 
 ## Configuration
 
@@ -117,11 +117,11 @@ dynamodb_adapter_config_manager
 `config.json` contains the basic settings for DynamoDB Adapter; GCP Project,
 Cloud Spanner Database and query record limit.
 
-| Key               | Description
-| ----------------- | -----------
-| GoogleProjectID   | Your Google Project ID
-| SpannerDb         | Your Spanner Database Name
-| QueryLimit        | Default limit for the number of records returned in query
+| Key               | Description |
+| ----------------- | ----------- |
+| GoogleProjectID   | Your Google Project ID |
+| SpannerDb         | Your Spanner Database Name |
+| QueryLimit        | Default limit for the number of records returned in query |
 
 For example:
 
@@ -159,13 +159,13 @@ DynamoDB. This includes all table's primary key, columns and index information.
 This file supports the update and query operations by providing the primary
 key, sort key and any other indexes present.
 
-| Key               | Description
-| ----------------- | -----------
-| tableName         | Name of the table in DynamoDB
-| partitionKey      | Primary key of the table in DynamoDB
-| sortKey           | Sorting key of the table in DynamoDB
-| attributeTypes    | Key/Value list of column names and type
-| indices           | Collection of index objects that represent the indexes present in the DynamoDB table
+| Key               | Description |
+| ----------------- | ----------- |
+| tableName         | Name of the table in DynamoDB |
+| partitionKey      | Primary key of the table in DynamoDB |
+| sortKey           | Sorting key of the table in DynamoDB |
+| attributeTypes    | Key/Value list of column names and type |
+| indices           | Collection of index objects that represent the indexes present in the DynamoDB table |
 
 For example:
 
