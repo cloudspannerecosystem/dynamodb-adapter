@@ -21,7 +21,6 @@ import (
 	"log"
 	"os"
 	"regexp"
-	"strings"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -31,13 +30,6 @@ import (
 )
 
 var readFile = os.ReadFile
-
-var (
-	colNameRg     = regexp.MustCompile("^[a-zA-Z0-9_]*$")
-	chars         = []string{"]", "^", "\\\\", "/", "[", ".", "(", ")", "-"}
-	ss            = strings.Join(chars, "")
-	specialCharRg = regexp.MustCompile("[" + ss + "]+")
-)
 
 func main() {
 	config, err := loadConfig("config.yaml")
