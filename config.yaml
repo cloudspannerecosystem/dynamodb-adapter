@@ -1,0 +1,6 @@
+spanner:
+  project_id: ${PROJECT_ID}
+  instance_id: ${INSTANCE_ID}
+  database_name: ${DATABASE_ID}
+  query_limit: ${QUERY_LIMIT}
+  dynamo_query_limit: ${DYNAMODB_QUERY_LIMIT}
