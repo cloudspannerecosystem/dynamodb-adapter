@@ -16,24 +16,35 @@ package spanner
 
 import (
 	"context"
+
 	"strings"
 
+	"cloud.google.com/go/spanner"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
-
-	"cloud.google.com/go/spanner"
 )
 
 // ParseDDL - this will parse DDL of spannerDB and set all the table configs in models
 // This fetches the spanner schema config from dynamodb_adapter_table_ddl table and stored it in
 // global map object which is used to read and write data into spanner tables
-func ParseDDL(updateDB bool) error {
 
+// InitConfig loads ConfigurationMap and DbConfigMap in memory based on
+// ACTIVE_ENV. If ACTIVE_ENV is not set or and empty string the environment
+// is defaulted to staging.
+//
+// These config files are read from rice-box
+
+func ParseDDL(updateDB bool) error {
 	stmt := spanner.Statement{}
+
 	stmt.SQL = "SELECT * FROM dynamodb_adapter_table_ddl"
-	ms, err := storage.GetStorageInstance().ExecuteSpannerQuery(context.Background(), "dynamodb_adapter_table_ddl", []string{"tableName", "column", "dataType", "originalColumn"}, false, stmt)
+	ms, err := storage.GetStorageInstance().ExecuteSpannerQuery(context.Background(), "dynamodb_adapter_table_ddl", []string{"tableName", "column", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"}, false, stmt)
+
 	if err != nil {
 		return err
+	}
+	if models.DbConfigMap == nil {
+		models.DbConfigMap = make(map[string]models.TableConfig)
 	}
 
 	if len(ms) > 0 {
@@ -41,8 +52,18 @@ func ParseDDL(updateDB bool) error {
 			tableName := ms[i]["tableName"].(string)
 			column := ms[i]["column"].(string)
 			column = strings.Trim(column, "`")
-			dataType := ms[i]["dataType"].(string)
+			dataType := ms[i]["dynamoDataType"].(string)
 			originalColumn, ok := ms[i]["originalColumn"].(string)
+			partitionKey := ms[i]["partitionKey"].(string)
+			sortKey, _ := ms[i]["sortKey"].(string) // Optional, check if available
+			spannerIndexName, _ := ms[i]["spannerIndexName"].(string)
+			models.DbConfigMap[tableName] = models.TableConfig{
+				PartitionKey:     partitionKey,
+				SortKey:          sortKey,
+				SpannerIndexName: spannerIndexName,
+				ActualTable:      tableName,
+			}
+
 			if ok {
 				originalColumn = strings.Trim(originalColumn, "`")
 				if column != originalColumn && originalColumn != "" {

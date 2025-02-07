@@ -18,7 +18,6 @@ import (
 	"log"
 	"net/http"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/api"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/docs"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/initializer"
@@ -38,11 +37,7 @@ import (
 // @BasePath /v1
 func main() {
 
-	// This will pack config-files folder inside binary
-	// you need rice utility for it
-	box := rice.MustFindBox("config-files")
-
-	initErr := initializer.InitAll(box)
+	initErr := initializer.InitAll("config.yaml")
 	if initErr != nil {
 		log.Fatalln(initErr)
 	}

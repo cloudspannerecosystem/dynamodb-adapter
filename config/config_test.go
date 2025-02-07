@@ -22,7 +22,7 @@ import (
 )
 
 func TestGetTableConf(t *testing.T) {
-	DbConfigMap = map[string]models.TableConfig{
+	models.DbConfigMap = map[string]models.TableConfig{
 		"employee_data": {
 			PartitionKey:     "emp_id",
 			SortKey:          "emp_name",

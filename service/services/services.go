@@ -539,7 +539,7 @@ func Scan(ctx context.Context, scanData models.ScanMeta) (map[string]interface{}
 	query.TableName = scanData.TableName
 	query.Limit = scanData.Limit
 	if query.Limit == 0 {
-		query.Limit = config.ConfigurationMap.QueryLimit
+		query.Limit = models.GlobalConfig.Spanner.QueryLimit
 	}
 	query.StartFrom = scanData.StartFrom
 	query.RangeValMap = scanData.ExpressionAttributeMap

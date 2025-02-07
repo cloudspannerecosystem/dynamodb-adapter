@@ -5,11 +5,20 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+      - image: cimg/go:1.22
+    working_directory: ~/project
     steps:
       - checkout
-      - run: go build
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.mod" }}
+            - go-mod-v1-
+      - run: go mod tidy
+      - save_cache:
+          paths:
+            - ~/.go/pkg/mod
+          key: go-mod-v1-{{ checksum "go.mod" }}
+      - run: go build ./...
 
   lint_golang:
     docker:
@@ -28,16 +37,16 @@ jobs:
 
   unit_test:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+      - image: cimg/go:1.22
+    working_directory: ~/project
     steps:
       - checkout
       - run: go test -v -short ./...
 
   integration_test:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/cloudspannerecosystem/dynamodb-adapter
+      - image: cimg/go:1.22
+    working_directory: ~/project
     steps:
       - checkout
       - run:
