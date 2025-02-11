@@ -56,9 +56,9 @@ DynamoDB Adapter currently supports the following DynamoDB data types
 | `BOOL` (boolean)              | `BOOL` |
 | `B` (binary type)             | `BYTES(MAX)` |
 | `S` (string and data values)  | `STRING(MAX)` |
-| `SS` (string set)             | `ARRAY<STRING(MAX)>`
-| `NS` (number set)             | `ARRAY<FLOAT64>`
-| `BS` (binary set)             | `ARRAY<BYTES(MAX)>`
+| `SS` (string set)             | `ARRAY<STRING(MAX)>` |
+| `NS` (number set)             | `ARRAY<FLOAT64>` |
+| `BS` (binary set)             | `ARRAY<BYTES(MAX)>` |
 
 ## Configuration
 
