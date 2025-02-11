@@ -36,6 +36,11 @@ import (
 
 var operations = map[string]string{"SET": "(?i) SET ", "DELETE": "(?i) DELETE ", "ADD": "(?i) ADD ", "REMOVE": "(?i) REMOVE "}
 var byteSliceType = reflect.TypeOf([]byte(nil))
+var (
+	listRegex             = regexp.MustCompile(`list_append\(([^,]+),\s*([^\)]+)\)`)
+	listIndexRegex        = regexp.MustCompile(`(\w+)\[(\d+)\]`)
+	listUpdateAppendRegex = regexp.MustCompile(`(?i)list_append\(([^)]+),\s*(:\w+)\)`)
+)
 
 func between(value string, a string, b string) string {
 	// Get substring between two strings.
@@ -86,18 +91,30 @@ func deleteEmpty(s []string) []string {
 	return r
 }
 
-func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignment bool) (map[string]interface{}, *models.UpdateExpressionCondition) {
+// parseActionValue parses an action value string and constructs a map of attributes to update,
+// as well as an update expression condition, based on the provided parameters.
+// Example of actionValue: "guid = :new_guid" or "list_append(guid, :new_values)"
+func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignment bool, oldRes map[string]interface{}) (map[string]interface{}, *models.UpdateExpressionCondition) {
+
 	expr := parseUpdateExpresstion(actionValue)
 	if expr != nil {
 		actionValue = expr.ActionVal
 		expr.AddValues = make(map[string]float64)
 	}
+
 	resp := make(map[string]interface{})
-	pairs := strings.Split(actionValue, ",")
+	var pairs []string
+	if strings.Contains(actionValue, "list_append") {
+		pairs = []string{actionValue}
+	} else {
+		pairs = strings.Split(actionValue, ",")
+	}
 	var v []string
 	for _, p := range pairs {
 		var addValue float64
 		status := false
+
+		// Handle + (addition) and - (subtraction)
 		if strings.Contains(p, "+") {
 			tokens := strings.Split(p, "+")
 			tokens[1] = strings.TrimSpace(tokens[1])
@@ -108,15 +125,10 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 				if ok {
 					addValue = v2
 					status = true
-				} else {
-					v2, ok := v1.(int64)
-					if ok {
-						addValue = float64(v2)
-						status = true
-					}
 				}
 			}
 		}
+
 		if strings.Contains(p, "-") {
 			tokens := strings.Split(p, "-")
 			tokens[1] = strings.TrimSpace(tokens[1])
@@ -126,28 +138,105 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 				if ok {
 					addValue = -v2
 					status = true
-
-				} else {
-					v2, ok := v1.(int64)
-					if ok {
-						addValue = float64(-v2)
-						status = true
-					}
 				}
 			}
 		}
+
+		if strings.Contains(p, "list_append") {
+			matches := listRegex.FindStringSubmatch(p)
+			if len(matches) == 3 {
+				fieldName := matches[1]
+				newValueKey := matches[2]
+				// Fetch the old value from OldData
+				oldValue, _ := oldRes[fieldName].([]interface{})
+
+				// Fetch the new value from ExpressionAttributeMap
+				newValue, ok := updateAtrr.ExpressionAttributeMap[newValueKey]
+				if ok {
+					if newValueList, ok := newValue.([]interface{}); ok {
+						// Append new values to the old list
+						mergedList := append(oldValue, newValueList...)
+						resp[fieldName] = mergedList
+					} else {
+						// Handle case where newValue is a single element
+						mergedList := append(oldValue, newValue)
+						resp[fieldName] = mergedList
+					}
+
+				} else {
+					// If newValue is not found in ExpressionAttributeMap, use placeholder
+					resp[fieldName] = oldValue
+				}
+				continue
+			}
+		}
+
+		// Handle SET with list index, e.g., guid[1] = :new_value
+		if strings.Contains(p, "=") {
+			parts := strings.Split(p, "=")
+			if len(parts) != 2 {
+				continue
+			}
+
+			field, valueKey := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+			value, ok := updateAtrr.ExpressionAttributeMap[valueKey]
+			if !ok {
+				continue
+			}
+			// Handle SET with list index, e.g., guid[1] = :new_value
+			matches := listIndexRegex.FindStringSubmatch(field)
+			if len(matches) == 3 {
+				listField := matches[1]
+				index, err := strconv.Atoi(matches[2])
+				if err != nil {
+					continue
+				}
+
+				// Retrieve the old list and modify the specified index
+				oldList, ok := oldRes[listField].([]interface{})
+				if !ok {
+					continue
+				}
+				// Validate index bounds
+				if index < 0 || index >= len(oldList) {
+					continue
+				}
+
+				updatedList := make([]interface{}, len(oldList))
+				copy(updatedList, oldList)
+
+				if index == len(oldList) {
+					updatedList = append(updatedList, value) // Append new value
+				} else if index < len(oldList) {
+					updatedList[index] = value // Modify existing value
+				}
+				resp[listField] = updatedList
+				continue
+			}
+
+			// Handle simple SET assignments
+			resp[field] = value
+		}
+
+		// For assignment operations (SET)
 		if assignment {
 			v = strings.Split(p, " ")
 			v = deleteEmpty(v)
 		} else {
 			v = strings.Split(p, "=")
 		}
+
+		if len(v) < 2 {
+			continue
+		}
+
 		v[0] = strings.Replace(v[0], " ", "", -1)
 		v[1] = strings.Replace(v[1], " ", "", -1)
 
 		if status {
 			expr.AddValues[v[0]] = addValue
 		}
+		// Handle attribute names and map updates
 		if updateAtrr.ExpressionAttributeNames[v[0]] != "" {
 			tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
 			if ok {
@@ -171,6 +260,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			}
 		}
 	}
+
 	// Merge primaryKeyMap and updateAttributes
 	for k, v := range updateAtrr.PrimaryKeyMap {
 		resp[k] = v
@@ -228,17 +318,23 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 	switch {
 	case action == "DELETE":
 		// perform delete
-		m, expr := parseActionValue(actionValue, updateAtrr, true)
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
 		res, err := services.Del(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, expr)
 		return res, m, err
 	case action == "SET":
+		if strings.Contains(actionValue, "list_append") {
+			// parse list_append operation here
+			m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
+			res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
+			return res, m, err
+		}
 		// Update data in table
-		m, expr := parseActionValue(actionValue, updateAtrr, false)
+		m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
 		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
 		return res, m, err
 	case action == "ADD":
 		// Add data in table
-		m, expr := parseActionValue(actionValue, updateAtrr, true)
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
 		res, err := services.Add(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, updateAtrr.ExpressionAttributeMap, expr, oldRes)
 		return res, m, err
 
@@ -265,6 +361,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interf
 		updateAtrr.ConditionExpression = strings.ReplaceAll(updateAtrr.ConditionExpression, k, v)
 	}
 	m := extractOperations(updateAtrr.UpdateExpression)
+
 	for k, v := range m {
 		res, acVal, err := performOperation(ctx, k, v, updateAtrr, oldRes)
 		resp = res
@@ -332,11 +429,20 @@ func extractOperations(updateExpression string) map[string]string {
 		updateExpression = re.ReplaceAllString(updateExpression, "%")
 	}
 
+	// Handle list_append explicitly
+	listAppendIndexes := listUpdateAppendRegex.FindAllStringIndex(updateExpression, -1)
+	for _, index := range listAppendIndexes {
+		opsSeq[index[0]] = "SET" // assuming list_append falls under a SET operation
+		opsIndex = append(opsIndex, index[0])
+	}
+
 	sort.Ints(opsIndex)
 	tokens := strings.Split(updateExpression, "%")[1:]
 	ops := map[string]string{}
-	for i, opsIndex := range opsIndex {
-		ops[strings.TrimSpace(opsSeq[opsIndex])] = tokens[i]
+	for i, index := range opsIndex {
+		if index < len(opsSeq) {
+			ops[strings.TrimSpace(opsSeq[index])] = tokens[i]
+		}
 	}
 	return ops
 }

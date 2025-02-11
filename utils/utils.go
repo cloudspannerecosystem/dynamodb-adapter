@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -81,11 +82,19 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 					str = fmt.Sprintf("%f", v)
 				case int64:
 					str = fmt.Sprintf("%d", v)
+				case []interface{}:
+					// Handle lists by converting them to JSON for easier evaluation
+					listBytes, err := json.Marshal(v)
+					if err != nil {
+						return nil, errors.New("InvalidListException", err.Error(), tokens[i])
+					}
+					str = string(listBytes)
 				}
 				sb.WriteString(str)
 				sb.WriteString(" ")
 				continue
 			}
+
 			t := "TOKEN" + strconv.Itoa(i)
 			col := GetFieldNameFromConditionalExpression(tokens[i])
 			sb.WriteString(t)
@@ -106,7 +115,6 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	str = strings.ReplaceAll(str, " and ", " && ")
 	str = strings.ReplaceAll(str, " AND ", " && ")
 	str = strings.ReplaceAll(str, " <> ", " != ")
-
 	e.Cond, err = expr.Compile(str)
 	if err != nil {
 		return nil, errors.New("ConditionalCheckFailedException", err.Error(), str)

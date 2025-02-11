@@ -17,6 +17,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -506,7 +507,8 @@ func Scan(c *gin.Context) {
 					c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 				}
 			}
-			c.JSON(http.StatusOK, res)
+			jsonData, _ := json.Marshal(res)
+			c.JSON(http.StatusOK, json.RawMessage(jsonData))
 		} else {
 			c.JSON(errors.HTTPResponse(err, meta))
 		}

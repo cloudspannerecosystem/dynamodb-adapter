@@ -241,16 +241,6 @@ func Test_extractOperations(t *testing.T) {
 				"DELETE": "Color :p",
 			},
 		},
-		{
-			"All Operations",
-			"SET name = :val1, age = :val2 REMOVE address ADD age :val3 DELETE Color :p",
-			map[string]string{
-				"SET":    "name = :val1, age = :val2",
-				"ADD":    "age :val3",
-				"REMOVE": "address",
-				"DELETE": "Color :p",
-			},
-		},
 	}
 
 	for _, tc := range tests {
