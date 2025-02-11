@@ -32,6 +32,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
 
 var operations = map[string]string{"SET": "(?i) SET ", "DELETE": "(?i) DELETE ", "ADD": "(?i) ADD ", "REMOVE": "(?i) REMOVE "}
@@ -86,96 +87,178 @@ func deleteEmpty(s []string) []string {
 	return r
 }
 
-func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignment bool) (map[string]interface{}, *models.UpdateExpressionCondition) {
+func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignment bool, oldRes map[string]interface{}) (map[string]interface{}, *models.UpdateExpressionCondition) {
 	expr := parseUpdateExpresstion(actionValue)
 	if expr != nil {
 		actionValue = expr.ActionVal
 		expr.AddValues = make(map[string]float64)
 	}
+
 	resp := make(map[string]interface{})
 	pairs := strings.Split(actionValue, ",")
 	var v []string
+
 	for _, p := range pairs {
 		var addValue float64
 		status := false
+
+		// Handle addition (e.g., "count + 1")
 		if strings.Contains(p, "+") {
 			tokens := strings.Split(p, "+")
 			tokens[1] = strings.TrimSpace(tokens[1])
 			p = tokens[0]
-			v1, ok := updateAtrr.ExpressionAttributeMap[(tokens[1])]
+			v1, ok := updateAtrr.ExpressionAttributeMap[tokens[1]]
 			if ok {
-				v2, ok := v1.(float64)
-				if ok {
+				switch v2 := v1.(type) {
+				case float64:
 					addValue = v2
 					status = true
-				} else {
-					v2, ok := v1.(int64)
-					if ok {
-						addValue = float64(v2)
-						status = true
-					}
+				case int64:
+					addValue = float64(v2)
+					status = true
 				}
 			}
 		}
+
+		// Handle subtraction (e.g., "count - 2")
 		if strings.Contains(p, "-") {
 			tokens := strings.Split(p, "-")
 			tokens[1] = strings.TrimSpace(tokens[1])
-			v1, ok := updateAtrr.ExpressionAttributeMap[(tokens[1])]
+			v1, ok := updateAtrr.ExpressionAttributeMap[tokens[1]]
 			if ok {
-				v2, ok := v1.(float64)
-				if ok {
+				switch v2 := v1.(type) {
+				case float64:
 					addValue = -v2
 					status = true
-
-				} else {
-					v2, ok := v1.(int64)
-					if ok {
-						addValue = float64(-v2)
-						status = true
-					}
+				case int64:
+					addValue = float64(-v2)
+					status = true
 				}
 			}
 		}
+
+		// Parse key-value pairs
 		if assignment {
 			v = strings.Split(p, " ")
 			v = deleteEmpty(v)
 		} else {
 			v = strings.Split(p, "=")
 		}
+
+		if len(v) < 2 {
+			continue
+		}
+
 		v[0] = strings.Replace(v[0], " ", "", -1)
 		v[1] = strings.Replace(v[1], " ", "", -1)
 
+		// Handle numeric additions
 		if status {
 			expr.AddValues[v[0]] = addValue
 		}
+
+		key := v[0]
 		if updateAtrr.ExpressionAttributeNames[v[0]] != "" {
-			tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
-			if ok {
-				resp[updateAtrr.ExpressionAttributeNames[v[0]]] = tmp
-			}
-		} else {
-			if strings.Contains(v[1], "%") {
-				for j := 0; j < len(expr.Field); j++ {
-					if strings.Contains(v[1], "%"+expr.Value[j]+"%") {
-						tmp, ok := updateAtrr.ExpressionAttributeMap[expr.Value[j]]
-						if ok {
-							resp[v[0]] = tmp
-						}
+			key = updateAtrr.ExpressionAttributeNames[v[0]]
+		}
+
+		if strings.Contains(v[1], "%") {
+			for j := 0; j < len(expr.Field); j++ {
+				if strings.Contains(v[1], "%"+expr.Value[j]+"%") {
+					tmp, ok := updateAtrr.ExpressionAttributeMap[expr.Value[j]]
+					if ok {
+						resp[key] = tmp
 					}
 				}
-			} else {
-				tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
-				if ok {
-					resp[v[0]] = tmp
+			}
+		} else {
+			tmp, ok := updateAtrr.ExpressionAttributeMap[v[1]]
+			if ok {
+				switch newValue := tmp.(type) {
+				case []string: // String Set
+					if strSlice, ok := oldRes[key].([]string); ok {
+						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
+							resp[key] = utils.RemoveDuplicatesString(append(strSlice, newValue...))
+						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
+							resp[key] = removeFromSlice(strSlice, newValue)
+						} else {
+							resp[key] = utils.RemoveDuplicatesString(newValue) // Ensure uniqueness even in replace
+						}
+					} else {
+						resp[key] = utils.RemoveDuplicatesString(newValue)
+					}
+				case []float64: // Number Set
+					if floatSlice, ok := oldRes[key].([]float64); ok {
+						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
+							resp[key] = utils.RemoveDuplicatesFloat(append(floatSlice, newValue...))
+						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
+							resp[key] = removeFromSlice(floatSlice, newValue)
+						} else {
+							resp[key] = utils.RemoveDuplicatesFloat(newValue)
+						}
+					} else {
+						resp[key] = utils.RemoveDuplicatesFloat(newValue)
+					}
+				case [][]byte: // Binary Set
+					if byteSlice, ok := oldRes[key].([][]byte); ok {
+						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
+							resp[key] = utils.RemoveDuplicatesByteSlice(append(byteSlice, newValue...))
+						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
+							resp[key] = removeFromByteSlice(byteSlice, newValue)
+						} else {
+							resp[key] = utils.RemoveDuplicatesByteSlice(newValue)
+						}
+					} else {
+						resp[key] = utils.RemoveDuplicatesByteSlice(newValue)
+					}
+				default:
+					resp[key] = tmp
 				}
 			}
 		}
+
 	}
+
 	// Merge primaryKeyMap and updateAttributes
 	for k, v := range updateAtrr.PrimaryKeyMap {
 		resp[k] = v
 	}
+
 	return resp, expr
+}
+
+func removeFromSlice[T comparable](slice []T, toRemove []T) []T {
+	result := []T{}
+	removeMap := make(map[T]struct{}, len(toRemove))
+
+	for _, val := range toRemove {
+		removeMap[val] = struct{}{}
+	}
+
+	for _, val := range slice {
+		if _, found := removeMap[val]; !found {
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
+func removeFromByteSlice(slice [][]byte, toRemove [][]byte) [][]byte {
+	result := [][]byte{}
+
+	for _, item := range slice {
+		found := false
+		for _, rem := range toRemove {
+			if bytes.Equal(item, rem) { // Use bytes.Equal to compare byte slices
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func parseUpdateExpresstion(actionValue string) *models.UpdateExpressionCondition {
@@ -228,17 +311,17 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 	switch {
 	case action == "DELETE":
 		// perform delete
-		m, expr := parseActionValue(actionValue, updateAtrr, true)
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
 		res, err := services.Del(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, expr)
 		return res, m, err
 	case action == "SET":
 		// Update data in table
-		m, expr := parseActionValue(actionValue, updateAtrr, false)
+		m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
 		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
 		return res, m, err
 	case action == "ADD":
 		// Add data in table
-		m, expr := parseActionValue(actionValue, updateAtrr, true)
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
 		res, err := services.Add(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, updateAtrr.ExpressionAttributeMap, expr, oldRes)
 		return res, m, err
 
@@ -519,18 +602,46 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 		return a.B
 	}
 	if a.SS != nil {
-		l := make([]interface{}, len(a.SS))
-		for index, v := range a.SS {
-			l[index] = *v
+		uniqueStrings := make(map[string]struct{})
+		for _, v := range a.SS {
+			uniqueStrings[*v] = struct{}{}
 		}
+
+		// Convert map keys to a slice
+		l := make([]string, 0, len(uniqueStrings))
+		for str := range uniqueStrings {
+			l = append(l, str)
+		}
+
 		return l
 	}
 	if a.NS != nil {
-		l := make([]interface{}, len(a.NS))
-		for index, v := range a.NS {
-			l[index], _ = strconv.ParseFloat(*v, 64)
+		l := []float64{}
+		numberMap := make(map[string]struct{})
+		for _, v := range a.NS {
+			if _, exists := numberMap[*v]; !exists {
+				numberMap[*v] = struct{}{}
+				n, err := strconv.ParseFloat(*v, 64)
+				if err != nil {
+					panic(fmt.Sprintf("Invalid number in NS: %s", *v))
+				}
+				l = append(l, n)
+			}
 		}
 		return l
+	}
+	if a.BS != nil {
+		// Handle Binary Set
+		binarySet := [][]byte{}
+		binaryMap := make(map[string]struct{})
+		for _, v := range a.BS {
+			key := string(v)
+			if _, exists := binaryMap[key]; !exists {
+				binaryMap[key] = struct{}{}
+				binarySet = append(binarySet, v)
+			}
+		}
+		return binarySet
 	}
 	panic(fmt.Sprintf("%#v is not a supported dynamodb.AttributeValue", a))
 }
@@ -699,10 +810,37 @@ func convertSlice(output map[string]interface{}, v reflect.Value) error {
 			return nil
 		}
 		output["B"] = append([]byte{}, b...)
+	case reflect.String:
+		listVal := []string{}
+		for i := 0; i < v.Len(); i++ {
+			listVal = append(listVal, v.Index(i).String())
+		}
+		output["SS"] = listVal
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Float32, reflect.Float64:
+		listVal := []string{}
+		for i := 0; i < v.Len(); i++ {
+			listVal = append(listVal, fmt.Sprintf("%v", v.Index(i).Interface()))
+		}
+		output["NS"] = listVal
+
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Slice {
+			binarySet := [][]byte{}
+			for i := 0; i < v.Len(); i++ {
+				elem := v.Index(i)
+				if elem.Kind() == reflect.Slice && elem.IsValid() && !elem.IsNil() {
+					binarySet = append(binarySet, elem.Bytes())
+				}
+			}
+			output["BS"] = binarySet
+		} else {
+			return fmt.Errorf("type of slice not supported: %s", v.Type().Elem().Kind().String())
+		}
+
 	default:
 		listVal := make([]map[string]interface{}, 0, v.Len())
 
-		count := 0
 		for i := 0; i < v.Len(); i++ {
 			elem := make(map[string]interface{})
 			err := convertMapToDynamoObject(elem, v.Index(i))
@@ -710,7 +848,6 @@ func convertSlice(output map[string]interface{}, v reflect.Value) error {
 				return err
 			}
 			listVal = append(listVal, elem)
-			count++
 		}
 		output["L"] = listVal
 	}
