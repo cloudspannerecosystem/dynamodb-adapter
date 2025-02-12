@@ -191,42 +191,12 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			if ok {
 				switch newValue := tmp.(type) {
 				case []string: // String Set
-					if strSlice, ok := oldRes[key].([]string); ok {
-						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
-							resp[key] = utils.RemoveDuplicatesString(append(strSlice, newValue...))
-						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
-							resp[key] = removeFromSlice(strSlice, newValue)
-						} else {
-							resp[key] = utils.RemoveDuplicatesString(newValue) // Ensure uniqueness even in replace
-						}
-					} else {
-						resp[key] = utils.RemoveDuplicatesString(newValue)
-					}
+					resp[key] = handleStringSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
 				case []float64: // Number Set
-					if floatSlice, ok := oldRes[key].([]float64); ok {
-						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
-							resp[key] = utils.RemoveDuplicatesFloat(append(floatSlice, newValue...))
-						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
-							resp[key] = removeFromSlice(floatSlice, newValue)
-						} else {
-							resp[key] = utils.RemoveDuplicatesFloat(newValue)
-						}
-					} else {
-						resp[key] = utils.RemoveDuplicatesFloat(newValue)
-					}
+					resp[key] = handleNumberSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
 				case [][]byte: // Binary Set
-					if byteSlice, ok := oldRes[key].([][]byte); ok {
-						if strings.Contains(updateAtrr.UpdateExpression, "ADD") {
-							resp[key] = utils.RemoveDuplicatesByteSlice(append(byteSlice, newValue...))
-						} else if strings.Contains(updateAtrr.UpdateExpression, "DELETE") {
-							resp[key] = removeFromByteSlice(byteSlice, newValue)
-						} else {
-							resp[key] = utils.RemoveDuplicatesByteSlice(newValue)
-						}
-					} else {
-						resp[key] = utils.RemoveDuplicatesByteSlice(newValue)
-					}
-				default:
+					resp[key] = handleByteSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
+				default: // Other types
 					resp[key] = tmp
 				}
 			}
@@ -242,6 +212,52 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 	return resp, expr
 }
 
+// handleStringSet handles set operations (ADD/DELETE) for string sets.
+func handleStringSet(oldRes map[string]interface{}, key string, newValue []string, updateExpression string) []string {
+	if strSlice, ok := oldRes[key].([]string); ok {
+		if strings.Contains(updateExpression, "ADD") {
+			return utils.RemoveDuplicatesString(append(strSlice, newValue...))
+		} else if strings.Contains(updateExpression, "DELETE") {
+			return removeFromSlice(strSlice, newValue)
+		} else {
+			return utils.RemoveDuplicatesString(newValue)
+		}
+	} else {
+		return utils.RemoveDuplicatesString(newValue)
+	}
+}
+
+// handleNumberSet handles set operations for number sets (float64).
+func handleNumberSet(oldRes map[string]interface{}, key string, newValue []float64, updateExpression string) []float64 {
+	if floatSlice, ok := oldRes[key].([]float64); ok {
+		if strings.Contains(updateExpression, "ADD") {
+			return utils.RemoveDuplicatesFloat(append(floatSlice, newValue...))
+		} else if strings.Contains(updateExpression, "DELETE") {
+			return removeFromSlice(floatSlice, newValue)
+		} else {
+			return utils.RemoveDuplicatesFloat(newValue)
+		}
+	} else { // No existing value
+		return utils.RemoveDuplicatesFloat(newValue)
+	}
+}
+
+// handleByteSet handles set operations for byte sets (byte).
+func handleByteSet(oldRes map[string]interface{}, key string, newValue [][]byte, updateExpression string) [][]byte {
+	if byteSlice, ok := oldRes[key].([][]byte); ok {
+		if strings.Contains(updateExpression, "ADD") {
+			return utils.RemoveDuplicatesByteSlice(append(byteSlice, newValue...))
+		} else if strings.Contains(updateExpression, "DELETE") {
+			return removeFromByteSlice(byteSlice, newValue)
+		} else {
+			return utils.RemoveDuplicatesByteSlice(newValue)
+		}
+	} else { // No existing value
+		return utils.RemoveDuplicatesByteSlice(newValue)
+	}
+}
+
+// removeFromSlice removes elements from a generic slice.
 func removeFromSlice[T comparable](slice []T, toRemove []T) []T {
 	result := []T{}
 	removeMap := make(map[T]struct{}, len(toRemove))
@@ -258,6 +274,7 @@ func removeFromSlice[T comparable](slice []T, toRemove []T) []T {
 	return result
 }
 
+// removeFromByteSlice removes elements from a byte slice.
 func removeFromByteSlice(slice [][]byte, toRemove [][]byte) [][]byte {
 	result := [][]byte{}
 
