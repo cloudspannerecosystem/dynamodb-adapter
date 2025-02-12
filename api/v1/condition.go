@@ -87,6 +87,21 @@ func deleteEmpty(s []string) []string {
 	return r
 }
 
+// parseActionValue parses the action value string from an update expression,
+// processes it, and returns a map of attribute names to their new values,
+// along with an UpdateExpressionCondition if one was parsed.
+//
+// Args:
+//
+//	actionValue: The string representing the action to be performed (e.g., "count + 1, name = :newName").
+//	updateAtrr: The UpdateAttr struct containing expression attribute names and values.
+//	assignment: A boolean indicating whether the action is an assignment (true) or a set/add/delete operation (false).
+//	oldRes: The existing item's values (map[string]interface{}), fetched from Spanner.
+//
+// Returns:
+//
+//	A map of attribute names to their new values (map[string]interface{}), and
+//	an UpdateExpressionCondition pointer, which might be nil if no condition was parsed.
 func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignment bool, oldRes map[string]interface{}) (map[string]interface{}, *models.UpdateExpressionCondition) {
 	expr := parseUpdateExpresstion(actionValue)
 	if expr != nil {

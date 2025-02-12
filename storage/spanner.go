@@ -749,7 +749,19 @@ func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap m
 	return rowMap[conditionalExpression]
 }
 
-// parseRow - Converts Spanner row and datatypes to a map removing null columns from the result.
+// parseRow parses a single Spanner row into a map of column name to value.
+// It uses a column DDL map to determine the data type of each column and
+// parse it accordingly.
+//
+// Args:
+//
+//	r: The Spanner row to parse.
+//	colDDL: A map of column name to data type (e.g., "S", "B", "N", "BOOL", "SS", "BS", "NS").
+//
+// Returns:
+//
+//	A map of column name to value (map[string]interface{}), or an error if any occurs during parsing.
+//	Returns an empty map and nil error if the input row `r` is nil.
 func parseRow(r *spanner.Row, colDDL map[string]string) (map[string]interface{}, error) {
 	singleRow := make(map[string]interface{})
 	if r == nil {
@@ -793,6 +805,18 @@ func parseRow(r *spanner.Row, colDDL map[string]string) (map[string]interface{},
 	return singleRow, nil
 }
 
+// parseStringColumn parses a string column from a Spanner row.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseStringColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var s spanner.NullString
 	err := r.Column(idx, &s)
@@ -805,6 +829,20 @@ func parseStringColumn(r *spanner.Row, idx int, col string, row map[string]inter
 	return nil
 }
 
+// parseBytesColumn parses a bytes column from a Spanner row.  It attempts to
+// unmarshal the bytes as JSON. If unmarshalling fails, it stores the raw
+// byte string as a string.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseBytesColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var s []byte
 	err := r.Column(idx, &s)
@@ -825,6 +863,17 @@ func parseBytesColumn(r *spanner.Row, idx int, col string, row map[string]interf
 	return nil
 }
 
+// parseNumericColumn parses a numeric (float64) column from a Spanner row.
+//
+// Args:
+//   r: The Spanner row.
+//   idx: The column index.
+//   col: The column name.
+//   row: The map to store the parsed value.
+//
+// Returns:
+//   An error if any occurs during column retrieval.
+
 func parseNumericColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var s spanner.NullFloat64
 	err := r.Column(idx, &s)
@@ -837,6 +886,18 @@ func parseNumericColumn(r *spanner.Row, idx int, col string, row map[string]inte
 	return nil
 }
 
+// parseBoolColumn parses a boolean column from a Spanner row.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseBoolColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var s spanner.NullBool
 	err := r.Column(idx, &s)
@@ -849,6 +910,18 @@ func parseBoolColumn(r *spanner.Row, idx int, col string, row map[string]interfa
 	return nil
 }
 
+// parseStringArrayColumn parses a string array column from a Spanner row.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseStringArrayColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var s []spanner.NullString
 	err := r.Column(idx, &s)
@@ -865,6 +938,18 @@ func parseStringArrayColumn(r *spanner.Row, idx int, col string, row map[string]
 	return nil
 }
 
+// parseByteArrayColumn parses a byte array column from a Spanner row.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseByteArrayColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var b [][]byte
 	err := r.Column(idx, &b)
@@ -877,6 +962,18 @@ func parseByteArrayColumn(r *spanner.Row, idx int, col string, row map[string]in
 	return nil
 }
 
+// parseNumberArrayColumn parses a numeric (float64) array column from a Spanner row.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
 func parseNumberArrayColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
 	var nums []spanner.NullFloat64
 	err := r.Column(idx, &nums)
@@ -895,6 +992,21 @@ func parseNumberArrayColumn(r *spanner.Row, idx int, col string, row map[string]
 	return nil
 }
 
+// processDecodedData attempts to decode base64 encoded strings within the
+// given data structure.  It handles both strings and maps of strings.  This
+// function is used to handle cases where JSON data is stored as a base64
+// encoded string within a Spanner column.
+//
+// Args:
+//
+//	m: The data structure to process (interface{}).  Can be a string or a
+//	   map[string]interface{}.
+//
+// Returns:
+//
+//	The processed data structure (interface{}).  If base64 decoding and JSON
+//	unmarshalling are successful, the decoded JSON will be returned. Otherwise,
+//	the original data structure is returned.
 func processDecodedData(m interface{}) interface{} {
 	if val, ok := m.(string); ok && base64Regexp.MatchString(val) {
 		if ba, err := base64.StdEncoding.DecodeString(val); err == nil {
