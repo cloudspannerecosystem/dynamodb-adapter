@@ -95,7 +95,7 @@ func deleteEmpty(s []string) []string {
 //
 //	actionValue: The string representing the action to be performed (e.g., "count + 1, name = :newName").
 //	updateAtrr: The UpdateAttr struct containing expression attribute names and values.
-//	assignment: A boolean indicating whether the action is an assignment (true) or a set/add/delete operation (false).
+//	assignment: A boolean indicating whether the action is an assignment (true) or a set operation (false).
 //	oldRes: The existing item's values (map[string]interface{}), fetched from Spanner.
 //
 // Returns:
