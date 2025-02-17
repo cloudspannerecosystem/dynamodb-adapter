@@ -31,7 +31,10 @@ require (
 	gopkg.in/go-playground/assert.v1 v1.2.1
 )
 
-require github.com/antlr4-go/antlr/v4 v4.13.1
+require (
+	github.com/antlr4-go/antlr/v4 v4.13.1
+	github.com/tj/assert v0.0.3
+)
 
 require (
 	cloud.google.com/go v0.94.1 // indirect
