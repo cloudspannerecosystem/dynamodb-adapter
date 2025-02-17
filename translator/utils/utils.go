@@ -8,6 +8,11 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/translator/PartiQLParser/parser"
 )
 
+const (
+	limitKeyWord  = "LIMIT"
+	offsetKeyWord = "OFFSET"
+)
+
 // Funtion to create lexer and parser object for the partiql query
 func NewPartiQLParser(partiQL string, isDebug bool) (*parser.PartiQLParser, error) {
 	if partiQL == "" {
@@ -74,12 +79,29 @@ func formSpannerSelectQuery(selectQueryMap *SelectQueryMap, whereConditions []Co
 
 	// Append LIMIT clause if present
 	if selectQueryMap.Limit != "" {
-		spannerQuery += " LIMIT " + strings.Trim(selectQueryMap.Limit, "LIMIT")
+		// Extract the numeric limit and trim any spaces
+		trimmedLimit := strings.TrimPrefix(selectQueryMap.Limit, limitKeyWord)
+		trimmedLimit = strings.TrimSpace(trimmedLimit)
+
+		if trimmedLimit == "" {
+			return "", fmt.Errorf("invalid LIMIT value; cannot be empty")
+		}
+
+		spannerQuery += " LIMIT " + trimmedLimit
 	}
 
 	// Append OFFSET clause if present
 	if selectQueryMap.Offset != "" {
-		spannerQuery += " OFFSET " + strings.Trim(selectQueryMap.Offset, "OFFSET")
+		// Extract the numeric offset and trim any spaces
+		trimmedOffset := strings.TrimPrefix(selectQueryMap.Offset, offsetKeyWord)
+		trimmedOffset = strings.TrimSpace(trimmedOffset)
+
+		// Check if the trimmedOffset is empty and handle accordingly
+		if trimmedOffset == "" {
+			// Optionally return an error or handle it according to your logic
+			trimmedOffset = "0" // Setting a default value, for example
+		}
+		spannerQuery += " OFFSET " + trimmedOffset
 	}
 
 	return spannerQuery, nil
