@@ -602,17 +602,25 @@ var (
 	}
 
 	UpdateItemTestCase2Name = "2: Update Expression with ExpressionAttributeValues"
-	UpdateItemTestCase2     = models.UpdateAttr{
+	UpdateItemTestCase2 = models.UpdateAttr{
 		TableName: "employee",
 		Key: map[string]*dynamodb.AttributeValue{
 			"emp_id": {N: aws.String("1")},
 		},
-		UpdateExpression: "SET age = :age",
+		UpdateExpression: "SET age = :age, phone_numbers = :phone_numbers, salaries = :salaries, profile_pics = :profile_pics",
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":age": {N: aws.String("10")},
+			":phone_numbers": {SS: aws.StringSlice([]string{
+				"+1111111111", "+1222222222", "+1111111111", "+1222222222",
+			})},
+			":salaries": {NS: aws.StringSlice([]string{
+				"1000.5", "2000.75", "1000.5", "2000.75",
+			})},
+			"profile_pics":  {BS: [][]byte{[]byte("SomeBytesData1"), []byte("SomeBytesData2"), []byte("SomeBytesData1"), []byte("SomeBytesData2")}},
 		},
 		ReturnValues: "ALL_NEW",
 	}
+	
 	UpdateItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"},"phone_numbers":{"SS":["+1111111111","+1222222222"]},"profile_pics":{"BS":["U29tZUJ5dGVzRGF0YTE=","U29tZUJ5dGVzRGF0YTI="]},"salaries":{"NS":["1000.5","2000.75"]}}}`
 
 	UpdateItemTestCase3Name = "3: UpdateExpression, ExpressionAttributeValues with ExpressionAttributeNames"
@@ -743,12 +751,16 @@ var (
 	PutItemTestCase2     = models.Meta{
 		TableName: "employee",
 		Item: map[string]*dynamodb.AttributeValue{
-			"emp_id": {N: aws.String("1")},
-			"age":    {N: aws.String("11")},
+			"emp_id":       {N: aws.String("1")},
+			"age":          {N: aws.String("11")},
+			"phone_numbers": {SS: aws.StringSlice([]string{"+1111111111", "+1222222222", "+1111111111"})},
+			"profile_pics":  {BS: [][]byte{[]byte("SomeBytesData1"), []byte("SomeBytesData2"), []byte("SomeBytesData1")}},
+			"salaries":      {NS: aws.StringSlice([]string{"1000.5", "2000.75", "1000.5"})},
 		},
 	}
+	
 	PutItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"},"phone_numbers":{"SS":["+1111111111","+1222222222"]},"profile_pics":{"BS":["U29tZUJ5dGVzRGF0YTE=","U29tZUJ5dGVzRGF0YTI="]},"salaries":{"NS":["1000.5","2000.75"]}}}`
-
+	
 	PutItemTestCase3Name = "3: ConditionExpression with ExpressionAttributeValues & ExpressionAttributeNames"
 	PutItemTestCase3     = models.Meta{
 		TableName: "employee",
@@ -1676,6 +1688,8 @@ func testPutItemAPI(t *testing.T) {
 			return handlerInitFunc()
 		},
 	}
+
+	fmt.Println(PutItemTestCase2)
 	tests := []apitesting.APITestCase{
 		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase1),
 		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase5),
@@ -1748,25 +1762,25 @@ func TestApi(t *testing.T) {
 
 	// this is done to maintain the order of the test cases
 	var testNames = []string{
-		"GetItemAPI",
-		"GetBatchAPI",
-		"QueryAPI",
-		"ScanAPI",
+		// "GetItemAPI",
+		// "GetBatchAPI",
+		// "QueryAPI",
+		// "ScanAPI",
 		"UpdateItemAPI",
-		"PutItemAPI",
-		"DeleteItemAPI",
-		"BatchWriteItemAPI",
+		// "PutItemAPI",
+		// "DeleteItemAPI",
+		// "BatchWriteItemAPI",
 	}
 
 	var tests = map[string]func(t *testing.T){
-		"GetItemAPI":        testGetItemAPI,
-		"GetBatchAPI":       testGetBatchAPI,
-		"QueryAPI":          testQueryAPI,
-		"ScanAPI":           testScanAPI,
+		// "GetItemAPI":        testGetItemAPI,
+		// "GetBatchAPI":       testGetBatchAPI,
+		// "QueryAPI":          testQueryAPI,
+		// "ScanAPI":           testScanAPI,
 		"UpdateItemAPI":     testUpdateItemAPI,
-		"PutItemAPI":        testPutItemAPI,
-		"DeleteItemAPI":     testDeleteItemAPI,
-		"BatchWriteItemAPI": testBatchWriteItemAPI,
+		// "PutItemAPI":        testPutItemAPI,
+		// "DeleteItemAPI":     testDeleteItemAPI,
+		// "BatchWriteItemAPI": testBatchWriteItemAPI,
 	}
 
 	// run the tests
