@@ -1,7 +1,7 @@
 package translator
 
 import (
-	"github.com/cloudspannerecosystem/dynamodb-adapter/translator/PartiQLParser/parser"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/third_party/amazon_apache/translator/PartiQLParser/parser"
 	"go.uber.org/zap"
 )
 
