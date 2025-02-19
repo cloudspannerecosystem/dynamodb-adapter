@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -327,11 +328,13 @@ func TestConvertDynamoToMap(t *testing.T) {
 				"address":    {S: aws.String("Ney York")},
 				"first_name": {S: aws.String("Catalina")},
 				"last_name":  {S: aws.String("Smith")},
+				"titles":     {SS: aws.StringSlice([]string{"Mr", "Dr"})},
 			},
 			map[string]interface{}{
 				"address":    "Ney York",
 				"first_name": "Catalina",
 				"last_name":  "Smith",
+				"titles":     []string{"Mr", "Dr"},
 			},
 		},
 		{
@@ -402,11 +405,7 @@ func TestChangeMaptoDynamoMap(t *testing.T) {
 				"age":     map[string]interface{}{"N": "20"},
 				"value":   map[string]interface{}{"N": "10"},
 				"array": map[string]interface{}{
-					"L": []map[string]interface{}{
-						{"S": "first"},
-						{"S": "second"},
-						{"S": "third"},
-					},
+					"SS": []string{"first", "second", "third"},
 				},
 			},
 		},
@@ -415,5 +414,205 @@ func TestChangeMaptoDynamoMap(t *testing.T) {
 	for _, tc := range tests {
 		got, _ := ChangeMaptoDynamoMap(tc.input)
 		assert.Equal(t, got, tc.want)
+	}
+}
+
+func TestParseActionValue(t *testing.T) {
+	tests := []struct {
+		name           string
+		updateAttr     models.UpdateAttr
+		oldRes         map[string]interface{}
+		expectedResult map[string]interface{}
+		actionValue    string
+	}{
+		{
+			name: "Simple key-value assignment",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET count = :countVal",
+				ExpressionAttributeMap: map[string]interface{}{
+					":countVal": 10,
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{},
+			expectedResult: map[string]interface{}{
+				"id":    "1",
+				"count": 10,
+			},
+			actionValue: "count :countVal",
+		},
+		{
+			name: "Addition operation",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET count = count + :incr",
+				ExpressionAttributeMap: map[string]interface{}{
+					":incr": 1,
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			expectedResult: map[string]interface{}{
+				"id": "1",
+			},
+			actionValue: "count = count + :incr",
+		},
+		{
+			name: "Subtraction operation",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET count = count - :decr",
+				ExpressionAttributeMap: map[string]interface{}{
+					":decr": 2,
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{},
+			expectedResult: map[string]interface{}{
+				"id": "1",
+			},
+			actionValue: "count = count - :decr",
+		},
+		{
+			name: "String set append with ADD",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "ADD tags :newTags",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newTags": []string{"newTag"},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"tags": []string{"oldTag"},
+			},
+			expectedResult: map[string]interface{}{
+				"id":   "1",
+				"tags": []string{"oldTag", "newTag"},
+			},
+			actionValue: "tags :newTags",
+		},
+		{
+			name: "String set removal with DELETE",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "DELETE tags :removeTags",
+				ExpressionAttributeMap: map[string]interface{}{
+					":removeTags": []string{"oldTag"},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"tags": []string{"oldTag", "newTag"},
+			},
+			expectedResult: map[string]interface{}{
+				"id":   "1",
+				"tags": []string{"newTag"},
+			},
+			actionValue: "tags :removeTags",
+		},
+		{
+			name: "Number set append with ADD",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "ADD tags :newTags",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newTags": []float64{10},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"tags": []float64{20},
+			},
+			expectedResult: map[string]interface{}{
+				"id":   "1",
+				"tags": []float64{20, 10},
+			},
+			actionValue: "tags :newTags",
+		},
+		{
+			name: "Number set removal with DELETE",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "DELETE tags :removeTags",
+				ExpressionAttributeMap: map[string]interface{}{
+					":removeTags": []float64{10},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"tags": []float64{20, 10},
+			},
+			expectedResult: map[string]interface{}{
+				"id":   "1",
+				"tags": []float64{20},
+			},
+			actionValue: "tags :removeTags",
+		},
+		{
+			name: "Binary set append with ADD",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "ADD binaryData :newBinary",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newBinary": [][]byte{[]byte("newData")},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"binaryData": [][]byte{[]byte("oldData")},
+			},
+			expectedResult: map[string]interface{}{
+				"id":         "1",
+				"binaryData": [][]byte{[]byte("oldData"), []byte("newData")},
+			},
+			actionValue: "binaryData :newBinary",
+		},
+		{
+			name: "Binary set removal with DELETE",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "DELETE binaryData :removeBinary",
+				ExpressionAttributeMap: map[string]interface{}{
+					":removeBinary": [][]byte{[]byte("oldData")},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"binaryData": [][]byte{[]byte("oldData"), []byte("newData")},
+			},
+			expectedResult: map[string]interface{}{
+				"id":         "1",
+				"binaryData": [][]byte{[]byte("newData")},
+			},
+			actionValue: "binaryData :removeBinary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _ := parseActionValue(tt.actionValue, tt.updateAttr, true, tt.oldRes)
+			if !reflect.DeepEqual(result, tt.expectedResult) {
+				t.Errorf("Test %s failed: expected %v, got %v", tt.name, tt.expectedResult, result)
+			}
+		})
 	}
 }
