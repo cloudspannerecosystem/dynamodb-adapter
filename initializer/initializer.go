@@ -18,7 +18,6 @@ package initializer
 
 import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/spanner"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 )
@@ -32,7 +31,7 @@ func InitAll(filepath string) error {
 	if err != nil {
 		return err
 	}
-	services.StartConfigManager()
-	services.InitStream()
+	// services.StartConfigManager()
+	// services.InitStream()
 	return nil
 }
