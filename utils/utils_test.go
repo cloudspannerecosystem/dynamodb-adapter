@@ -15,6 +15,8 @@
 package utils
 
 import (
+	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/antonmedv/expr"
@@ -245,4 +247,94 @@ func TestChangeTableNameForSpanner(t *testing.T) {
 		got := ChangeTableNameForSpanner(tc.tableName)
 		assert.Equal(t, got, tc.want)
 	}
+}
+
+func TestRemoveDuplicatesString(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected []string
+	}{
+		{[]string{"apple", "banana", "apple", "orange"}, []string{"apple", "banana", "orange"}},
+		{[]string{"a", "b", "a", "c", "b"}, []string{"a", "b", "c"}},
+		{[]string{"one", "two", "three"}, []string{"one", "two", "three"}}, // No duplicates
+		{[]string{}, []string{}}, // Empty slice
+	}
+
+	for _, test := range tests {
+		result := RemoveDuplicatesString(test.input)
+		if len(result) == 0 && len(test.expected) == 0 {
+			continue
+		}
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("RemoveDuplicatesString(%v) = %v; want %v", test.input, result, test.expected)
+		}
+
+	}
+}
+
+func TestRemoveDuplicatesFloat(t *testing.T) {
+	tests := []struct {
+		input    []float64
+		expected []float64
+	}{
+		{[]float64{1.1, 2.2, 3.3, 1.1, 2.2}, []float64{1.1, 2.2, 3.3}},
+		{[]float64{0.5, 0.5, 0.5}, []float64{0.5}},
+		{[]float64{10.0, 20.0, 30.0}, []float64{10.0, 20.0, 30.0}}, // No duplicates
+		{[]float64{}, []float64{}},                                 // Empty slice
+	}
+
+	for _, test := range tests {
+		result := RemoveDuplicatesFloat(test.input)
+		if len(result) == 0 && len(test.expected) == 0 {
+			continue
+		}
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("RemoveDuplicatesString(%v) = %v; want %v", test.input, result, test.expected)
+		}
+
+	}
+}
+
+func TestRemoveDuplicatesByteSlice(t *testing.T) {
+	tests := []struct {
+		input    [][]byte
+		expected [][]byte
+	}{
+		{
+			[][]byte{[]byte("foo"), []byte("bar"), []byte("foo"), []byte("baz")},
+			[][]byte{[]byte("foo"), []byte("bar"), []byte("baz")},
+		},
+		{
+			[][]byte{[]byte("apple"), []byte("banana"), []byte("apple")},
+			[][]byte{[]byte("apple"), []byte("banana")},
+		},
+		{
+			[][]byte{[]byte("one"), []byte("two"), []byte("three")},
+			[][]byte{[]byte("one"), []byte("two"), []byte("three")},
+		},
+		{
+			[][]byte{},
+			[][]byte{},
+		},
+	}
+
+	for _, test := range tests {
+		result := RemoveDuplicatesByteSlice(test.input)
+		if !equalByteSlices(result, test.expected) {
+			t.Errorf("RemoveDuplicatesByteSlice(%v) = %v; want %v", test.input, result, test.expected)
+		}
+	}
+}
+
+// Helper function to compare [][]byte slices
+func equalByteSlices(a, b [][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !bytes.Equal(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }
