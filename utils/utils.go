@@ -200,3 +200,46 @@ func ConvertDynamoTypeToSpannerType(dynamoType string) string {
 		return "STRING(MAX)"
 	}
 }
+
+// RemoveDuplicatesString removes duplicates from a []string
+func RemoveDuplicatesString(input []string) []string {
+	seen := make(map[string]struct{})
+	var result []string
+
+	for _, val := range input {
+		if _, exists := seen[val]; !exists {
+			seen[val] = struct{}{}
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
+// RemoveDuplicatesFloat removes duplicates from a []float64
+func RemoveDuplicatesFloat(input []float64) []float64 {
+	seen := make(map[float64]struct{})
+	var result []float64
+
+	for _, val := range input {
+		if _, exists := seen[val]; !exists {
+			seen[val] = struct{}{}
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
+// RemoveDuplicatesByteSlice removes duplicates from a [][]byte
+func RemoveDuplicatesByteSlice(input [][]byte) [][]byte {
+	seen := make(map[string]struct{})
+	var result [][]byte
+
+	for _, val := range input {
+		key := string(val) // Convert byte slice to string for map key
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			result = append(result, val)
+		}
+	}
+	return result
+}

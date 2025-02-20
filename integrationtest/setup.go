@@ -24,8 +24,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
-	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	"gopkg.in/yaml.v2"
 )
 
@@ -88,7 +88,7 @@ func createDatabase(w io.Writer, db string) error {
 	}
 	defer adminClient.Close()
 
-	op, err := adminClient.CreateDatabase(ctx, &adminpb.CreateDatabaseRequest{
+	op, err := adminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          matches[1],
 		CreateStatement: "CREATE DATABASE `" + matches[2] + "`",
 		ExtraStatements: []string{
@@ -104,11 +104,14 @@ func createDatabase(w io.Writer, db string) error {
 				spannerDataType STRING(MAX)
 			) PRIMARY KEY (tableName, column)`,
 			`CREATE TABLE employee (
-				emp_id 	   FLOAT64,
-				address    STRING(MAX),
-				age 	   FLOAT64,
-				first_name STRING(MAX),
-				last_name  STRING(MAX),
+				emp_id          FLOAT64,
+				address         STRING(MAX),
+				age            FLOAT64,
+				first_name      STRING(MAX),
+				last_name       STRING(MAX),
+				phone_numbers   ARRAY<STRING(MAX)>,
+				profile_pics    ARRAY<BYTES(MAX)>,
+				salaries        ARRAY<FLOAT64>
 			) PRIMARY KEY (emp_id)`,
 			`CREATE TABLE department (
 				d_id 		 FLOAT64,
@@ -133,7 +136,7 @@ func deleteDatabase(w io.Writer, db string) error {
 	if err != nil {
 		return err
 	}
-	if err := adminClient.DropDatabase(ctx, &adminpb.DropDatabaseRequest{
+	if err := adminClient.DropDatabase(ctx, &databasepb.DropDatabaseRequest{
 		Database: db,
 	}); err != nil {
 		return err
@@ -152,15 +155,20 @@ func initData(w io.Writer, db string) error {
 
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
-			SQL: `INSERT dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType) VALUES
-						('employee', 'emp_id', 'N', 'emp_id', 'emp_id','', 'emp_id','employee', 'FLOAT64'),
-						('employee', 'address', 'S', 'address', 'emp_id','', 'address','employee', 'STRING(MAX)'),
-						('employee', 'age', 'N', 'age', 'emp_id','', 'age','employee', 'FLOAT64'),
-						('employee', 'first_name', 'S', 'first_name', 'emp_id','', 'first_name','employee', 'STRING(MAX)'),
-						('employee', 'last_name', 'S', 'last_name', 'emp_id','', 'last_name','employee', 'STRING(MAX)'),
-						('department', 'd_id', 'N', 'd_id', 'd_id','', 'd_id','department', 'FLOAT64'),
-						('department', 'd_name', 'S', 'd_name', 'd_id','', 'd_name','department', 'STRING(MAX)'),
-						('department', 'd_specialization', 'S', 'd_specialization', 'd_id','', 'd_specialization','department', 'STRING(MAX)')`,
+			SQL: `INSERT INTO dynamodb_adapter_table_ddl 
+			(tableName, column, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType) 
+			VALUES
+			('employee', 'emp_id', 'N', 'emp_id', 'emp_id', '', 'emp_id', 'employee', 'FLOAT64'),
+			('employee', 'address', 'S', 'address', 'emp_id', '', 'address', 'employee', 'STRING(MAX)'),
+			('employee', 'age', 'N', 'age', 'emp_id', '', 'age', 'employee', 'FLOAT64'),
+			('employee', 'first_name', 'S', 'first_name', 'emp_id', '', 'first_name', 'employee', 'STRING(MAX)'),
+			('employee', 'last_name', 'S', 'last_name', 'emp_id', '', 'last_name', 'employee', 'STRING(MAX)'),
+			('employee', 'phone_numbers', 'SS', 'phone_numbers', 'emp_id', '', 'phone_numbers', 'employee', 'ARRAY<STRING(MAX)>'),
+			('employee', 'profile_pics', 'BS', 'profile_pics', 'emp_id', '', 'profile_pics', 'employee', 'ARRAY<BYTES(MAX)>'),
+			('employee', 'salaries', 'NS', 'salaries', 'emp_id', '', 'salaries', 'employee', 'ARRAY<FLOAT64>'),
+			('department', 'd_id', 'N', 'd_id', 'd_id', '', 'd_id', 'department', 'FLOAT64'),
+			('department', 'd_name', 'S', 'd_name', 'd_id', '', 'd_name', 'department', 'STRING(MAX)'),
+			('department', 'd_specialization', 'S', 'd_specialization', 'd_id', '', 'd_specialization', 'department', 'STRING(MAX)');`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {
@@ -175,12 +183,27 @@ func initData(w io.Writer, db string) error {
 
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
-			SQL: `INSERT employee (emp_id, address, age, first_name, last_name) VALUES
-						(1, 'Shamli', 10, 'Marc', 'Richards'),
-						(2, 'Ney York', 20, 'Catalina', 'Smith'),
-						(3, 'Pune', 30, 'Alice', 'Trentor'),
-						(4, 'Silicon Valley', 40, 'Lea', 'Martin'),
-						(5, 'London', 50, 'David', 'Lomond')`,
+			SQL: `INSERT INTO employee (emp_id, address, age, first_name, last_name, phone_numbers, profile_pics, salaries) VALUES
+				(1, 'Shamli', 10, 'Marc', 'Richards', 
+				['+1111111111', '+1222222222'], 
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTE='), FROM_BASE64('U29tZUJ5dGVzRGF0YTI=')], 
+				[1000.50, 2000.75]),				
+				(2, 'New York', 20, 'Catalina', 'Smith', 
+				['+1333333333'], 
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTM=')], 
+				[3000.00]),
+				(3, 'Pune', 30, 'Alice', 'Trentor', 
+				['+1444444444', '+1555555555'], 
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTQ='), FROM_BASE64('U29tZUJ5dGVzRGF0YTU=')], 
+				[4000.25, 5000.50, 6000.75]),
+				(4, 'Silicon Valley', 40, 'Lea', 'Martin', 
+				['+1666666666'], 
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTY=')], 
+				[7000.00, 8000.25]),
+				(5, 'London', 50, 'David', 'Lomond', 
+				['+1777777777', '+1888888888', '+1999999999'], 
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTc='), FROM_BASE64('U29tZUJ5dGVzRGF0YTg=')], 
+				[9000.50]);`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {
