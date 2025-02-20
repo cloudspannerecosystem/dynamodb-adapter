@@ -24,8 +24,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
-	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	"gopkg.in/yaml.v2"
 )
 
@@ -88,7 +88,7 @@ func createDatabase(w io.Writer, db string) error {
 	}
 	defer adminClient.Close()
 
-	op, err := adminClient.CreateDatabase(ctx, &adminpb.CreateDatabaseRequest{
+	op, err := adminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          matches[1],
 		CreateStatement: "CREATE DATABASE `" + matches[2] + "`",
 		ExtraStatements: []string{
@@ -136,7 +136,7 @@ func deleteDatabase(w io.Writer, db string) error {
 	if err != nil {
 		return err
 	}
-	if err := adminClient.DropDatabase(ctx, &adminpb.DropDatabaseRequest{
+	if err := adminClient.DropDatabase(ctx, &databasepb.DropDatabaseRequest{
 		Database: db,
 	}); err != nil {
 		return err
