@@ -27,10 +27,10 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"google.golang.org/api/iterator"
-	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
 
 const (
@@ -42,7 +42,7 @@ var (
 	chars         = []string{"]", "^", "\\\\", "/", "[", ".", "(", ")", "-"}
 	ss            = strings.Join(chars, "")
 	specialCharRg = regexp.MustCompile("[" + ss + "]+")
-	adapterTables    = map[string]string{
+	adapterTables = map[string]string{
 		"dynamodb_adapter_table_ddl": `CREATE TABLE dynamodb_adapter_table_ddl (
 			column	       STRING(MAX),
 			tableName      STRING(MAX),
@@ -128,7 +128,7 @@ func createDatabase(w io.Writer, db string) error {
 	}
 	defer adminClient.Close()
 
-	op, err := adminClient.CreateDatabase(ctx, &adminpb.CreateDatabaseRequest{
+	op, err := adminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          matches[1],
 		CreateStatement: "CREATE DATABASE `" + matches[2] + "`",
 	})
@@ -156,7 +156,7 @@ func createDynamodbAdatperTableDDL(w io.Writer, db string) error {
 	defer adminClient.Close()
 
 	for name, table := range adapterTables {
-		op, err := adminClient.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
+		op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
 			Database: db,
 			Statements: []string{
 				table,
@@ -169,7 +169,7 @@ func createDynamodbAdatperTableDDL(w io.Writer, db string) error {
 			if strings.Contains(err.Error(), "Duplicate name") {
 				fmt.Fprintf(w, "[%s] already exists\n", name)
 			} else {
-				return err 
+				return err
 			}
 		}
 	}
@@ -232,8 +232,8 @@ func readDatabaseSchema(db string) ([]string, error) {
 	}
 	defer adminClient.Close()
 
-	ddlResp, err := adminClient.GetDatabaseDdl(ctx, 
-		&adminpb.GetDatabaseDdlRequest{Database: db},
+	ddlResp, err := adminClient.GetDatabaseDdl(ctx,
+		&databasepb.GetDatabaseDdlRequest{Database: db},
 	)
 	if err != nil {
 		return nil, err
@@ -279,7 +279,7 @@ func verifySpannerSetup(db string) (int, error) {
 		}
 		count++
 	}
-	
+
 	return count, nil
 }
 
