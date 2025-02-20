@@ -122,7 +122,6 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 		pairs = strings.Split(actionValue, ",")
 	}
 	var v []string
-
 	for _, p := range pairs {
 		var addValue float64
 		status := false
@@ -218,13 +217,12 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 					continue
 				}
 				// Validate index bounds
-				if index < 0 || index >= len(oldList) {
+				if index < 0 || index > len(oldList) {
 					continue
 				}
 
 				updatedList := make([]interface{}, len(oldList))
 				copy(updatedList, oldList)
-
 				if index == len(oldList) {
 					updatedList = append(updatedList, value) // Append new value
 				} else if index < len(oldList) {
@@ -262,7 +260,6 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 		if updateAtrr.ExpressionAttributeNames[v[0]] != "" {
 			key = updateAtrr.ExpressionAttributeNames[v[0]]
 		}
-
 		if strings.Contains(v[1], "%") {
 			for j := 0; j < len(expr.Field); j++ {
 				if strings.Contains(v[1], "%"+expr.Value[j]+"%") {
@@ -294,7 +291,6 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 	for k, v := range updateAtrr.PrimaryKeyMap {
 		resp[k] = v
 	}
-
 	return resp, expr
 }
 

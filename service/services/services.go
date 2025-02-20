@@ -18,8 +18,8 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -32,8 +32,6 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
-
-var listRemoveTargetRegex = regexp.MustCompile(`(.*)\[(\d+)\]`)
 
 // getSpannerProjections makes a projection array of columns
 func getSpannerProjections(projectionExpression, table string, expressionAttributeNames map[string]string) []string {
@@ -586,16 +584,14 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 	for _, target := range colsToRemove {
 		if strings.Contains(target, "[") && strings.Contains(target, "]") {
 			// Handle list index removal
-			listAttr, idx := parseListRemoveTarget(target)
-			if list, ok := oldRes[listAttr].([]interface{}); ok {
-				oldRes[listAttr] = removeListElement(list, idx)
-			}
-		} else if strings.Contains(target, ".") {
-			// Handle map key removal
-			mapAttr, key := parseMapRemoveTarget(target)
-			if m, ok := oldRes[mapAttr].(map[string]interface{}); ok {
-				delete(m, key)
-				oldRes[mapAttr] = m
+			listAttr, idx := utils.ParseListRemoveTarget(target)
+			if idx != -1 {
+				if list, ok := oldRes[listAttr].([]interface{}); ok {
+					oldRes[listAttr] = utils.RemoveListElement(list, idx)
+				}
+			} else {
+				// Handle invalid list index format
+				return nil, fmt.Errorf("invalid list index format for target %q", target)
 			}
 		} else {
 			// Handle direct column removal
@@ -603,33 +599,4 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		}
 	}
 	return updateResp, nil
-}
-
-// parseListRemoveTarget parses a list attribute target and its index from the action value.
-func parseListRemoveTarget(target string) (string, int) {
-	// Example: listAttribute[2]
-	matches := listRemoveTargetRegex.FindStringSubmatch(target)
-	if len(matches) == 3 {
-		index, _ := strconv.Atoi(matches[2])
-		return matches[1], index
-	}
-	return target, -1
-}
-
-// parseMapRemoveTarget parses a map attribute and its key from the action value.
-func parseMapRemoveTarget(target string) (string, string) {
-	// Example: mapAttribute.key
-	parts := strings.SplitN(target, ".", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return target, ""
-}
-
-// removeListElement removes an element from a list at the specified index.
-func removeListElement(list []interface{}, idx int) []interface{} {
-	if idx < 0 || idx >= len(list) {
-		return list // Invalid index; return original list
-	}
-	return append(list[:idx], list[idx+1:]...)
 }

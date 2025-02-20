@@ -572,24 +572,11 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 		for _, target := range colsToRemove {
 			if strings.Contains(target, "[") && strings.Contains(target, "]") {
 				// Handle list element removal
-				listAttr, idx := parseListRemoveTarget(target)
-
+				listAttr, idx := utils.ParseListRemoveTarget(target)
 				if val, ok := oldRes[listAttr]; ok {
 					if list, ok := val.([]interface{}); ok {
-						oldList := list
-						oldRes[listAttr] = removeListElement(list, idx)
-						tmpMap[listAttr] = oldList
-					}
-				}
-			} else if strings.Contains(target, ".") {
-				// Handle map key removal
-				mapAttr, key := parseMapRemoveTarget(target)
-				if val, ok := oldRes[mapAttr]; ok {
-					if m, ok := val.(map[string]interface{}); ok {
-						oldMap := m
-						delete(m, key)
-						oldRes[mapAttr] = m
-						tmpMap[mapAttr] = oldMap
+						oldRes[listAttr] = utils.RemoveListElement(list, idx)
+						tmpMap[listAttr] = oldRes[listAttr]
 					}
 				}
 			} else {
@@ -622,33 +609,6 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 		return nil
 	})
 	return err
-}
-
-func parseListRemoveTarget(target string) (string, int) {
-	// Example: listAttr[2]
-	re := regexp.MustCompile(`(.*)\[(\d+)\]`)
-	matches := re.FindStringSubmatch(target)
-	if len(matches) == 3 {
-		index, _ := strconv.Atoi(matches[2])
-		return matches[1], index
-	}
-	return target, -1
-}
-
-func removeListElement(list []interface{}, idx int) []interface{} {
-	if idx < 0 || idx >= len(list) {
-		return list // Return original list for invalid indices
-	}
-	return append(list[:idx], list[idx+1:]...)
-}
-
-func parseMapRemoveTarget(target string) (string, string) {
-	// Example: mapAttr.key
-	parts := strings.SplitN(target, ".", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return target, ""
 }
 
 // SpannerBatchPut - this insert or update data in batch
@@ -1113,45 +1073,6 @@ func parseNumberArrayColumn(r *spanner.Row, idx int, col string, row map[string]
 	return nil
 }
 
-// processDecodedData attempts to decode base64 encoded strings within the
-// given data structure.  It handles both strings and maps of strings.  This
-// function is used to handle cases where JSON data is stored as a base64
-// encoded string within a Spanner column.
-//
-// Args:
-//
-//	m: The data structure to process (interface{}).  Can be a string or a
-//	   map[string]interface{}.
-//
-// Returns:
-//
-//	The processed data structure (interface{}).  If base64 decoding and JSON
-//	unmarshalling are successful, the decoded JSON will be returned. Otherwise,
-//	the original data structure is returned.
-func processDecodedData(m interface{}) interface{} {
-	if val, ok := m.(string); ok && base64Regexp.MatchString(val) {
-		if ba, err := base64.StdEncoding.DecodeString(val); err == nil {
-			var sample interface{}
-			if err := json.Unmarshal(ba, &sample); err == nil {
-				return sample
-			}
-		}
-	}
-	if mp, ok := m.(map[string]interface{}); ok {
-		for k, v := range mp {
-			if val, ok := v.(string); ok && base64Regexp.MatchString(val) {
-				if ba, err := base64.StdEncoding.DecodeString(val); err == nil {
-					var sample interface{}
-					if err := json.Unmarshal(ba, &sample); err == nil {
-						mp[k] = sample
-					}
-				}
-			}
-		}
-	}
-	return m
-}
-
 // parseListColumn parses a list column from a Spanner row.
 //
 // Args:
@@ -1231,6 +1152,45 @@ func parseDynamoDBJSON(value interface{}) interface{} {
 	}
 
 	return value // Return as-is for unsupported types
+}
+
+// processDecodedData attempts to decode base64 encoded strings within the
+// given data structure.  It handles both strings and maps of strings.  This
+// function is used to handle cases where JSON data is stored as a base64
+// encoded string within a Spanner column.
+//
+// Args:
+//
+//	m: The data structure to process (interface{}).  Can be a string or a
+//	   map[string]interface{}.
+//
+// Returns:
+//
+//	The processed data structure (interface{}).  If base64 decoding and JSON
+//	unmarshalling are successful, the decoded JSON will be returned. Otherwise,
+//	the original data structure is returned.
+func processDecodedData(m interface{}) interface{} {
+	if val, ok := m.(string); ok && base64Regexp.MatchString(val) {
+		if ba, err := base64.StdEncoding.DecodeString(val); err == nil {
+			var sample interface{}
+			if err := json.Unmarshal(ba, &sample); err == nil {
+				return sample
+			}
+		}
+	}
+	if mp, ok := m.(map[string]interface{}); ok {
+		for k, v := range mp {
+			if val, ok := v.(string); ok && base64Regexp.MatchString(val) {
+				if ba, err := base64.StdEncoding.DecodeString(val); err == nil {
+					var sample interface{}
+					if err := json.Unmarshal(ba, &sample); err == nil {
+						mp[k] = sample
+					}
+				}
+			}
+		}
+	}
+	return m
 }
 
 func checkInifinty(value float64, logData interface{}) error {

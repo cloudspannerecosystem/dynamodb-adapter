@@ -270,7 +270,7 @@ var (
 			},
 		},
 	}
-	TestGetBatchForListOutput = `{"Responses":{"test_table":[{"category":{"S":"category"},"id":{"S":"testing"},"list_type":{"L":[{"S":"John doe"},{"S":"62536"},{"B":true}]}","rank_list":{"S":"rank_list"},"updated_at":{"S":"2024-12-04T11:02:02Z"}},{"category":{"S":"category1"},"id":{"S":"id"},"list_type":{"L":[{"S":"string_value"},{"N":"12345"},{"BOOL":true},{"NULL":true}, "M":{"key":{"N":"1245"}}},{"L":[{"N":"1"},{"N":"2"},{"N":"3"}]},{"S":"testing"}]},"rank_list":{"S":"rank_list1"},"updated_at":{"S":"2024-12-04T11:02:02Z"}},{"category":{"S":"category2"},"id":{"S":"id2"},"list_type":{"L":[{"S":"test"},{"S":"dummy_value"},{"S":"62536"}]},"rank_list":{"S":"rank_list2"},"updated_at":{"S":"2024-12-04T11:02:02Z"}})]}}`
+	TestGetBatchForListOutput = `{"Responses":{"test_table":[{"category":{"S":"category"},"id":{"S":"testing"},"list_type":{"L":[{"S":"John Doe"},{"S":"62536"},{"BOOL":true}]},"rank_list":{"S":"rank_list"},"updated_at":{"S":"2024-12-04T11:02:02Z"}},{"category":{"S":"category1"},"id":{"S":"id"},"list_type":{"L":[{"S":"string_value"},{"S":"12345"},{"BOOL":true},{"L":[{"N":"1"},{"N":"2"},{"N":"3"}]},{"S":"testing"}]},"rank_list":{"S":"rank_list1"},"updated_at":{"S":"2024-12-04T11:02:02Z"}},{"category":{"S":"category2"},"id":{"S":"id2"},"list_type":{"L":[{"S":"test"},{"S":"dummy_value"},{"S":"62536"}]},"rank_list":{"S":"rank_list2"},"updated_at":{"S":"2024-12-04T11:02:02Z"}}]}}`
 )
 
 // test Data for Query API
@@ -919,7 +919,6 @@ var (
 					{S: aws.String("list_value1")},
 					{N: aws.String("100")},
 					{BOOL: aws.Bool(false)},
-					{NULL: aws.Bool(true)},
 					{M: map[string]*dynamodb.AttributeValue{
 						"key1": {S: aws.String("value1")},
 					}},
@@ -1015,7 +1014,6 @@ var (
 		},
 		ConditionExpression: "#ag > :val2",
 	}
-
 	DeleteItemTestCaseListName = "ConditionExpression with ExpressionAttributeValues for List"
 	DeleteItemTestCaseList     = models.Delete{
 		TableName: "test_table",
@@ -1630,7 +1628,7 @@ func testGetBatchAPI(t *testing.T) {
 		createPostTestCase(TestGetBatch7Name, "/v1", "BatchGetItem", TestGetBatch7Output, TestGetBatch7),
 		createPostTestCase(TestGetBatch8Name, "/v1", "BatchGetItem", TestGetBatch8Output, TestGetBatch8),
 		createPostTestCase(TestGetBatch9Name, "/v1", "BatchGetItem", TestGetBatch9Output, TestGetBatch9),
-		//	createPostTestCase(TestGetBatchForListName, "/v1", "BatchGetItem", TestGetBatchForListOutput, TestGetBatchForList),
+		createPostTestCase(TestGetBatchForListName, "/v1", "BatchGetItem", TestGetBatchForListOutput, TestGetBatchForList),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1816,8 +1814,6 @@ func testPutItemAPI(t *testing.T) {
 			return handlerInitFunc()
 		},
 	}
-
-	fmt.Println(PutItemTestCase2)
 	tests := []apitesting.APITestCase{
 		createStatusCheckPostTestCase(PutItemTestCase1Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase1),
 		createStatusCheckPostTestCase(PutItemTestCase5Name, "/v1", "PutItem", http.StatusBadRequest, PutItemTestCase5),

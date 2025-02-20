@@ -17,6 +17,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -24,6 +25,8 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 )
+
+var listRemoveTargetRegex = regexp.MustCompile(`(.*)\[(\d+)\]`)
 
 // GetFieldNameFromConditionalExpression returns the field name from conditional expression
 func GetFieldNameFromConditionalExpression(conditionalExpression string) string {
@@ -250,4 +253,28 @@ func RemoveDuplicatesByteSlice(input [][]byte) [][]byte {
 		}
 	}
 	return result
+}
+
+// parseListRemoveTarget parses a list attribute target and its index from the action value.
+// It returns the attribute name and index.
+// Example: listAttr[2]
+func ParseListRemoveTarget(target string) (string, int) {
+	matches := listRemoveTargetRegex.FindStringSubmatch(target)
+	if len(matches) == 3 {
+		index, err := strconv.Atoi(matches[2])
+		if err != nil {
+			return target, -1
+		}
+		return matches[1], index
+	}
+	return target, -1
+}
+
+// removeListElement removes an element from a list at the specified index.
+// If the index is invalid, it returns the original list.
+func RemoveListElement(list []interface{}, idx int) []interface{} {
+	if idx < 0 || idx >= len(list) {
+		return list // Return original list for invalid indices
+	}
+	return append(list[:idx], list[idx+1:]...)
 }
