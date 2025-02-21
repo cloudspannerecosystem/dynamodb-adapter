@@ -25,13 +25,13 @@ import (
 
 	"cloud.google.com/go/spanner"
 	Admindatabase "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
-	"google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	"gopkg.in/yaml.v3"
 )
 
@@ -286,7 +286,7 @@ func createDatabase(ctx context.Context, adminClient *Admindatabase.DatabaseAdmi
 	parent, dbName := matches[1], matches[2]
 
 	// Initiate database creation
-	op, err := adminClient.CreateDatabase(ctx, &database.CreateDatabaseRequest{
+	op, err := adminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          parent,
 		CreateStatement: "CREATE DATABASE `" + dbName + "`",
 	})
@@ -346,7 +346,7 @@ func createTable(ctx context.Context, adminClient *Admindatabase.DatabaseAdminCl
 	}
 
 	// Create the table
-	op, err := adminClient.UpdateDatabaseDdl(ctx, &database.UpdateDatabaseDdlRequest{
+	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   db,
 		Statements: []string{ddl},
 	})
@@ -508,7 +508,7 @@ func applySpannerDDL(ctx context.Context, db string, ddlStatements []string) err
 	defer adminClient.Close() // Ensure the client is closed after the operation.
 
 	// Initiate the DDL update operation.
-	op, err := adminClient.UpdateDatabaseDdl(ctx, &database.UpdateDatabaseDdlRequest{
+	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   db,
 		Statements: ddlStatements,
 	})
