@@ -18,6 +18,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
 	"strconv"
 	"strings"
@@ -82,7 +83,6 @@ func Put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	for k, v := range newResp {
 		updateResp[k] = v
 	}
-
 	return updateResp, nil
 }
 
@@ -570,7 +570,7 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 	if err != nil {
 		return nil, err
 	}
-	err = storage.GetStorageInstance().SpannerRemove(ctx, tableName, updateAttr.PrimaryKeyMap, e, expr, colsToRemove)
+	err = storage.GetStorageInstance().SpannerRemove(ctx, tableName, updateAttr.PrimaryKeyMap, e, expr, colsToRemove, oldRes)
 	if err != nil {
 		return nil, err
 	}
@@ -581,9 +581,22 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 	for k, v := range oldRes {
 		updateResp[k] = v
 	}
-
-	for i := 0; i < len(colsToRemove); i++ {
-		delete(updateResp, colsToRemove[i])
+	for _, target := range colsToRemove {
+		if strings.Contains(target, "[") && strings.Contains(target, "]") {
+			// Handle list index removal
+			listAttr, idx := utils.ParseListRemoveTarget(target)
+			if idx != -1 {
+				if list, ok := oldRes[listAttr].([]interface{}); ok {
+					oldRes[listAttr] = utils.RemoveListElement(list, idx)
+				}
+			} else {
+				// Handle invalid list index format
+				return nil, fmt.Errorf("invalid list index format for target %q", target)
+			}
+		} else {
+			// Handle direct column removal
+			delete(updateResp, target)
+		}
 	}
 	return updateResp, nil
 }
