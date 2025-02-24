@@ -242,16 +242,6 @@ func Test_extractOperations(t *testing.T) {
 				"DELETE": "Color :p",
 			},
 		},
-		{
-			"All Operations",
-			"SET name = :val1, age = :val2 REMOVE address ADD age :val3 DELETE Color :p",
-			map[string]string{
-				"SET":    "name = :val1, age = :val2",
-				"ADD":    "age :val3",
-				"REMOVE": "address",
-				"DELETE": "Color :p",
-			},
-		},
 	}
 
 	for _, tc := range tests {
@@ -604,6 +594,67 @@ func TestParseActionValue(t *testing.T) {
 				"binaryData": [][]byte{[]byte("newData")},
 			},
 			actionValue: "binaryData :removeBinary",
+		},
+		{
+			name: "List append operation",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET list_type = list_append(list_type, :newValue)",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newValue": []interface{}{"John"},
+				},
+				ExpressionAttributeNames: map[string]string{},
+				PrimaryKeyMap: map[string]interface{}{
+					"rank_list": "rank_list",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"list_type": []interface{}{"test"},
+			},
+			expectedResult: map[string]interface{}{
+				"rank_list": "rank_list",
+				"list_type": []interface{}{"test", "John"},
+			},
+			actionValue: "list_type list_append(list_type, :newValue)",
+		},
+		{
+			name: "List item update by index",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET list_type[1] = :newValue",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newValue": "Jacob",
+				},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"list_type": []interface{}{"John", "Doe"},
+			},
+			expectedResult: map[string]interface{}{
+				"id":        "1",
+				"list_type": []interface{}{"John", "Jacob"},
+			},
+			actionValue: "list_type[1] = :newValue",
+		},
+		{
+			name: "List item update by index",
+			updateAttr: models.UpdateAttr{
+				UpdateExpression: "SET list_type[2] = :newValue",
+				ExpressionAttributeMap: map[string]interface{}{
+					":newValue": "newData",
+				},
+				PrimaryKeyMap: map[string]interface{}{
+					"id": "1",
+				},
+			},
+			oldRes: map[string]interface{}{
+				"list_type": []interface{}{"John", "Doe"},
+			},
+			expectedResult: map[string]interface{}{
+				"id":        "1",
+				"list_type": []interface{}{"John", "Doe", "newData"},
+			},
+			actionValue: "list_type[2] =  :newValue",
 		},
 	}
 
