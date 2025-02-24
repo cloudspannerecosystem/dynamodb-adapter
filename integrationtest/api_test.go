@@ -85,6 +85,14 @@ var (
 		ProjectionExpression: "#emp, address",
 	}
 	getItemTest5Output = `{"Item":{"address":{"S":"New York"}}}`
+
+	getItemTest6 = models.GetItemMeta{
+		TableName: "department",
+		Key: map[string]*dynamodb.AttributeValue{
+			"d_id": {N: aws.String("200")}, // Assuming d_id 200 has a NULL d_name
+		},
+	}
+	getItemTest6Output = `{"Item":{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}}`
 )
 
 // params for TestGetBatchAPI
@@ -472,6 +480,15 @@ var (
 	queryTestCaseOutput15 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
 	queryTestCaseOutput16 = `{"Count":1,"Items":[]}`
+
+	queryTestCase17 = models.Query{
+		TableName: "department",
+		RangeExp:  "d_id =:val1",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val1": {N: aws.String("200")}, // d_id 200 has NULL d_name
+		},
+	}
+	queryTestCaseOutput17 = `{"Count":1,"Items":[{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}]}`
 )
 
 // Test Data for Scan API
@@ -590,6 +607,16 @@ var (
 		Select:    "COUNT",
 	}
 	ScanTestCase13Output = `{"Count":5,"Items":[]}`
+
+	ScanTestCase14Name = "14: NULL Value"
+	ScanTestCase14     = models.ScanMeta{
+		TableName:        "department",
+		FilterExpression: "d_id = :val1",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val1": {N: aws.String("200")}, // Filter for NULL d_name
+		},
+	}
+	ScanTestCase14Output = `{"Count":1,"Items":[{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}]}`
 )
 
 // Test Data for UpdateItem API
@@ -602,7 +629,7 @@ var (
 	}
 
 	UpdateItemTestCase2Name = "2: Update Expression with ExpressionAttributeValues"
-	UpdateItemTestCase2 = models.UpdateAttr{
+	UpdateItemTestCase2     = models.UpdateAttr{
 		TableName: "employee",
 		Key: map[string]*dynamodb.AttributeValue{
 			"emp_id": {N: aws.String("1")},
@@ -616,11 +643,11 @@ var (
 			":salaries": {NS: aws.StringSlice([]string{
 				"1000.5", "2000.75", "1000.5", "2000.75",
 			})},
-			"profile_pics":  {BS: [][]byte{[]byte("SomeBytesData1"), []byte("SomeBytesData2"), []byte("SomeBytesData1"), []byte("SomeBytesData2")}},
+			"profile_pics": {BS: [][]byte{[]byte("SomeBytesData1"), []byte("SomeBytesData2"), []byte("SomeBytesData1"), []byte("SomeBytesData2")}},
 		},
 		ReturnValues: "ALL_NEW",
 	}
-	
+
 	UpdateItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"},"phone_numbers":{"SS":["+1111111111","+1222222222"]},"profile_pics":{"BS":["U29tZUJ5dGVzRGF0YTE=","U29tZUJ5dGVzRGF0YTI="]},"salaries":{"NS":["1000.5","2000.75"]}}}`
 
 	UpdateItemTestCase3Name = "3: UpdateExpression, ExpressionAttributeValues with ExpressionAttributeNames"
@@ -751,16 +778,16 @@ var (
 	PutItemTestCase2     = models.Meta{
 		TableName: "employee",
 		Item: map[string]*dynamodb.AttributeValue{
-			"emp_id":       {N: aws.String("1")},
-			"age":          {N: aws.String("11")},
+			"emp_id":        {N: aws.String("1")},
+			"age":           {N: aws.String("11")},
 			"phone_numbers": {SS: aws.StringSlice([]string{"+1111111111", "+1222222222", "+1111111111"})},
 			"profile_pics":  {BS: [][]byte{[]byte("SomeBytesData1"), []byte("SomeBytesData2"), []byte("SomeBytesData1")}},
 			"salaries":      {NS: aws.StringSlice([]string{"1000.5", "2000.75", "1000.5"})},
 		},
 	}
-	
+
 	PutItemTestCase2Output = `{"Attributes":{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"},"phone_numbers":{"SS":["+1111111111","+1222222222"]},"profile_pics":{"BS":["U29tZUJ5dGVzRGF0YTE=","U29tZUJ5dGVzRGF0YTI="]},"salaries":{"NS":["1000.5","2000.75"]}}}`
-	
+
 	PutItemTestCase3Name = "3: ConditionExpression with ExpressionAttributeValues & ExpressionAttributeNames"
 	PutItemTestCase3     = models.Meta{
 		TableName: "employee",
@@ -951,17 +978,17 @@ var (
 	}
 
 	BatchWriteItemTestCase2Name = "2: Batch Put Request for one table"
-	BatchWriteItemTestCase2 = models.BatchWriteItem{
+	BatchWriteItemTestCase2     = models.BatchWriteItem{
 		RequestItems: map[string][]models.BatchWriteSubItems{
 			"employee": {
 				{
 					PutReq: models.BatchPutItem{
 						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":       {N: aws.String("6")},
-							"age":          {N: aws.String("60")},
-							"address":      {S: aws.String("London")},
-							"first_name":   {S: aws.String("David")},
-							"last_name":    {S: aws.String("Root")},
+							"emp_id":        {N: aws.String("6")},
+							"age":           {N: aws.String("60")},
+							"address":       {S: aws.String("London")},
+							"first_name":    {S: aws.String("David")},
+							"last_name":     {S: aws.String("Root")},
 							"phone_numbers": {SS: []*string{aws.String("+1777777777"), aws.String("+1888888888")}},
 							"profile_pics":  {BS: [][]byte{[]byte("U29tZUJ5dGVzRGF0YTc="), []byte("U29tZUJ5dGVzRGF0YTg=")}},
 							"salaries":      {NS: []*string{aws.String("9000.50"), aws.String("10000.75")}},
@@ -971,11 +998,11 @@ var (
 				{
 					PutReq: models.BatchPutItem{
 						Item: map[string]*dynamodb.AttributeValue{
-							"emp_id":       {N: aws.String("7")},
-							"age":          {N: aws.String("70")},
-							"address":      {S: aws.String("Paris")},
-							"first_name":   {S: aws.String("Marc")},
-							"last_name":    {S: aws.String("Ponting")},
+							"emp_id":        {N: aws.String("7")},
+							"age":           {N: aws.String("70")},
+							"address":       {S: aws.String("Paris")},
+							"first_name":    {S: aws.String("Marc")},
+							"last_name":     {S: aws.String("Ponting")},
 							"phone_numbers": {SS: []*string{aws.String("+1999999999"), aws.String("+2111111111")}},
 							"profile_pics":  {BS: [][]byte{[]byte("U29tZUJ5dGVzRGF0YTk="), []byte("U29tZUJ5dGVzRGF0YTEw=")}},
 							"salaries":      {NS: []*string{aws.String("11000"), aws.String("12000.25")}},
@@ -984,7 +1011,7 @@ var (
 				},
 			},
 		},
-	}	
+	}
 
 	BatchWriteItemTestCase3Name = "3: Batch Delete Request for one Table"
 	BatchWriteItemTestCase3     = models.BatchWriteItem{
@@ -1456,6 +1483,7 @@ func testGetItemAPI(t *testing.T) {
 		createPostTestCase("Crorect data with Projection param Testcase", "/v1", "GetItem", getItemTest3Output, getItemTest3),
 		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1", "GetItem", getItemTest4Output, getItemTest4),
 		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1", "GetItem", getItemTest5Output, getItemTest5),
+		createPostTestCase("Correct data with NULL value Testcase", "/v1", "GetItem", getItemTest6Output, getItemTest6),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1590,6 +1618,7 @@ func testQueryAPI(t *testing.T) {
 		createPostTestCase("count with other attributes present", "/v1", "Query", queryTestCaseOutput14, queryTestCase14),
 		createPostTestCase("Select with other than count", "/v1", "Query", queryTestCaseOutput15, queryTestCase15),
 		createPostTestCase("all attributes", "/v1", "Query", queryTestCaseOutput16, queryTestCase16),
+		createPostTestCase("Query with NULL value in KeyConditionExpression", "/v1", "Query", queryTestCaseOutput17, queryTestCase17),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1656,6 +1685,7 @@ func testScanAPI(t *testing.T) {
 		createPostTestCase(ScanTestCase11Name, "/v1", "Query", ScanTestCase11Output, ScanTestCase11),
 		createPostTestCase(ScanTestCase12Name, "/v1", "Query", ScanTestCase12Output, ScanTestCase12),
 		createPostTestCase(ScanTestCase13Name, "/v1", "Query", ScanTestCase13Output, ScanTestCase13),
+		//	createPostTestCase(ScanTestCase14Name, "/v1", "Scan", ScanTestCase14Output, ScanTestCase14),
 	}
 	apitest.RunTests(t, tests)
 }

@@ -794,6 +794,8 @@ func parseRow(r *spanner.Row, colDDL map[string]string) (map[string]interface{},
 			err = parseByteArrayColumn(r, i, k, singleRow)
 		case "NS":
 			err = parseNumberArrayColumn(r, i, k, singleRow)
+		case "NULL":
+			err = parseNullColumn(r, i, k, singleRow)
 		default:
 			return nil, errors.New("TypeNotFound", err, k)
 		}
@@ -823,7 +825,10 @@ func parseStringColumn(r *spanner.Row, idx int, col string, row map[string]inter
 	if err != nil && !strings.Contains(err.Error(), "ambiguous column name") {
 		return err
 	}
-	if !s.IsNull() {
+	if s.IsNull() {
+		row[col] = nil
+		return nil
+	} else {
 		row[col] = s.StringVal
 	}
 	return nil
@@ -880,7 +885,10 @@ func parseNumericColumn(r *spanner.Row, idx int, col string, row map[string]inte
 	if err != nil && !strings.Contains(err.Error(), "ambiguous column name") {
 		return err
 	}
-	if !s.IsNull() {
+	if s.IsNull() {
+		row[col] = nil
+		return nil
+	} else {
 		row[col] = s.Float64
 	}
 	return nil
@@ -904,7 +912,9 @@ func parseBoolColumn(r *spanner.Row, idx int, col string, row map[string]interfa
 	if err != nil && !strings.Contains(err.Error(), "ambiguous column name") {
 		return err
 	}
-	if !s.IsNull() {
+	if s.IsNull() {
+		row[col] = nil
+	} else {
 		row[col] = s.Bool
 	}
 	return nil
@@ -1029,6 +1039,31 @@ func processDecodedData(m interface{}) interface{} {
 		}
 	}
 	return m
+}
+
+// parseNullColumn handles NULL values for any column type.
+//
+// Args:
+//
+//	r: The Spanner row.
+//	idx: The column index.
+//	col: The column name.
+//	row: The map to store the parsed value.
+//
+// Returns:
+//
+//	An error if any occurs during column retrieval.
+func parseNullColumn(r *spanner.Row, idx int, col string, row map[string]interface{}) error {
+	var s spanner.NullString
+	err := r.Column(idx, &s)
+	if err != nil && !strings.Contains(err.Error(), "ambiguous column name") {
+		return err
+	}
+	if s.IsNull() {
+		row[col] = nil
+		return nil
+	}
+	return nil
 }
 
 func checkInifinty(value float64, logData interface{}) error {

@@ -220,7 +220,7 @@ func initData(w io.Writer, db string) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT department (d_id, d_name, d_specialization) VALUES
 						(100, 'Engineering', 'CSE, ECE, Civil'),
-						(200, 'Arts', 'BA'),
+						(200, NULL, 'BA'),
 						(300, 'Culture', 'History')`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)

@@ -44,6 +44,9 @@ func createItem(svc *dynamodb.DynamoDB) {
 		"emp_image": {
 			B: []byte("binary_data_here"),
 		},
+		"emp_status": {
+			NULL: aws.Bool(true), // Explicitly setting NULL
+		},
 	}
 
 	input := &dynamodb.PutItemInput{

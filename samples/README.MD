@@ -15,7 +15,8 @@ CREATE TABLE employee_table (
   emp_name STRING(MAX),
   emp_id FLOAT64,
   emp_image BYTES(MAX),
-  isHired BOOL
+  isHired BOOL,
+  emp_status STRING(MAX),
 ) PRIMARY KEY(emp_id);
 ```
 
@@ -27,11 +28,16 @@ Use the following SQL statement to create this table:
 
 ```sql
 CREATE TABLE dynamodb_adapter_table_ddl (
-  column         STRING(MAX),
-  tableName      STRING(MAX),
-  dataType       STRING(MAX),
-  originalColumn STRING(MAX),
-) PRIMARY KEY (tableName, column);
+tableName STRING(MAX) NOT NULL,
+column STRING(MAX) NOT NULL,
+dynamoDataType STRING(MAX) NOT NULL,
+originalColumn STRING(MAX) NOT NULL,
+partitionKey STRING(MAX),
+sortKey STRING(MAX),
+spannerIndexName STRING(MAX),
+actualTable STRING(MAX),
+spannerDataType STRING(MAX)
+) PRIMARY KEY (tableName, column)
 ```
 
 ## 3. Insert Data into `dynamodb_adapter_table_ddl`
@@ -40,17 +46,18 @@ Once the `dynamodb_adapter_table_ddl` table is created,
 insert the metadata for `employee_table` as follows:
 
 ```sql
-INSERT INTO dynamodb_adapter_table_ddl (column, tableName, dataType, originalColumn)
-VALUES ('emp_name', 'employee_table', 'STRING(MAX)', 'emp_name');
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType) VALUES ('employee_table','emp_name','S','emp_name','emp_id', '', 'emp_name', 'employee_table','STRING(MAX)');
 
-INSERT INTO dynamodb_adapter_table_ddl (column, tableName, dataType, originalColumn)
-VALUES ('emp_id', 'employee_table', 'FLOAT64', 'emp_id');
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType) VALUES ('employee_table','emp_id','N','emp_id','emp_id', '', 'emp_id', 'employee_table','FLOAT64');
 
-INSERT INTO dynamodb_adapter_table_ddl (column, tableName, dataType, originalColumn)
-VALUES ('emp_image', 'employee_table', 'BYTES(MAX)', 'emp_image');
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
+VALUES ('employee_table','emp_image','B','emp_image','emp_id', '', 'emp_image', 'employee_table','BYTES(MAX)');
 
-INSERT INTO dynamodb_adapter_table_ddl (column, tableName, dataType, originalColumn)
-VALUES ('isHired', 'employee_table', 'BOOL', 'isHired');
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
+VALUES ('employee_table','isHired','BOOL','isHired','emp_id', '', 'isHired', 'employee_table','BOOL');
+
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
+VALUES ('employee_table','emp_status','S','emp_status','emp_id', '', 'emp_status', 'employee_table','STRING(MAX)');
 ```
 
 ## 4. Configuration Files
@@ -58,48 +65,24 @@ VALUES ('isHired', 'employee_table', 'BOOL', 'isHired');
 The DynamoDB adapter requires several configuration files to function properly.
 Below are examples of these configuration files:
 
-### 4.1. `config.json`
+## config.yaml
 
-The `config.json` file contains the basic settings for the DynamoDB Adapter.
-Replace the `GoogleProjectID` and `SpannerDb` values with your own project
-and database names:
+This file defines the necessary settings for the adapter.
+A sample configuration might look like this:
 
-```json
-{
-    "GoogleProjectID": "cassandra-to-spanner",
-    "SpannerDb": "cluster10",
-    "QueryLimit": 5000
-}
-```
+spanner:
+        project_id: "my-project-id"
+        instance_id: "my-instance-id"
+        database_name: "my-database-name"
+        query_limit: "query_limit"
+        dynamo_query_limit: "dynamo_query_limit"
 
-### 4.2. `spanner.json`
-
-The `spanner.json` file maps table names to Cloud Spanner instance IDs.
-Define the instance where each table resides:
-
-```json
-{
-    "dynamodb_adapter_table_ddl": "spanner-instance-dev",
-    "dynamodb_adapter_config_manager": "spanner-instance-dev",
-    "employee_table": "spanner-instance-dev"
-}
-```
-
-### 4.3. `tables.json`
-
-The `tables.json` file describes the DynamoDB table schema,
-including the partition and sort keys. Here's an example for `employee_table`:
-
-```json
-{
-    "employee_table": {
-        "partitionKey": "guid",
-        "sortKey": "context",
-        "spannerIndexName": "guid",
-        "actualTable": "employee_table"
-    }
-}
-```
+The fields are:
+project_id: The Google Cloud project ID.
+instance_id: The Spanner instance ID.
+database_name: The database name in Spanner.
+query_limit: Database query limit.
+dynamo_query_limit: DynamoDb query limit.
 
 ## 5. Build the Project
 
@@ -123,9 +106,3 @@ After building the project, start the DynamoDB Adapter by running the following 
 Follow these steps to set up your DynamoDB Adapter environment
 and perform necessary operations using the `employee_table`.
 Let me know if you need further clarification or assistance!
-
-
-
-
-
-
