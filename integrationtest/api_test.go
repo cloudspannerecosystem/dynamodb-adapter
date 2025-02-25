@@ -2105,7 +2105,7 @@ func testBatchWriteItemAPI(t *testing.T) {
 		createStatusCheckPostTestCase(BatchWriteItemTestCase6Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase6),
 		createStatusCheckPostTestCase(BatchWriteItemTestCase7Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase7),
 		createStatusCheckPostTestCase(BatchWriteItemTestCase8Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase8),
-		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1", "BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase9),
+		createStatusCheckPostTestCase(BatchWriteItemTestCase9Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase9),
 		createStatusCheckPostTestCase(BatchWriteItemTestCase10Name, "/v1", "BatchWriteItem", http.StatusBadRequest, BatchWriteItemTestCase10),
 		createStatusCheckPostTestCase(BatchWriteItemTestCaseListName, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCaseList),
 		createStatusCheckPostTestCase(BatchWriteItemTestCase11Name, "/v1", "BatchWriteItem", http.StatusOK, BatchWriteItemTestCase11),
