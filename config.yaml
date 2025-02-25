@@ -1,6 +1,6 @@
 spanner:
-  project_id: ${PROJECT_ID}
-  instance_id: ${INSTANCE_ID}
-  database_name: ${DATABASE_ID}
-  query_limit: ${QUERY_LIMIT}
-  dynamo_query_limit: ${DYNAMODB_QUERY_LIMIT}
+  project_id: "cassandra-to-spanner"
+  instance_id: "spanner-instance-dev"
+  database_name: "cluster8"
+  query_limit: 5000
+  dynamo_query_limit: 5000
