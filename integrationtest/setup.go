@@ -131,7 +131,7 @@ func createDatabase(w io.Writer, db string) error {
 				contact_ranking_list STRING(MAX),
 				name STRING(MAX),
 				address JSON
-			) PRIMARY KEY (guid, context)`,
+			) PRIMARY KEY (guid)`,
 		},
 	})
 	if err != nil {
@@ -187,7 +187,12 @@ func initData(w io.Writer, db string) error {
 			('test_table', 'rank_list', 'S', 'rank_list', 'rank_list', '', 'rank_list', 'test_table', 'STRING(MAX)'),
 			('test_table', 'category', 'S', 'category', 'rank_list', '', 'category', 'test_table', 'STRING(MAX)'),
 			('test_table', 'id', 'S', 'id', 'rank_list', '', 'id', 'test_table', 'STRING(MAX)'),
-			('test_table', 'list_type', 'L', 'list_type', 'rank_list', '', 'list_type', 'test_table', 'JSON');`,
+			('test_table', 'list_type', 'L', 'list_type', 'rank_list', '', 'list_type', 'test_table', 'JSON'),
+			('mapdynamo', 'guid', 'S', 'guid', 'guid', '', 'guid', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'context', 'S', 'context', 'guid', '', 'context', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'contact_ranking_list', 'S', 'contact_ranking_list', 'guid', '', 'contact_ranking_list', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'name', 'S', 'name', 'guid', '', 'name', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'address', 'M', 'address', 'guid', '', 'address', 'mapdynamo', 'JSON');`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {

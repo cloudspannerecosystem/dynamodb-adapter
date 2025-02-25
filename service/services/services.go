@@ -277,6 +277,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 		return nil, hash, err
 	}
 	if isCountQuery {
+		fmt.Println("finalResp-resp->", resp)
 		return resp[0], hash, nil
 	}
 	finalResp := make(map[string]interface{})
@@ -285,6 +286,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 		finalResp["Count"] = 0
 		finalResp["Items"] = []map[string]interface{}{}
 		finalResp["LastEvaluatedKey"] = nil
+		fmt.Println("finalResp-->", finalResp)
 		return finalResp, hash, nil
 	}
 	if int64(length) > originalLimit {
@@ -306,6 +308,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 		finalResp["Items"] = resp
 		finalResp["LastEvaluatedKey"] = nil
 	}
+	fmt.Println("-----finalResp--->", finalResp)
 	return finalResp, hash, nil
 }
 

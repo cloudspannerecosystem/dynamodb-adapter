@@ -887,7 +887,7 @@ func convertMapToDynamoObject(output map[string]interface{}, v reflect.Value, is
 	v = valueElem(v)
 	switch v.Kind() {
 	case reflect.Map:
-		return convertMap(output, v)
+		return convertMap(output, v, isFirstLevelField)
 	case reflect.Slice, reflect.Array:
 		return convertSlice(output, v, isFirstLevelField)
 	case reflect.Chan, reflect.Func, reflect.UnsafePointer:
@@ -910,7 +910,7 @@ func valueElem(v reflect.Value) reflect.Value {
 	return v
 }
 
-func convertMap(output map[string]interface{}, v reflect.Value) error {
+func convertMap(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
 	fmt.Println("===convertMap==", v)
 	for _, key := range v.MapKeys() {
 		keyName := fmt.Sprint(key.Interface())
@@ -920,7 +920,7 @@ func convertMap(output map[string]interface{}, v reflect.Value) error {
 
 		elemVal := v.MapIndex(key)
 		elem := make(map[string]interface{})
-		_ = convertMapToDynamoObject(elem, elemVal, false)
+		_ = convertMapToDynamoObject(elem, elemVal, isFirstLevelField)
 
 		output[keyName] = elem
 	}
@@ -978,7 +978,7 @@ func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelFi
 		typeArray := []string{}
 		for i := 0; i < v.Len(); i++ {
 			elem := make(map[string]interface{})
-			err := convertMapToDynamoObject(elem, v.Index(i), false)
+			err := convertMapToDynamoObject(elem, v.Index(i), isFirstLevelField)
 			v_type := valueElem(v.Index(i))
 			typeArray = append(typeArray, v_type.Kind().String())
 			if err != nil {
@@ -988,19 +988,40 @@ func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelFi
 		}
 		if isFirstLevelField {
 			output["L"] = listVal
+			isFirstLevelField = false
 		} else {
+			newlistVal := []string{}
 			if allElementsMatch(typeArray, []string{reflect.String.String()}) {
-				output["SS"] = listVal
+				for _, val := range listVal {
+					for _, j := range val {
+						newlistVal = append(newlistVal, j.(string))
+					}
+				}
+				output["SS"] = newlistVal
 			} else if allElementsMatch(typeArray, []string{reflect.Float64.String(), reflect.Int.String(), reflect.Int8.String(), reflect.Int16.String(), reflect.Int32.String(), reflect.Int64.String()}) {
-				output["NS"] = listVal
-			} else if allElementsMatch(typeArray, []string{reflect.Uint8.String()}) {
-				output["BS"] = listVal
+				for _, val := range listVal {
+					for _, j := range val {
+						newlistVal = append(newlistVal, j.(string))
+					}
+				}
+				output["NS"] = newlistVal
+			} else if allElementsMatch(typeArray, []string{reflect.Slice.String()}) {
+				for _, val := range listVal {
+					for _, j := range val {
+						switch k := j.(type) {
+						case []byte:
+							newlistVal = append(newlistVal, string(k))
+						default:
+							newlistVal = append(newlistVal, j.(string))
+						}
+					}
+				}
+				output["BS"] = newlistVal
 			} else {
 				output["L"] = listVal
 			}
 		}
 	}
-
 	return nil
 }
 

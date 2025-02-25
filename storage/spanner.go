@@ -107,6 +107,8 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 	}
 	tableName = utils.ChangeTableNameForSpanner(tableName)
 	client := s.getSpannerClient(tableName)
+	fmt.Println("key, tableName, projectionCols")
+	fmt.Println(key, tableName, projectionCols)
 	row, err := client.Single().ReadRow(ctx, tableName, key, projectionCols)
 	if err := errors.AssignError(err); err != nil {
 		return nil, nil, errors.New("ResourceNotFoundException", tableName, key, err)
