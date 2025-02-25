@@ -1410,6 +1410,7 @@ func parseBytes(r *spanner.Row, i int, k string) (map[string]interface{}, error)
 	}
 	return singleRowImg, err
 }
+
 func parseNestedJSON(value interface{}) interface{} {
 	switch v := value.(type) {
 	case map[string]interface{}:
@@ -1418,11 +1419,16 @@ func parseNestedJSON(value interface{}) interface{} {
 			m[key] = parseNestedJSON(val)
 		}
 		return map[string]interface{}{"M": m}
-	case []interface{}:
+	case []string:
 		for i, item := range v {
-			v[i] = parseNestedJSON(item)
+			v[i] = string(item)
 		}
-		return map[string]interface{}{"L": v} // Assuming list items should be wrapped
+		return v
+	case []float64:
+		for i, item := range v {
+			v[i] = item
+		}
+		return v
 	case string:
 		// Additional handling for strings if necessary (e.g., base64 validation)
 		if base64Regexp.MatchString(v) {
@@ -1437,7 +1443,17 @@ func parseNestedJSON(value interface{}) interface{} {
 		return v
 	case []byte:
 		return v
+	case []interface{}:
+		for i, item := range v {
+			v[i] = parseNestedJSON(item)
+		}
+		return v
+		// return map[string]interface{}{"L": v} // Assuming list items should be wrapped
+	case float64:
+		fmt.Println("in float64 -->? ", v)
+		return v
 	default:
+		fmt.Println("in default -->? ", v)
 		return v
 	}
 }

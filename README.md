@@ -60,6 +60,7 @@ DynamoDB Adapter currently supports the following DynamoDB data types
 | `NS` (number set)             | `ARRAY<FLOAT64>` |
 | `BS` (binary set)             | `ARRAY<BYTES(MAX)>` |
 | `L` (List Type)               | `JSON` |
+| `M` (Map Type)                | `JSON` |
 
 ## Configuration
 

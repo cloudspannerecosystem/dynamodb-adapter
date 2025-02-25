@@ -117,7 +117,7 @@ var (
 			"employee": {},
 		},
 	}
-	TestGetBatch2Output = `{"Responses":{"employee":[]}}`
+	TestGetBatch2Output = "{\"Responses\":{\"employee\":null}}"
 
 	TestGetBatch3Name = "3: Keys present for 1 table"
 	TestGetBatch3     = models.BatchGetMeta{
