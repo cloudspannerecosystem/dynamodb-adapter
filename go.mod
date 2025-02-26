@@ -29,8 +29,13 @@ require (
 	go.uber.org/zap v1.19.1
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/api v0.218.0
-	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4
+	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1
+)
+
+require (
+	github.com/antlr4-go/antlr/v4 v4.13.1
+	github.com/tj/assert v0.0.3
 )
 
 require (
@@ -77,6 +82,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
