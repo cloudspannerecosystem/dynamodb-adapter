@@ -1238,3 +1238,66 @@ func checkInifinty(value float64, logData interface{}) error {
 
 	return nil
 }
+
+// SpannerTransactGetItems retrieves items from a Spanner table within a transaction.
+//
+// Args:
+//
+//	ctx: The context for the transaction.
+//	tableName: The name of the Spanner table.
+//	pKeys: The primary keys for filtering the records.
+//	sKeys: The secondary keys for additional filtering.
+//	projectionCols: The columns to be retrieved in the result.
+//
+// Returns:
+//
+//	A slice of maps representing the retrieved rows, where each map corresponds to a row with column names as keys.
+//	An error if any issue occurs during the transaction or data retrieval.
+func (s Storage) SpannerTransactGetItems(ctx context.Context, tableName string, pKeys, sKeys []interface{}, projectionCols []string) ([]map[string]interface{}, error) {
+	client := s.getSpannerClient(tableName)
+	// Start the transaction using the Spanner client
+	txn := client.ReadOnlyTransaction()
+	defer txn.Close()
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
+	if !ok {
+		return nil, errors.New("ResourceNotFoundException", tableName)
+	}
+
+	var keySet []spanner.KeySet
+
+	for i := range pKeys {
+		if len(sKeys) == 0 || sKeys[i] == nil {
+			keySet = append(keySet, spanner.Key{pKeys[i]})
+		} else {
+			keySet = append(keySet, spanner.Key{pKeys[i], sKeys[i]})
+		}
+	}
+	if len(projectionCols) == 0 {
+		var ok bool
+		projectionCols, ok = models.TableColumnMap[utils.ChangeTableNameForSpanner(tableName)]
+		if !ok {
+			return nil, errors.New("ResourceNotFoundException", tableName)
+		}
+	}
+	// Perform the transaction read operation
+	itr := txn.Read(ctx, tableName, spanner.KeySets(keySet...), projectionCols)
+	defer itr.Stop()
+	allRows := []map[string]interface{}{}
+	for {
+		r, err := itr.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, errors.New("ValidationException", err)
+		}
+		singleRow, err := parseRow(r, colDLL)
+		if err != nil {
+			return nil, err
+		}
+		if len(singleRow) > 0 {
+			allRows = append(allRows, singleRow)
+		}
+	}
+	return allRows, nil
+}

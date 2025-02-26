@@ -32,6 +32,10 @@ type Storage struct {
 	spannerClient map[string]*spanner.Client
 }
 
+func (s *Storage) GetSpannerClient() (*spanner.Client, error) {
+	return s.getSpannerClient(models.GlobalConfig.Spanner.ProjectID), nil
+}
+
 // storage - global instance of storage
 var storage *Storage
 
@@ -74,8 +78,11 @@ func GetStorageInstance() *Storage {
 			InitializeDriver()
 		}
 	})
-
 	return storage
+}
+
+func SetStorageInstance(s *Storage) {
+	storage = s
 }
 
 func (s Storage) getSpannerClient(_ string) *spanner.Client {

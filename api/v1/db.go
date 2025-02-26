@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
@@ -33,32 +34,45 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
+type APIHandler struct {
+	svc services.Service
+}
+
+func NewAPIHandler(svc services.Service) *APIHandler {
+	return &APIHandler{svc: svc}
+}
+
 // InitDBAPI - routes for apis
 func InitDBAPI(r *gin.Engine) {
-	r.POST("/v1", RouteRequest)
+	svc := services.GetServiceInstance()
+
+	// Create API handler with dependency injection
+	apiHandler := NewAPIHandler(svc)
+	r.POST("/v1", apiHandler.RouteRequest)
 }
 
 // RouteRequest - parse X-Amz-Target and call appropiate handler
-func RouteRequest(c *gin.Context) {
+func (h *APIHandler) RouteRequest(c *gin.Context) {
 	var amzTarget = c.Request.Header.Get("X-Amz-Target")
-
 	switch strings.Split(amzTarget, ".")[1] {
 	case "BatchGetItem":
-		BatchGetItem(c)
+		h.BatchGetItem(c)
 	case "BatchWriteItem":
-		BatchWriteItem(c)
+		h.BatchWriteItem(c)
 	case "DeleteItem":
-		DeleteItem(c)
+		h.DeleteItem(c)
 	case "GetItem":
-		GetItemMeta(c)
+		h.GetItemMeta(c)
 	case "PutItem":
-		UpdateMeta(c)
+		h.UpdateMeta(c)
 	case "Query":
-		QueryTable(c)
+		h.QueryTable(c)
 	case "Scan":
-		Scan(c)
+		h.Scan(c)
 	case "UpdateItem":
-		Update(c)
+		h.Update(c)
+	case "TransactGetItems":
+		h.TransactGetItems(c)
 	default:
 		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of "+amzTarget).
 			HTTPResponse("X-Amz-Target Header not supported"))
@@ -85,7 +99,7 @@ func addParentSpanID(c *gin.Context, span opentracing.Span) opentracing.Span {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /put/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func UpdateMeta(c *gin.Context) {
+func (h *APIHandler) UpdateMeta(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -101,7 +115,7 @@ func UpdateMeta(c *gin.Context) {
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 	} else {
-		if allow := services.MayIReadOrWrite(meta.TableName, true, "UpdateMeta"); !allow {
+		if allow := h.svc.MayIReadOrWrite(meta.TableName, true, "UpdateMeta"); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
@@ -159,14 +173,14 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	return oldResp, nil
 }
 
-func queryResponse(query models.Query, c *gin.Context) {
+func queryResponse(query models.Query, c *gin.Context, svc services.Service) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI())
 	c.Request = c.Request.WithContext(ctx)
 	defer span.Finish()
 	var err1 error
-	if allow := services.MayIReadOrWrite(query.TableName, false, ""); !allow {
+	if allow := svc.MayIReadOrWrite(query.TableName, false, ""); !allow {
 		c.JSON(http.StatusOK, gin.H{})
 		return
 	}
@@ -232,7 +246,7 @@ func queryResponse(query models.Query, c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /query/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func QueryTable(c *gin.Context) {
+func (h *APIHandler) QueryTable(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -249,7 +263,7 @@ func QueryTable(c *gin.Context) {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
 	} else {
 		logger.LogInfo(query)
-		queryResponse(query, c)
+		queryResponse(query, c, h.svc)
 	}
 }
 
@@ -263,7 +277,7 @@ func QueryTable(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /getWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func GetItemMeta(c *gin.Context) {
+func (h *APIHandler) GetItemMeta(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -281,7 +295,7 @@ func GetItemMeta(c *gin.Context) {
 	} else {
 		span.SetTag("table", getItemMeta.TableName)
 		logger.LogDebug(getItemMeta)
-		if allow := services.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
+		if allow := h.svc.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
@@ -318,7 +332,7 @@ func GetItemMeta(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /batchGetWithProjection/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchGetItem(c *gin.Context) {
+func (h *APIHandler) BatchGetItem(c *gin.Context) {
 	start := time.Now()
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
@@ -342,7 +356,7 @@ func BatchGetItem(c *gin.Context) {
 			batchGetWithProjectionMeta := v
 			batchGetWithProjectionMeta.TableName = k
 			logger.LogDebug(batchGetWithProjectionMeta)
-			if allow := services.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
+			if allow := h.svc.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
 				c.JSON(http.StatusOK, []gin.H{})
 				return
 			}
@@ -396,7 +410,7 @@ func batchGetDataSingleTable(ctx context.Context, batchGetWithProjectionMeta mod
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /deleteItem/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func DeleteItem(c *gin.Context) {
+func (h *APIHandler) DeleteItem(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -413,7 +427,7 @@ func DeleteItem(c *gin.Context) {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(deleteItem))
 	} else {
 		logger.LogDebug(deleteItem)
-		if allow := services.MayIReadOrWrite(deleteItem.TableName, true, "DeleteItem"); !allow {
+		if allow := h.svc.MayIReadOrWrite(deleteItem.TableName, true, "DeleteItem"); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
@@ -454,7 +468,7 @@ func DeleteItem(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /scan/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func Scan(c *gin.Context) {
+func (h *APIHandler) Scan(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -470,7 +484,7 @@ func Scan(c *gin.Context) {
 	if err := c.ShouldBindJSON(&meta); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(meta))
 	} else {
-		if allow := services.MayIReadOrWrite(meta.TableName, false, ""); !allow {
+		if allow := h.svc.MayIReadOrWrite(meta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
@@ -525,7 +539,7 @@ func Scan(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /update/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func Update(c *gin.Context) {
+func (h *APIHandler) Update(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -541,7 +555,7 @@ func Update(c *gin.Context) {
 	if err := c.ShouldBindJSON(&updateAttr); err != nil {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(updateAttr))
 	} else {
-		if allow := services.MayIReadOrWrite(updateAttr.TableName, true, "update"); !allow {
+		if allow := h.svc.MayIReadOrWrite(updateAttr.TableName, true, "update"); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
@@ -574,7 +588,7 @@ func Update(c *gin.Context) {
 // @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
 // @Router /BatchWriteItem/ [post]
 // @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
-func BatchWriteItem(c *gin.Context) {
+func (h *APIHandler) BatchWriteItem(c *gin.Context) {
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
@@ -593,7 +607,7 @@ func BatchWriteItem(c *gin.Context) {
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
 	} else {
 		for key, value := range batchWriteItem.RequestItems {
-			if allow := services.MayIReadOrWrite(key, true, "BatchWriteItem"); !allow {
+			if allow := h.svc.MayIReadOrWrite(key, true, "BatchWriteItem"); !allow {
 				c.JSON(http.StatusOK, gin.H{})
 				return
 			}
@@ -664,4 +678,94 @@ func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdat
 		return err
 	}
 	return nil
+}
+
+// TransactGetItems to get with projections
+// @Description Request items in a batch with projections.
+// @Summary Request items in a batch with projections.
+// @ID transact-get-with-projection
+// @Produce  json
+// @Success 200 {object} gin.H
+// @Param requestBody body models.TransactGetItemsRequest true "Please add request body of type models.TransactGetItemsRequest"
+// @Failure 500 {object} gin.H "{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}"
+// @Router /transactGetItems/ [post]
+// @Failure 401 {object} gin.H "{"errorMessage":"API access not allowed","errorCode": "E0005"}"
+func (h *APIHandler) TransactGetItems(c *gin.Context) {
+	start := time.Now()
+	ctx := c.Request.Context()
+
+	// Parse request body into struct
+	var transactGetMeta models.TransactGetItemsRequest
+	if err := c.ShouldBindJSON(&transactGetMeta); err != nil {
+		c.JSON(errors.New("ValidationException", err).HTTPResponse(transactGetMeta))
+		return
+	}
+
+	// Initialize output with empty slice
+	output := make([]models.TransactGetItemResponse, 0)
+
+	// Iterate over each transact item
+	for _, transactItem := range transactGetMeta.TransactItems {
+		getRequest := transactItem.Get
+
+		// Validate read permissions
+		if allow := h.svc.MayIReadOrWrite(getRequest.TableName, false, ""); !allow {
+			c.JSON(http.StatusOK, gin.H{"Responses": []gin.H{}})
+			return
+		}
+
+		// Fetch data from Spanner
+		singleOutput, err := transactGetDataSingleTable(ctx, getRequest, h.svc)
+		if err != nil {
+			c.JSON(errors.HTTPResponse(err, transactGetMeta))
+			return
+		}
+
+		// Convert Spanner output to DynamoDB format
+		currOutput, err := ChangeMaptoDynamoMap(singleOutput)
+		if err != nil {
+			c.JSON(errors.HTTPResponse(err, transactGetMeta))
+			return
+		}
+
+		// Append structured response including table name
+		output = append(output, models.TransactGetItemResponse{
+			TableName: getRequest.TableName,
+			Item:      currOutput,
+		})
+	}
+
+	// Send final response
+	c.JSON(http.StatusOK, models.TransactGetItemsResponse{Responses: output})
+
+	// Log slow transactions
+	if time.Since(start) > time.Second*1 {
+		go fmt.Println("TransactGetCall", transactGetMeta)
+	}
+}
+
+// TransactGetDataSingleTable is a utility function to fetch data for a single Get operation within TransactGetItems.
+// It takes a context, a GetItemRequest, and a Service interface, and returns a slice of maps and an error.
+// The function first converts the DynamoDB-style Keys to a Spanner-style KeyArray.
+// Then it calls the TransactGetItem function on the Service interface to fetch the data from Spanner.
+// Finally, it converts the Spanner-style output to DynamoDB-style and returns it.
+func transactGetDataSingleTable(ctx context.Context, getRequest models.GetItemRequest, svc services.Service) ([]map[string]interface{}, error) {
+	// Convert DynamoDB Keys to Spanner KeyArray
+	var err1 error
+	getRequest.KeyArray, err1 = ConvertDynamoArrayToMapArray(getRequest.TableName, []map[string]*dynamodb.AttributeValue{getRequest.Keys})
+	if err1 != nil {
+		return nil, nil
+	}
+
+	// Change ExpressionAttributeNames to Spanner-style
+	getRequest.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getRequest.TableName, getRequest.ExpressionAttributeNames)
+
+	// Fetch data from Spanner
+	rows, err := svc.TransactGetItem(ctx, getRequest, getRequest.KeyArray, getRequest.ProjectionExpression, getRequest.ExpressionAttributeNames)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert Spanner-style output to DynamoDB-style
+	return ChangesArrayResponseToOriginalColumns(getRequest.TableName, rows), nil
 }
