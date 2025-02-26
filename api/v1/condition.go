@@ -911,7 +911,6 @@ func valueElem(v reflect.Value) reflect.Value {
 }
 
 func convertMap(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
-	fmt.Println("===convertMap==", v)
 	for _, key := range v.MapKeys() {
 		keyName := fmt.Sprint(key.Interface())
 		if keyName == "" {
@@ -928,7 +927,6 @@ func convertMap(output map[string]interface{}, v reflect.Value, isFirstLevelFiel
 }
 
 func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
-	fmt.Println("===convertSlice==", v)
 	if v.Kind() == reflect.Array && v.Len() == 0 {
 		return nil
 	}
@@ -972,8 +970,6 @@ func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelFi
 		}
 
 	default:
-		fmt.Println("v.Type()")
-		fmt.Println(v.Type())
 		listVal := make([]map[string]interface{}, 0, v.Len())
 		typeArray := []string{}
 		for i := 0; i < v.Len(); i++ {
@@ -1045,7 +1041,6 @@ func allElementsMatch(elements []string, allowedTypes []string) bool {
 }
 
 func convertSingle(output map[string]interface{}, v reflect.Value) error {
-	fmt.Println("convertSingle", v)
 	switch v.Kind() {
 	case reflect.Bool:
 		output["BOOL"] = new(bool)

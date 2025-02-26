@@ -195,7 +195,6 @@ func queryResponse(query models.Query, c *gin.Context) {
 	if err == nil {
 		finalResult := make(map[string]interface{})
 		changedOutput := ChangeQueryResponseColumn(query.TableName, res)
-		fmt.Println("changedOutput-->", changedOutput)
 		if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 			changedOutput["Items"], err = ChangeMaptoDynamoMap(changedOutput["Items"])
 			if err != nil {
@@ -205,19 +204,14 @@ func queryResponse(query models.Query, c *gin.Context) {
 		if _, ok := changedOutput["Items"].(map[string]interface{})["L"]; ok {
 			finalResult["Count"] = changedOutput["Count"]
 			finalResult["Items"] = changedOutput["Items"].(map[string]interface{})["L"]
-			fmt.Println("here 4")
-			fmt.Println("finalResult-->", finalResult)
 		}
 
 		if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
 			finalResult["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
-			fmt.Println("here 2")
 			if err != nil {
 				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 			}
 		}
-		fmt.Println("here 3")
-		fmt.Println("finalResult return", finalResult)
 		c.JSON(http.StatusOK, finalResult)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))

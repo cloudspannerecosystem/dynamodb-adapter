@@ -1579,7 +1579,7 @@ var (
 	BatchWriteItemTestCase9Name = "9: Batch Put Request for wrong Table"
 	BatchWriteItemTestCase9     = models.BatchWriteItem{
 		RequestItems: map[string][]models.BatchWriteSubItems{
-			"employee_wrong_table": {
+			"employee1": {
 				{
 					PutReq: models.BatchPutItem{
 						Item: map[string]*dynamodb.AttributeValue{

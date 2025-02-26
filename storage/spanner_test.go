@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	"github.com/tj/assert"
 )
 
 func Test_parseRow(t *testing.T) {
@@ -307,4 +308,62 @@ func Test_parseRow(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsValidJSONObject(t *testing.T) {
+	validJSON := `{"name":"John", "age":30}`
+	invalidJSON := `{"name":"John", "age":30,}` // Trailing comma
+
+	assert.NoError(t, isValidJSONObject(validJSON))
+	assert.Error(t, isValidJSONObject(invalidJSON))
+}
+
+func TestIsValidBase64(t *testing.T) {
+	validBase64 := "SGVsbG8sIFdvcmxkIQ=="
+	invalidBase64 := "SGVsbG8sIFdvcmxkI!" // Invalid character
+
+	assert.True(t, isValidBase64(validBase64))
+	assert.False(t, isValidBase64(invalidBase64))
+}
+
+func TestParseNestedJSON(t *testing.T) {
+	input := map[string]interface{}{
+		"key1": "value1",
+		"key3": map[string]interface{}{
+			"subKey": "subValue",
+		},
+	}
+
+	expected := map[string]interface{}{
+		"M": map[string]interface{}{
+			"key1": "value1",
+			"key3": map[string]interface{}{
+				"M": map[string]interface{}{
+					"subKey": "subValue",
+				},
+			},
+		},
+	}
+
+	result := parseNestedJSON(input)
+	assert.Equal(t, expected, result)
+}
+
+func TestUpdateFieldByPath(t *testing.T) {
+	data := map[string]interface{}{
+		"first": map[string]interface{}{
+			"second": map[string]interface{}{
+				"third": "value",
+			},
+		},
+	}
+
+	// Successful update
+	success := updateFieldByPath(data, ".first.second.third", "newValue")
+	assert.True(t, success)
+	assert.Equal(t, "newValue", data["first"].(map[string]interface{})["second"].(map[string]interface{})["third"])
+
+	// Invalid path
+	success = updateFieldByPath(data, ".first.invalid_key.third", "newValue")
+	assert.False(t, success)
 }

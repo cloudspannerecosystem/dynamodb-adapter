@@ -107,8 +107,6 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 	}
 	tableName = utils.ChangeTableNameForSpanner(tableName)
 	client := s.getSpannerClient(tableName)
-	fmt.Println("key, tableName, projectionCols")
-	fmt.Println(key, tableName, projectionCols)
 	row, err := client.Single().ReadRow(ctx, tableName, key, projectionCols)
 	if err := errors.AssignError(err); err != nil {
 		return nil, nil, errors.New("ResourceNotFoundException", tableName, key, err)
@@ -770,7 +768,6 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 			}
 		}
 	}
-	fmt.Println("InsertOrUpdateMap -->", m)
 	mutation := spanner.InsertOrUpdateMap(table, m)
 
 	mutations := []*spanner.Mutation{mutation}
@@ -1450,12 +1447,9 @@ func parseNestedJSON(value interface{}) interface{} {
 			v[i] = parseNestedJSON(item)
 		}
 		return v
-		// return map[string]interface{}{"L": v} // Assuming list items should be wrapped
 	case float64:
-		fmt.Println("in float64 -->? ", v)
 		return v
 	default:
-		fmt.Println("in default -->? ", v)
 		return v
 	}
 }
@@ -1465,7 +1459,6 @@ func updateFieldByPath(data map[string]interface{}, path string, newValue interf
 	keys := strings.Split(path, ".")
 	keys = keys[1:]
 	// Traverse to the deepest map
-	fmt.Println("data-->", data)
 	current := data
 	for i, key := range keys {
 		if i == len(keys)-1 {

@@ -667,3 +667,51 @@ func TestParseActionValue(t *testing.T) {
 		})
 	}
 }
+
+// TestAllElementsMatch tests the allElementsMatch function with various scenarios
+func TestAllElementsMatch(t *testing.T) {
+	tests := []struct {
+		elements     []string
+		allowedTypes []string
+		expected     bool
+	}{
+		{
+			elements:     []string{"string", "int", "float64"},
+			allowedTypes: []string{"string", "int", "float64"},
+			expected:     true,
+		},
+		{
+			elements:     []string{"string", "int"},
+			allowedTypes: []string{"string", "int", "bool"},
+			expected:     true,
+		},
+		{
+			elements:     []string{"string", "float64"},
+			allowedTypes: []string{"int", "bool"},
+			expected:     false,
+		},
+		{
+			elements:     []string{"string", "not_allowed"},
+			allowedTypes: []string{"string", "int"},
+			expected:     false,
+		},
+		{
+			elements:     []string{},
+			allowedTypes: []string{"string", "int"},
+			expected:     true, // An empty slice matches all types
+		},
+		{
+			elements:     []string{"not_allowed"},
+			allowedTypes: []string{},
+			expected:     false, // Non-empty slice with empty allowed types
+		},
+	}
+
+	for _, test := range tests {
+		result := allElementsMatch(test.elements, test.allowedTypes)
+		if result != test.expected {
+			t.Errorf("Expected %v for elements %v and allowedTypes %v, but got %v",
+				test.expected, test.elements, test.allowedTypes, result)
+		}
+	}
+}
