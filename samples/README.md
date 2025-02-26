@@ -16,6 +16,7 @@ CREATE TABLE employee_table (
   emp_id FLOAT64,
   emp_image BYTES(MAX),
   isHired BOOL,
+  emp_status STRING(MAX),
   emp_details JSON
 ) PRIMARY KEY(emp_id);
 ```
@@ -55,6 +56,9 @@ VALUES ('employee_table','emp_image','B','emp_image','emp_id', '', 'emp_image', 
 
 INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
 VALUES ('employee_table','isHired','BOOL','isHired','emp_id', '', 'isHired', 'employee_table','BOOL');
+
+INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
+VALUES ('employee_table','emp_status','S','emp_status','emp_id', '', 'emp_status', 'employee_table','STRING(MAX)');
 
 INSERT INTO dynamodb_adapter_table_ddl (tableName, column, dynamoDataType, originalColumn, partitionKey,sortKey, spannerIndexName, actualTable, spannerDataType)
 VALUES ('employee_table','emp_details','L','emp_details','emp_id', '', 'emp_details', 'employee_table','JSON');
