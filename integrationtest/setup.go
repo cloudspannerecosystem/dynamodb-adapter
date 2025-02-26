@@ -118,6 +118,13 @@ func createDatabase(w io.Writer, db string) error {
 				d_name 		 STRING(MAX),
 				d_specialization STRING(MAX),
 			) PRIMARY KEY (d_id)`,
+			`CREATE TABLE test_table (
+				updated_at STRING(MAX),
+				rank_list STRING(MAX),
+				category STRING(MAX),
+				id STRING(MAX),
+				list_type JSON,
+			  ) PRIMARY KEY(rank_list)`,
 		},
 	})
 	if err != nil {
@@ -168,7 +175,12 @@ func initData(w io.Writer, db string) error {
 			('employee', 'salaries', 'NS', 'salaries', 'emp_id', '', 'salaries', 'employee', 'ARRAY<FLOAT64>'),
 			('department', 'd_id', 'N', 'd_id', 'd_id', '', 'd_id', 'department', 'FLOAT64'),
 			('department', 'd_name', 'S', 'd_name', 'd_id', '', 'd_name', 'department', 'STRING(MAX)'),
-			('department', 'd_specialization', 'S', 'd_specialization', 'd_id', '', 'd_specialization', 'department', 'STRING(MAX)');`,
+			('department', 'd_specialization', 'S', 'd_specialization', 'd_id', '', 'd_specialization', 'department', 'STRING(MAX)'),
+			('test_table', 'updated_at', 'S', 'updated_at', 'rank_list', '', 'updated_at', 'test_table', 'STRING(MAX)'),
+			('test_table', 'rank_list', 'S', 'rank_list', 'rank_list', '', 'rank_list', 'test_table', 'STRING(MAX)'),
+			('test_table', 'category', 'S', 'category', 'rank_list', '', 'category', 'test_table', 'STRING(MAX)'),
+			('test_table', 'id', 'S', 'id', 'rank_list', '', 'id', 'test_table', 'STRING(MAX)'),
+			('test_table', 'list_type', 'L', 'list_type', 'rank_list', '', 'list_type', 'test_table', 'JSON');`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {
@@ -220,7 +232,7 @@ func initData(w io.Writer, db string) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT department (d_id, d_name, d_specialization) VALUES
 						(100, 'Engineering', 'CSE, ECE, Civil'),
-						(200, 'Arts', 'BA'),
+						(200, NULL, 'BA'),
 						(300, 'Culture', 'History')`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
@@ -230,6 +242,27 @@ func initData(w io.Writer, db string) error {
 		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
 		return err
 	})
+	if err != nil {
+		return err
+	}
+
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT INTO test_table (updated_at, rank_list, category, id, list_type) VALUES
+    ('2024-12-04T11:02:02Z', 'rank_list', 'category', 'testing', JSON '[ "John Doe", "62536", true ]'),
+    ('2024-12-04T11:02:02Z', 'rank_list1', 'category1', 'id', JSON '["string_value","12345",true,[1, 2, 3],"testing"]'),
+    ('2024-12-04T11:02:02Z', 'rank_list2', 'category2', 'id2', JSON '["test","dummy_value","62536"]')`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
+	if err != nil {
+		return err
+	}
 
 	return err
 }

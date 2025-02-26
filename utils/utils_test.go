@@ -338,3 +338,54 @@ func equalByteSlices(a, b [][]byte) bool {
 	}
 	return true
 }
+
+func TestParseListRemoveTarget(t *testing.T) {
+	tests := []struct {
+		name          string
+		target        string
+		expected      string
+		expectedIndex int
+	}{
+		{"Valid target", "listAttr[2]", "listAttr", 2},
+		{"Invalid target", "listAttr", "listAttr", -1},
+		{"Invalid target with no brackets", "listAttr2", "listAttr2", -1},
+		{"Invalid target with no index", "listAttr[]", "listAttr[]", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualName, actualIndex := ParseListRemoveTarget(tt.target)
+			if actualName != tt.expected {
+				t.Errorf("expected name %q, got %q", tt.expected, actualName)
+			}
+			if actualIndex != tt.expectedIndex {
+				t.Errorf("expected index %d, got %d", tt.expectedIndex, actualIndex)
+			}
+		})
+	}
+}
+
+func TestRemoveListElement(t *testing.T) {
+	tests := []struct {
+		name     string
+		list     []interface{}
+		idx      int
+		expected []interface{}
+	}{
+		{"Remove from middle", []interface{}{1, 2, 3, 4, 5}, 2, []interface{}{1, 2, 4, 5}},
+		{"Remove from start", []interface{}{1, 2, 3, 4, 5}, 0, []interface{}{2, 3, 4, 5}},
+		{"Remove from end", []interface{}{1, 2, 3, 4, 5}, 4, []interface{}{1, 2, 3, 4}},
+		{"Invalid index", []interface{}{1, 2, 3, 4, 5}, 5, []interface{}{1, 2, 3, 4, 5}},
+		{"Invalid index negative", []interface{}{1, 2, 3, 4, 5}, -1, []interface{}{1, 2, 3, 4, 5}},
+		{"Empty list", []interface{}{}, 0, []interface{}{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := RemoveListElement(tt.list, tt.idx)
+			if !reflect.DeepEqual(actual, tt.expected) {
+				t.Errorf("expected %v, got %v", tt.expected, actual)
+			}
+		})
+	}
+}
