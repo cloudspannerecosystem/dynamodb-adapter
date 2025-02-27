@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 
@@ -42,8 +41,6 @@ type Configuration struct {
 
 // ConfigurationMap pointer
 var ConfigurationMap *Configuration
-
-var once sync.Once
 
 func init() {
 	ConfigurationMap = new(Configuration)

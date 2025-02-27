@@ -153,7 +153,7 @@ var once sync.Once
 func GetStorageInstance() *Storage {
 	once.Do(func() {
 		if storage == nil {
-			InitializeDriver(context.Background())
+			_ = InitializeDriver(context.Background())
 		}
 	})
 	return storage
