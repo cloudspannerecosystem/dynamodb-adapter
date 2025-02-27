@@ -17,6 +17,8 @@
 package initializer
 
 import (
+	"context"
+
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/spanner"
@@ -27,12 +29,14 @@ import (
 // Config, storage and all other global objects are initialize
 func InitAll(filepath string) error {
 	config.InitConfig(filepath)
-	storage.InitializeDriver()
-	err := spanner.ParseDDL(true)
+	err := storage.InitializeDriver(context.Background())
+	if err != nil {
+		return err
+	}
+	err = spanner.ParseDDL(true)
 	if err != nil {
 		return err
 	}
 	services.StartConfigManager()
-	services.InitStream()
 	return nil
 }

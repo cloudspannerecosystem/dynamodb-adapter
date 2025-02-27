@@ -29,6 +29,7 @@ import (
 	"github.com/ahmetb/go-linq"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
@@ -39,8 +40,22 @@ import (
 
 var base64Regexp = regexp.MustCompile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$")
 
+const (
+	SpannerBatchGetAnnotation     = "Calling SpannerBatchGet Method"
+	SpannerGetAnnotation          = "Calling SpannerGet Method"
+	ExecuteSpannerQueryAnnotation = "Calling ExecuteSpannerQuery Method"
+	SpannerPutAnnotation          = "Calling SpannerPut Method"
+	SpannerDeleteAnnotation       = "Calling SpannerDelete Method"
+	SpannerBatchDeleteAnnotation  = "Calling SpannerBatchDelete Method"
+	SpannerAddAnnotation          = "Calling SpannerAdd Method"
+	SpannerDelAnnotation          = "Calling SpannerDel Method"
+	SpannerRemoveAnnotation       = "Calling SpannerRemove Method"
+	SpannerBatchPutAnnotation     = "Calling SpannerBatchPut Method"
+)
+
 // SpannerBatchGet - fetch all rows
 func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, sKeys []interface{}, projectionCols []string) ([]map[string]interface{}, error) {
+	otelgo.AddAnnotation(ctx, SpannerBatchGetAnnotation)
 	var keySet []spanner.KeySet
 
 	for i := range pKeys {
@@ -87,6 +102,7 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 
 // SpannerGet - get with spanner
 func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error) {
+	otelgo.AddAnnotation(ctx, SpannerGetAnnotation)
 	var key spanner.Key
 	if sKeys == nil {
 		key = spanner.Key{pKeys}
@@ -116,7 +132,7 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 
 // ExecuteSpannerQuery - this will execute query on spanner database
 func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []string, isCountQuery bool, stmt spanner.Statement) ([]map[string]interface{}, error) {
-
+	otelgo.AddAnnotation(ctx, ExecuteSpannerQueryAnnotation)
 	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 
 	if !ok {
@@ -157,6 +173,7 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 
 // SpannerPut - Spanner put insert a single object
 func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition) (map[string]interface{}, error) {
+	otelgo.AddAnnotation(ctx, SpannerPutAnnotation)
 	update := map[string]interface{}{}
 	_, err := s.getSpannerClient(table).ReadWriteTransaction(ctx, func(ctx context.Context, t *spanner.ReadWriteTransaction) error {
 		tmpMap := map[string]interface{}{}
@@ -194,6 +211,7 @@ func (s Storage) SpannerPut(ctx context.Context, table string, m map[string]inte
 
 // SpannerDelete - this will delete the data
 func (s Storage) SpannerDelete(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition) error {
+	otelgo.AddAnnotation(ctx, SpannerDeleteAnnotation)
 	_, err := s.getSpannerClient(table).ReadWriteTransaction(ctx, func(ctx context.Context, t *spanner.ReadWriteTransaction) error {
 		tmpMap := map[string]interface{}{}
 		for k, v := range m {
@@ -244,6 +262,7 @@ func (s Storage) SpannerDelete(ctx context.Context, table string, m map[string]i
 
 // SpannerBatchDelete - this delete the data in batch
 func (s Storage) SpannerBatchDelete(ctx context.Context, table string, keys []map[string]interface{}) error {
+	otelgo.AddAnnotation(ctx, SpannerBatchDeleteAnnotation)
 	tableConf, err := config.GetTableConf(table)
 	if err != nil {
 		return err
@@ -281,6 +300,7 @@ func (s Storage) SpannerBatchDelete(ctx context.Context, table string, keys []ma
 
 // SpannerAdd - Spanner Add functionality like update attribute
 func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition) (map[string]interface{}, error) {
+	otelgo.AddAnnotation(ctx, SpannerAddAnnotation)
 	tableConf, err := config.GetTableConf(table)
 	if err != nil {
 		return nil, err
@@ -425,6 +445,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 }
 
 func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition) error {
+	otelgo.AddAnnotation(ctx, SpannerDelAnnotation)
 	tableConf, err := config.GetTableConf(table)
 	if err != nil {
 		return err
@@ -556,6 +577,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 
 // SpannerRemove - Spanner Remove functionality like update attribute
 func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, colsToRemove []string, oldRes map[string]interface{}) error {
+	otelgo.AddAnnotation(ctx, SpannerRemoveAnnotation)
 	_, err := s.getSpannerClient(table).ReadWriteTransaction(ctx, func(ctx context.Context, t *spanner.ReadWriteTransaction) error {
 		tmpMap := map[string]interface{}{}
 		for k, v := range m {
@@ -613,6 +635,7 @@ func (s Storage) SpannerRemove(ctx context.Context, table string, m map[string]i
 
 // SpannerBatchPut - this insert or update data in batch
 func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[string]interface{}) error {
+	otelgo.AddAnnotation(ctx, SpannerBatchPutAnnotation)
 	mutations := make([]*spanner.Mutation, len(m))
 	ddl := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	table = utils.ChangeTableNameForSpanner(table)

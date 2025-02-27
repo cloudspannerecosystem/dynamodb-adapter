@@ -18,12 +18,19 @@ package config
 
 import (
 	"fmt"
+	"sync"
+
+	"gopkg.in/yaml.v3"
+
 	"log"
 	"os"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
-	"gopkg.in/yaml.v2"
+)
+
+const (
+	proxyReleaseVersion = "v1.0.0"
 )
 
 // Configuration struct
@@ -36,6 +43,8 @@ type Configuration struct {
 // ConfigurationMap pointer
 var ConfigurationMap *Configuration
 
+var once sync.Once
+
 func init() {
 	ConfigurationMap = new(Configuration)
 }
@@ -47,6 +56,7 @@ func InitConfig(filepath string) {
 	if err != nil {
 		log.Printf("failed to read config file: %v", err)
 	}
+	GlobalConfig.UserAgent = "dynamodb-adapter/" + proxyReleaseVersion
 	models.GlobalConfig = GlobalConfig
 }
 
@@ -60,7 +70,6 @@ func loadConfig(filename string) (*models.Config, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-
 	return &config, nil
 }
 
