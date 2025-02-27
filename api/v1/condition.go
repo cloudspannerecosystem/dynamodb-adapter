@@ -37,6 +37,7 @@ import (
 
 var operations = map[string]string{"SET": "(?i) SET ", "DELETE": "(?i) DELETE ", "ADD": "(?i) ADD ", "REMOVE": "(?i) REMOVE "}
 var byteSliceType = reflect.TypeOf([]byte(nil))
+var defaultLevel int16 = 1
 var (
 	listRegex             = regexp.MustCompile(`list_append\(([^,]+),\s*([^\)]+)\)`)
 	listIndexRegex        = regexp.MustCompile(`(\w+)\[(\d+)\]`)
@@ -681,7 +682,7 @@ func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	return rs
 }
 
-func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
+func convertFrom(a *dynamodb.AttributeValue, tableName string, level int16) interface{} {
 	if a.S != nil {
 		return *a.S
 	}
@@ -716,7 +717,12 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 	if a.M != nil {
 		m := make(map[string]interface{})
 		for k, v := range a.M {
-			m[k] = convertFrom(v, tableName)
+			if level == 0 {
+				level = 2
+			} else {
+				level++
+			}
+			m[k] = convertFrom(v, tableName, level)
 		}
 		return m
 	}
@@ -724,7 +730,7 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 	if a.L != nil {
 		l := make([]interface{}, len(a.L))
 		for index, v := range a.L {
-			l[index] = convertFrom(v, tableName)
+			l[index] = convertFrom(v, tableName, 0)
 		}
 		return l
 	}
@@ -733,46 +739,58 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 		return a.B
 	}
 	if a.SS != nil {
-		uniqueStrings := make(map[string]struct{})
-		for _, v := range a.SS {
-			uniqueStrings[*v] = struct{}{}
-		}
+		if level > 1 {
+			panic("M does not support String Set[SS]type value")
+		} else {
+			uniqueStrings := make(map[string]struct{})
+			for _, v := range a.SS {
+				uniqueStrings[*v] = struct{}{}
+			}
 
-		// Convert map keys to a slice
-		l := make([]string, 0, len(uniqueStrings))
-		for str := range uniqueStrings {
-			l = append(l, str)
+			// Convert map keys to a slice
+			l := make([]string, 0, len(uniqueStrings))
+			for str := range uniqueStrings {
+				l = append(l, str)
+			}
+			return l
 		}
-
-		return l
 	}
 	if a.NS != nil {
-		l := []float64{}
-		numberMap := make(map[string]struct{})
-		for _, v := range a.NS {
-			if _, exists := numberMap[*v]; !exists {
-				numberMap[*v] = struct{}{}
-				n, err := strconv.ParseFloat(*v, 64)
-				if err != nil {
-					panic(fmt.Sprintf("Invalid number in NS: %s", *v))
+		if level > 1 {
+			panic("M does not support Number Set[NS]type value")
+		} else {
+			l := []float64{}
+			numberMap := make(map[string]struct{})
+			for _, v := range a.NS {
+				if _, exists := numberMap[*v]; !exists {
+					numberMap[*v] = struct{}{}
+					n, err := strconv.ParseFloat(*v, 64)
+					if err != nil {
+						panic(fmt.Sprintf("Invalid number in NS: %s", *v))
+					}
+					l = append(l, n)
 				}
-				l = append(l, n)
 			}
+			return l
 		}
-		return l
 	}
 	if a.BS != nil {
-		// Handle Binary Set
-		binarySet := [][]byte{}
-		binaryMap := make(map[string]struct{})
-		for _, v := range a.BS {
-			key := string(v)
-			if _, exists := binaryMap[key]; !exists {
-				binaryMap[key] = struct{}{}
-				binarySet = append(binarySet, v)
+		if level > 1 {
+			panic("M does not support Binary Set[BS]type value")
+		} else {
+			// Handle Binary Set
+			binarySet := [][]byte{}
+			binaryMap := make(map[string]struct{})
+			for _, v := range a.BS {
+				key := string(v)
+				if _, exists := binaryMap[key]; !exists {
+					binaryMap[key] = struct{}{}
+					binarySet = append(binarySet, v)
+				}
 			}
+			return binarySet
 		}
-		return binarySet
+
 	}
 	panic(fmt.Sprintf("%#v is not a supported dynamodb.AttributeValue", a))
 }
@@ -808,7 +826,7 @@ func ConvertFromMap(item map[string]*dynamodb.AttributeValue, v interface{}, tab
 
 	m := make(map[string]interface{})
 	for k, v := range item {
-		m[k] = convertFrom(v, tableName)
+		m[k] = convertFrom(v, tableName, defaultLevel)
 	}
 
 	if isTyped(reflect.TypeOf(v)) {
@@ -879,17 +897,17 @@ func ChangeMaptoDynamoMap(in interface{}) (map[string]interface{}, error) {
 		return nil, nil
 	}
 	outputObject := make(map[string]interface{})
-	err := convertMapToDynamoObject(outputObject, reflect.ValueOf(in), true)
+	err := convertMapToDynamoObject(outputObject, reflect.ValueOf(in))
 	return outputObject, err
 }
 
-func convertMapToDynamoObject(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
+func convertMapToDynamoObject(output map[string]interface{}, v reflect.Value) error {
 	v = valueElem(v)
 	switch v.Kind() {
 	case reflect.Map:
-		return convertMap(output, v, isFirstLevelField)
+		return convertMap(output, v)
 	case reflect.Slice, reflect.Array:
-		return convertSlice(output, v, isFirstLevelField)
+		return convertSlice(output, v)
 	case reflect.Chan, reflect.Func, reflect.UnsafePointer:
 		// unsupported
 	default:
@@ -910,7 +928,7 @@ func valueElem(v reflect.Value) reflect.Value {
 	return v
 }
 
-func convertMap(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
+func convertMap(output map[string]interface{}, v reflect.Value) error {
 	for _, key := range v.MapKeys() {
 		keyName := fmt.Sprint(key.Interface())
 		if keyName == "" {
@@ -919,14 +937,14 @@ func convertMap(output map[string]interface{}, v reflect.Value, isFirstLevelFiel
 
 		elemVal := v.MapIndex(key)
 		elem := make(map[string]interface{})
-		_ = convertMapToDynamoObject(elem, elemVal, isFirstLevelField)
+		_ = convertMapToDynamoObject(elem, elemVal)
 
 		output[keyName] = elem
 	}
 	return nil
 }
 
-func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelField bool) error {
+func convertSlice(output map[string]interface{}, v reflect.Value) error {
 	if v.Kind() == reflect.Array && v.Len() == 0 {
 		return nil
 	}
@@ -971,73 +989,19 @@ func convertSlice(output map[string]interface{}, v reflect.Value, isFirstLevelFi
 
 	default:
 		listVal := make([]map[string]interface{}, 0, v.Len())
-		typeArray := []string{}
+
 		for i := 0; i < v.Len(); i++ {
 			elem := make(map[string]interface{})
-			err := convertMapToDynamoObject(elem, v.Index(i), isFirstLevelField)
-			v_type := valueElem(v.Index(i))
-			typeArray = append(typeArray, v_type.Kind().String())
+			err := convertMapToDynamoObject(elem, v.Index(i))
 			if err != nil {
 				return err
 			}
 			listVal = append(listVal, elem)
 		}
-		if isFirstLevelField {
-			output["L"] = listVal
-			isFirstLevelField = false
-		} else {
-			newlistVal := []string{}
-			if allElementsMatch(typeArray, []string{reflect.String.String()}) {
-				for _, val := range listVal {
-					for _, j := range val {
-						newlistVal = append(newlistVal, j.(string))
-					}
-				}
-				output["SS"] = newlistVal
-			} else if allElementsMatch(typeArray, []string{reflect.Float64.String(), reflect.Int.String(), reflect.Int8.String(), reflect.Int16.String(), reflect.Int32.String(), reflect.Int64.String()}) {
-				for _, val := range listVal {
-					for _, j := range val {
-						newlistVal = append(newlistVal, j.(string))
-					}
-				}
-				output["NS"] = newlistVal
-			} else if allElementsMatch(typeArray, []string{reflect.Slice.String()}) {
-				for _, val := range listVal {
-					for _, j := range val {
-						switch k := j.(type) {
-						case []byte:
-							newlistVal = append(newlistVal, string(k))
-						default:
-							newlistVal = append(newlistVal, j.(string))
-						}
-					}
-				}
-				output["BS"] = newlistVal
-			} else {
-				output["L"] = listVal
-			}
-		}
+		output["L"] = listVal
 	}
+
 	return nil
-}
-
-// allElementsMatch checks if all elements in the slice match at least one of the allowed types.
-// It accepts a slice of strings representing element types and a slice of allowed type names as strings.
-func allElementsMatch(elements []string, allowedTypes []string) bool {
-	typeSet := make(map[string]struct{})
-
-	// Populate the type set for quick lookup from allowedTypes
-	for _, t := range allowedTypes {
-		typeSet[t] = struct{}{}
-	}
-
-	// Check each element against the allowed types
-	for _, element := range elements {
-		if _, exists := typeSet[element]; !exists {
-			return false // If any element does not match, return false
-		}
-	}
-	return true // All elements match at least one of the allowed types
 }
 
 func convertSingle(output map[string]interface{}, v reflect.Value) error {

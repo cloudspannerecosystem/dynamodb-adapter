@@ -2130,13 +2130,13 @@ func TestApi(t *testing.T) {
 
 	// this is done to maintain the order of the test cases
 	var testNames = []string{
-		// "GetItemAPI",
-		// "GetBatchAPI",
-		// "QueryAPI",
-		// "ScanAPI",
-		// "UpdateItemAPI",
-		// "PutItemAPI",
-		// "DeleteItemAPI",
+		"GetItemAPI",
+		"GetBatchAPI",
+		"QueryAPI",
+		"ScanAPI",
+		"UpdateItemAPI",
+		"PutItemAPI",
+		"DeleteItemAPI",
 		"BatchWriteItemAPI",
 	}
 

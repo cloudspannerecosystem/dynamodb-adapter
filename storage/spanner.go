@@ -654,8 +654,7 @@ func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[stri
 					}
 
 					// Store the updated JSON in the map
-					strigngyfiedJSON := string(updatedJSON)
-					m[i][colName] = strings.ReplaceAll(strigngyfiedJSON, `\"`, `"`)
+					m[i][colName] = string(updatedJSON)
 					delete(m[i], k)
 				}
 			} else {
@@ -674,18 +673,6 @@ func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[stri
 					}
 					m[i][k] = string(ba)
 				}
-			}
-			switch v := v.(type) {
-			case []interface{}:
-				// Serialize lists to JSON
-				jsonValue, err := json.Marshal(v)
-				if err != nil {
-					return fmt.Errorf("failed to serialize column %s to JSON: %v", k, err)
-				}
-				m[i][k] = string(jsonValue)
-			default:
-				// Assign other types as-is
-				m[i][k] = v
 			}
 		}
 		mutations[i] = spanner.InsertOrUpdateMap(table, m[i])
