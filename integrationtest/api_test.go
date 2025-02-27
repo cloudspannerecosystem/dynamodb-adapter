@@ -85,6 +85,14 @@ var (
 		ProjectionExpression: "#emp, address",
 	}
 	getItemTest5Output = `{"Item":{"address":{"S":"New York"}}}`
+
+	getItemTest6 = models.GetItemMeta{
+		TableName: "department",
+		Key: map[string]*dynamodb.AttributeValue{
+			"d_id": {N: aws.String("200")}, // Assuming d_id 200 has a NULL d_name
+		},
+	}
+	getItemTest6Output = `{"Item":{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}}`
 	getItemTestForList = models.GetItemMeta{
 		TableName: "test_table",
 		Key: map[string]*dynamodb.AttributeValue{
@@ -492,6 +500,15 @@ var (
 	queryTestCaseOutput15 = `{"Count":1,"Items":[{"emp_id":{"N":"3"},"first_name":{"S":"Alice"},"last_name":{"S":"Trentor"}}]}`
 
 	queryTestCaseOutput16 = `{"Count":1,"Items":[]}`
+
+	queryTestCase17 = models.Query{
+		TableName: "department",
+		RangeExp:  "d_id =:val1",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val1": {N: aws.String("200")}, // d_id 200 has NULL d_name
+		},
+	}
+	queryTestCaseOutput17 = `{"Count":1,"Items":[{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}]}`
 )
 
 // Test Data for Scan API
@@ -611,7 +628,16 @@ var (
 	}
 	ScanTestCase13Output = `{"Count":5,"Items":[]}`
 
-	ScanTestCaseListName = "13: List Type"
+	ScanTestCase14Name = "14: NULL Value"
+	ScanTestCase14     = models.ScanMeta{
+		TableName:        "department",
+		FilterExpression: "d_id = :val1",
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":val1": {N: aws.String("200")}, // Filter for NULL d_name
+		},
+	}
+	ScanTestCase14Output = `{"Count":1,"Items":[{"d_id":{"N":"200"},"d_name":{"NULL":true},"d_specialization":{"S":"BA"}}]}`
+	ScanTestCaseListName = "15: List Type"
 	ScanTestCaseList     = models.ScanMeta{
 		TableName: "test_table",
 		Limit:     2,
@@ -1578,6 +1604,7 @@ func testGetItemAPI(t *testing.T) {
 		createPostTestCase("Crorect data with Projection param Testcase", "/v1", "GetItem", getItemTest3Output, getItemTest3),
 		createPostTestCase("Crorect data with  ExpressionAttributeNames Testcase", "/v1", "GetItem", getItemTest4Output, getItemTest4),
 		createPostTestCase("Crorect data with  ExpressionAttributeNames values not passed Testcase", "/v1", "GetItem", getItemTest5Output, getItemTest5),
+		createPostTestCase("Correct data with NULL value Testcase", "/v1", "GetItem", getItemTest6Output, getItemTest6),
 		createPostTestCase("Crorect data for List Data Type", "/v1", "GetItem", getItemTestForListOutput, getItemTestForList),
 	}
 	apitest.RunTests(t, tests)
@@ -1714,6 +1741,7 @@ func testQueryAPI(t *testing.T) {
 		createPostTestCase("count with other attributes present", "/v1", "Query", queryTestCaseOutput14, queryTestCase14),
 		createPostTestCase("Select with other than count", "/v1", "Query", queryTestCaseOutput15, queryTestCase15),
 		createPostTestCase("all attributes", "/v1", "Query", queryTestCaseOutput16, queryTestCase16),
+		createPostTestCase("Query with NULL value in KeyConditionExpression", "/v1", "Query", queryTestCaseOutput17, queryTestCase17),
 	}
 	apitest.RunTests(t, tests)
 }
@@ -1780,6 +1808,7 @@ func testScanAPI(t *testing.T) {
 		createPostTestCase(ScanTestCase11Name, "/v1", "Query", ScanTestCase11Output, ScanTestCase11),
 		createPostTestCase(ScanTestCase12Name, "/v1", "Query", ScanTestCase12Output, ScanTestCase12),
 		createPostTestCase(ScanTestCase13Name, "/v1", "Query", ScanTestCase13Output, ScanTestCase13),
+		createPostTestCase(ScanTestCase14Name, "/v1", "Scan", ScanTestCase14Output, ScanTestCase14),
 		createPostTestCase(ScanTestCaseListName, "/v1", "Query", ScanTestCaseListOutput, ScanTestCaseList),
 	}
 	apitest.RunTests(t, tests)

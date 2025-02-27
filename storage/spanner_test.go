@@ -96,7 +96,7 @@ func Test_parseRow(t *testing.T) {
 				return row
 			}(),
 			colDDL: map[string]string{"strCol": "S"},
-			want:   map[string]interface{}{}, // Null value should be removed
+			want:   map[string]interface{}{"strCol": nil}, // Null value should be removed
 		},
 		{
 			name: "SkipCommitTimestamp",
@@ -292,6 +292,20 @@ func Test_parseRow(t *testing.T) {
 			colDDL:    map[string]string{"binaryArrayCol": "BS"},
 			want:      nil,
 			wantError: true,
+		},
+		{
+			name: "ParseNullValue",
+			row: func() *spanner.Row {
+				row, err := spanner.NewRow([]string{"nullCol"}, []interface{}{
+					spanner.NullString{Valid: false}, // Represents a NULL value
+				})
+				if err != nil {
+					t.Fatalf("failed to create row: %v", err)
+				}
+				return row
+			}(),
+			colDDL: map[string]string{"nullCol": "NULL"},   // Define the column type as NULL
+			want:   map[string]interface{}{"nullCol": nil}, // Expect a nil value in the output
 		},
 	}
 
