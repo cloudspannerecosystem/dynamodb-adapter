@@ -445,7 +445,6 @@ func createWhereClause(whereClause string, expression string, queryVar string, R
 		// Construct new JSON_VALUE expression
 		newExpression := fmt.Sprintf("JSON_VALUE(%s, '$.%s') = %s", jsonFields[0], strings.Join(jsonFields[1:], "."), expressionParts[1])
 		whereClause = whereClause + " " + newExpression
-		expression = newExpression
 	} else if expression != "" {
 		whereClause = whereClause + expression
 	}
