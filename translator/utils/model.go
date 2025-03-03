@@ -48,6 +48,7 @@ type SelectQueryMap struct {
 	Limit             string   // Ensure Limit is part of this struct
 	Offset            string   // Ensure Offset is part of this struct
 	Where             []Condition
+	Params            map[string]interface{} // To hold key and the values for parameterised query placeholder
 }
 
 type Clause struct {
@@ -57,14 +58,15 @@ type Clause struct {
 	IsPrimaryKey bool
 }
 
-type UpdateQueryMap struct {
+type DeleteUpdateQueryMap struct {
 	PartiQLQuery    string // Original query string
 	SpannerQuery    string
-	QueryType       string           // Type of the query (e.g., UPDATE)
-	Table           string           // Table involved in the query
-	UpdateSetValues []UpdateSetValue // Values to be updated
-	Clauses         []Clause         // List of clauses in the update query
-	PrimaryKeys     []string         // Primary keys of the table                   // Flag to indicate if local IDs pattern is used
+	QueryType       string                 // Type of the query (e.g., UPDATE)
+	Table           string                 // Table involved in the query
+	UpdateSetValues []UpdateSetValue       // Values to be updated
+	Clauses         []Clause               // List of clauses in the update query
+	PrimaryKeys     []string               // Primary keys of the table                   // Flag to indicate if local IDs pattern is used
+	Params          map[string]interface{} // To hold key and the values for parameterised query placeholder
 }
 type UpdateSetValue struct {
 	Column   string
@@ -83,11 +85,12 @@ type DeleteQueryListener struct {
 type DeleteQueryMap struct {
 	PartiQL           string // Original query string
 	SpannerQuery      string
-	QueryType         string   // Type of the query (e.g., DELETE)
-	Table             string   // Table involved in the query
-	Clauses           []Clause // List of clauses in the delete query
-	PrimaryKeys       []string // Primary keys of the table
-	ExecuteByMutation bool     // Flag to indicate if the delete should be executed by mutation
+	QueryType         string                 // Type of the query (e.g., DELETE)
+	Table             string                 // Table involved in the query
+	Clauses           []Clause               // List of clauses in the delete query
+	PrimaryKeys       []string               // Primary keys of the table
+	ExecuteByMutation bool                   // Flag to indicate if the delete should be executed by mutation
+	Params            map[string]interface{} // To hold key and the values for parameterised query placeholder
 }
 
 type InsertStatement struct {
@@ -98,6 +101,7 @@ type InsertStatement struct {
 	Values        []string
 	OnConflict    string
 	AdditionalMap map[string]interface{} //
+	Params        map[string]interface{} // To hold key and the values for parameterised query placeholder
 }
 
 // Listener for INSERT queries.

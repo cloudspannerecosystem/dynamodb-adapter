@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
+	translator "github.com/cloudspannerecosystem/dynamodb-adapter/translator/utils"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
 
@@ -599,4 +601,267 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		}
 	}
 	return updateResp, nil
+}
+
+// ExecuteStatement service API handler function
+func ExecuteStatement(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+
+	query := strings.TrimSpace(executeStatement.Statement) // Remove any leading or trailing whitespace
+	queryUpper := strings.ToUpper(query)
+
+	// Regular expressions to match the beginning of the query
+	selectRegex := regexp.MustCompile(`(?i)^\s*SELECT`)
+	insertRegex := regexp.MustCompile(`(?i)^\s*INSERT`)
+	updateRegex := regexp.MustCompile(`(?i)^\s*UPDATE`)
+	deleteRegex := regexp.MustCompile(`(?i)^\s*DELETE`)
+
+	switch {
+	case selectRegex.MatchString(queryUpper):
+		return ExecuteStatementForSelect(ctx, executeStatement)
+	case insertRegex.MatchString(queryUpper):
+		return ExecuteStatementForInsert(ctx, executeStatement)
+	case updateRegex.MatchString(queryUpper):
+		return ExecuteStatementForUpdate(ctx, executeStatement)
+	case deleteRegex.MatchString(queryUpper):
+		return ExecuteStatementForDelete(ctx, executeStatement)
+	default:
+		return nil, nil
+	}
+
+}
+
+func parsePartiQlToSpannerforSelect(ctx context.Context, executeStatement models.ExecuteStatement) (spanner.Statement, error) {
+	stmt := spanner.Statement{}
+	paramMap := make(map[string]interface{})
+	var err error
+
+	translatorObj := translator.Translator{}
+
+	queryMap, err := translatorObj.ToSpannerSelect(executeStatement.Statement)
+	if err != nil {
+		return stmt, err
+	}
+	queryStmt := queryMap.SpannerQuery
+	if executeStatement.Limit != 0 {
+		queryMap.Limit = strconv.FormatInt(executeStatement.Limit, 10)
+	}
+
+	for i, val := range executeStatement.Parameters {
+		if val.S != nil {
+			paramMap[queryMap.Where[i].Column] = *val.S
+			queryStmt = strings.Replace(queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.N != nil {
+			floatVal, err := strconv.ParseFloat(*val.N, 64)
+			if err != nil {
+				return stmt, fmt.Errorf("failed to convert the string type to the float")
+			}
+			paramMap[queryMap.Where[i].Column] = floatVal
+			queryStmt = strings.Replace(queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.BOOL != nil {
+			paramMap[queryMap.Where[i].Column] = *val.BOOL
+			queryStmt = strings.Replace(queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.SS != nil {
+			ss := make([]interface{}, len(val.SS))
+			for index, v := range val.SS {
+				ss[index] = *v
+			}
+			paramMap[queryMap.Where[i].Column] = ss
+			queryStmt = strings.Replace(queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else {
+			return stmt, fmt.Errorf("unsupported datatype")
+		}
+	}
+	stmt.SQL = queryMap.SpannerQuery
+	stmt.Params = paramMap
+	return stmt, nil
+}
+
+func ExecuteStatementForSelect(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	spannerStatement, err := parsePartiQlToSpannerforSelect(ctx, executeStatement)
+	if err != nil {
+		return nil, err
+
+	}
+	resp, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, executeStatement.TableName, []string{}, false, spannerStatement)
+	if err != nil {
+		return nil, err
+	}
+	finalResp := make(map[string]interface{})
+	finalResp["Items"] = resp
+	return finalResp, nil
+}
+
+func ExecuteStatementForInsert(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerInsert(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+	if !ok {
+		return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+	}
+
+	newMap := make(map[string]interface{})
+	attrParams := executeStatement.AttrParams
+
+	columns := parsedQueryObj.Columns
+	values := parsedQueryObj.Values
+
+	// Determine the number of parameters to use and iterate accordingly
+	var paramsCount int
+	if len(attrParams) > 0 {
+		paramsCount = len(attrParams)
+	} else {
+		paramsCount = len(columns)
+	}
+
+	for i := 0; i < paramsCount; i++ {
+		var value interface{}
+		if len(attrParams) > 0 {
+			value = attrParams[i]
+		} else {
+			value = values[i]
+		}
+
+		columnName := columns[i]
+		columnType := colDLL[columnName]
+
+		convertedValue, err := convertType(columnName, value, columnType)
+		if err != nil {
+			return nil, err
+		}
+		newMap[columnName] = convertedValue
+	}
+	result, err := Put(ctx, executeStatement.TableName, newMap, nil, "", nil, nil)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+func ExecuteStatementForUpdate(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerUpdate(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+	paramMap := make(map[string]interface{})
+	if len(executeStatement.Parameters) > 0 {
+		j := len(parsedQueryObj.UpdateSetValues)
+		for i, val := range parsedQueryObj.UpdateSetValues {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[i], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			paramMap[val.Column] = convertedValue
+
+		}
+		for _, val := range parsedQueryObj.Clauses {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[j], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			paramMap[val.Column] = convertedValue
+			j++
+		}
+		parsedQueryObj.Params = paramMap
+	}
+	res, err := storage.GetStorageInstance().InsertUpdateOrDeleteStatement(ctx, parsedQueryObj)
+	if err != nil {
+		return res, err
+	}
+	return nil, err
+}
+
+func ExecuteStatementForDelete(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerDelete(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+	newMap := make(map[string]interface{})
+	if len(executeStatement.AttrParams) > 0 {
+		for i, val := range parsedQueryObj.Clauses {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[i], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			newMap[val.Column] = convertedValue
+		}
+		parsedQueryObj.Params = newMap
+	}
+
+	res, err := storage.GetStorageInstance().InsertUpdateOrDeleteStatement(ctx, parsedQueryObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func trimSingleQuotes(s string) string {
+	// Check if the string starts and ends with single quotes
+	if strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'") {
+		// Remove the quotes from the beginning and end
+		s = s[1 : len(s)-1]
+	}
+	return s
+}
+
+func convertType(columnName string, val interface{}, columntype string) (interface{}, error) {
+	switch columntype {
+	case "STRING(MAX)", "S":
+		// Ensure the value is a string
+		return trimSingleQuotes(fmt.Sprintf("%v", val)), nil
+
+	case "INT64":
+		// Convert to int64
+		intValue, err := strconv.ParseInt(fmt.Sprintf("%v", val), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting to int64: %v", err)
+		}
+		return intValue, nil
+
+	case "FLOAT64", "N":
+		// Convert to float64
+		floatValue, err := strconv.ParseFloat(fmt.Sprintf("%v", val), 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting to float64: %v", err)
+		}
+		return floatValue, nil
+
+	case "NUMERIC":
+		// Treat same as FLOAT64 here or use a specific library for decimal types
+		numValue, err := strconv.ParseFloat(fmt.Sprintf("%v", val), 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting to numeric: %v", err)
+		}
+		return numValue, nil
+
+	case "BOOL":
+		// Convert to boolean
+		boolValue, err := strconv.ParseBool(fmt.Sprintf("%v", val))
+		if err != nil {
+			return nil, fmt.Errorf("error converting to bool: %v", err)
+		}
+		return boolValue, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported data type: %s", columntype)
+	}
+
 }

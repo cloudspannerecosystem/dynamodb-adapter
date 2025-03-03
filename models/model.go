@@ -18,6 +18,7 @@ package models
 import (
 	"sync"
 
+	"cloud.google.com/go/spanner"
 	"github.com/antonmedv/expr/vm"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -291,4 +292,21 @@ type StreamDataModel struct {
 	SequenceNumber int64                  `json:"SequenceNumber"`
 	EventID        string                 `json:"EventId"`
 	EventSourceArn string                 `json:"EventSourceArn"`
+}
+
+// ScanMeta for Scan request
+type ExecuteStatement struct {
+	Limit        int64                      `json:"Limit"`
+	NextToken    int64                      `json:"NextToken"`
+	Parameters   []*dynamodb.AttributeValue `json:"Parameters"`
+	ReturnValues string                     `json:"ReturnValues"`
+	Statement    string                     `json:"Statement"`
+	TableName    string                     `json:"TableName"`
+	AttrParams   []interface{}              `json:"AttrParams"`
+}
+
+type ExecuteStatementQuery struct {
+	PartiQl      string
+	Params       map[string]interface{}
+	SQLStatement spanner.Statement
 }

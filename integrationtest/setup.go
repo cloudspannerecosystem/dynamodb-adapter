@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -30,6 +31,12 @@ import (
 )
 
 var readFile = os.ReadFile
+var (
+	colNameRg     = regexp.MustCompile("^[a-zA-Z0-9_]*$")
+	chars         = []string{"]", "^", "\\\\", "/", "[", ".", "(", ")", "-"}
+	ss            = strings.Join(chars, "")
+	specialCharRg = regexp.MustCompile("[" + ss + "]+")
+)
 
 func main() {
 	config, err := loadConfig("config.yaml")
@@ -162,8 +169,8 @@ func initData(w io.Writer, db string) error {
 
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
-			SQL: `INSERT INTO dynamodb_adapter_table_ddl 
-			(tableName, column, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType) 
+			SQL: `INSERT INTO dynamodb_adapter_table_ddl
+			(tableName, column, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType)
 			VALUES
 			('employee', 'emp_id', 'N', 'emp_id', 'emp_id', '', 'emp_id', 'employee', 'FLOAT64'),
 			('employee', 'address', 'S', 'address', 'emp_id', '', 'address', 'employee', 'STRING(MAX)'),
@@ -196,25 +203,25 @@ func initData(w io.Writer, db string) error {
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT INTO employee (emp_id, address, age, first_name, last_name, phone_numbers, profile_pics, salaries) VALUES
-				(1, 'Shamli', 10, 'Marc', 'Richards', 
-				['+1111111111', '+1222222222'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTE='), FROM_BASE64('U29tZUJ5dGVzRGF0YTI=')], 
-				[1000.50, 2000.75]),				
-				(2, 'New York', 20, 'Catalina', 'Smith', 
-				['+1333333333'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTM=')], 
+				(1, 'Shamli', 10, 'Marc', 'Richards',
+				['+1111111111', '+1222222222'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTE='), FROM_BASE64('U29tZUJ5dGVzRGF0YTI=')],
+				[1000.50, 2000.75]),
+				(2, 'New York', 20, 'Catalina', 'Smith',
+				['+1333333333'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTM=')],
 				[3000.00]),
-				(3, 'Pune', 30, 'Alice', 'Trentor', 
-				['+1444444444', '+1555555555'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTQ='), FROM_BASE64('U29tZUJ5dGVzRGF0YTU=')], 
+				(3, 'Pune', 30, 'Alice', 'Trentor',
+				['+1444444444', '+1555555555'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTQ='), FROM_BASE64('U29tZUJ5dGVzRGF0YTU=')],
 				[4000.25, 5000.50, 6000.75]),
-				(4, 'Silicon Valley', 40, 'Lea', 'Martin', 
-				['+1666666666'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTY=')], 
+				(4, 'Silicon Valley', 40, 'Lea', 'Martin',
+				['+1666666666'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTY=')],
 				[7000.00, 8000.25]),
-				(5, 'London', 50, 'David', 'Lomond', 
-				['+1777777777', '+1888888888', '+1999999999'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTc='), FROM_BASE64('U29tZUJ5dGVzRGF0YTg=')], 
+				(5, 'London', 50, 'David', 'Lomond',
+				['+1777777777', '+1888888888', '+1999999999'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTc='), FROM_BASE64('U29tZUJ5dGVzRGF0YTg=')],
 				[9000.50]);`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)

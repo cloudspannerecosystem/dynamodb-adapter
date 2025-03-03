@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -59,6 +60,8 @@ func RouteRequest(c *gin.Context) {
 		Scan(c)
 	case "UpdateItem":
 		Update(c)
+	case "ExecuteStatement":
+		ExecuteStatement(c)
 	default:
 		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of "+amzTarget).
 			HTTPResponse("X-Amz-Target Header not supported"))
@@ -664,4 +667,67 @@ func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdat
 		return err
 	}
 	return nil
+}
+
+func ExecuteStatement(c *gin.Context) {
+	defer PanicHandler(c)
+	defer c.Request.Body.Close()
+	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
+	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
+	if err != nil || spanContext == nil {
+		logger.LogDebug(err)
+	}
+	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(ctx)
+	defer span.Finish()
+	addParentSpanID(c, span)
+	var execStmt models.ExecuteStatement
+	if err := c.ShouldBindJSON(&execStmt); err != nil {
+		c.JSON(errors.New("ValidationException", err).HTTPResponse(execStmt))
+	} else {
+		execStmt.TableName = extractTableName(execStmt.Statement)
+		for _, val := range execStmt.Parameters {
+			execStmt.AttrParams = append(execStmt.AttrParams, convertFrom(val, execStmt.TableName))
+		}
+		res, err := services.ExecuteStatement(c.Request.Context(), execStmt)
+		if err == nil {
+			changedOutput := ChangeQueryResponseColumn(execStmt.TableName, res)
+			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+				}
+				changedOutput["Items"] = itemsOutput["L"]
+			}
+			if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+				changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+				}
+			}
+			c.JSON(http.StatusOK, changedOutput)
+		} else {
+			c.JSON(errors.HTTPResponse(err, execStmt))
+		}
+
+	}
+}
+
+// extractTableName extracts the table name from a PartiQL query.
+func extractTableName(query string) string {
+	patterns := []string{
+		`(?i)FROM\s+"?(\w+)"?`,          // Matches SELECT and DELETE queries
+		`(?i)INSERT\s+INTO\s+"?(\w+)"?`, // Matches INSERT queries
+		`(?i)UPDATE\s+"?(\w+)"?`,        // Matches UPDATE queries
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(query)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+	}
+
+	return ""
 }
