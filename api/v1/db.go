@@ -167,11 +167,11 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	pKey := tableConf.PartitionKey
 	var oldResp map[string]interface{}
 
-	oldResp, err = storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
+	oldResp, spannerRow, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp)
+	res, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,6 @@ func queryResponse(query models.Query, c *gin.Context) {
 				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 			}
 		}
-
 		c.JSON(http.StatusOK, finalResult)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
@@ -354,12 +353,9 @@ func GetItemMeta(c *gin.Context) {
 		// Add annotation for changing expression attribute names
 		otelgo.AddAnnotation(ctx, "Changing Column Names to Spanner Expression Names")
 		getItemMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getItemMeta.TableName, getItemMeta.ExpressionAttributeNames)
-
 		// Add annotation before calling the Get service
 		otelgo.AddAnnotation(ctx, "Calling GetWithProjection Service")
-		res, rowErr := services.GetWithProjection(ctx, getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
-
-		// Process the response
+		res, _, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
 		if rowErr == nil {
 			// Add annotation for processing the response
 			otelgo.AddAnnotation(ctx, "Changing Response Columns to Original Format")
@@ -539,9 +535,9 @@ func DeleteItem(c *gin.Context) {
 		}
 
 		otelgo.AddAnnotation(ctx, "Fetching current item for deletion")
-		oldRes, _ := services.GetWithProjection(ctx, deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
+		oldRes, _, _ := services.GetWithProjection(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
 		otelgo.AddAnnotation(ctx, "Attempting to delete item")
-		err := services.Delete(ctx, deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionExpression, deleteItem.ExpressionAttributeMap, nil)
+		err := services.Delete(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionExpression, deleteItem.ExpressionAttributeMap, nil)
 		if err == nil {
 			otelgo.AddAnnotation(ctx, "Item deleted successfully")
 			output, _ := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
@@ -774,6 +770,15 @@ func BatchWriteItem(c *gin.Context) {
 				if err != nil {
 					for _, v := range value {
 						if v.PutReq.Item != nil {
+							if unprocessedBatchWriteItems.UnprocessedItems == nil {
+								unprocessedBatchWriteItems.UnprocessedItems = make(map[string][]models.BatchWriteSubItems) // Adjust type as needed
+							}
+
+							// Ensure that the specific key's slice is initialized
+							if _, exists := unprocessedBatchWriteItems.UnprocessedItems[key]; !exists {
+								unprocessedBatchWriteItems.UnprocessedItems[key] = []models.BatchWriteSubItems{} // Instantiate the slice
+							}
+
 							unprocessedBatchWriteItems.UnprocessedItems[key] = append(unprocessedBatchWriteItems.UnprocessedItems[key], v)
 						}
 					}
@@ -819,7 +824,7 @@ func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdat
 	if err != nil {
 		return err
 	}
-	err = services.BatchPut(con, batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap)
+	err = services.BatchPut(con, batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap, nil)
 	if err != nil {
 		return err
 	}
