@@ -31,9 +31,6 @@ import (
 type Storage struct {
 	spannerClient map[string]*spanner.Client
 }
-type storageSpanner interface {
-	GetSpannerClient() (*spanner.Client, error)
-}
 
 func (s *Storage) GetSpannerClient() (*spanner.Client, error) {
 	return s.getSpannerClient(models.GlobalConfig.Spanner.ProjectID), nil
