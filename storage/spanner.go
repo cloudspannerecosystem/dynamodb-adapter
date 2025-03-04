@@ -1404,7 +1404,7 @@ func (s Storage) SpannerTransactGetItems(ctx context.Context, tableProjectionCol
 				return nil, errors.New("ValidationException", err)
 			}
 			// Parse the Spanner row into a DynamoDB-style row
-			singleRow, err := parseRow(r, colDDL)
+			singleRow, _, err := parseRow(r, colDDL)
 			if err != nil {
 				return nil, err
 			}
