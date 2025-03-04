@@ -19,9 +19,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tj/assert"
+
 	"github.com/antonmedv/expr"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
-	"gopkg.in/go-playground/assert.v1"
 )
 
 func TestGetStringInBetween(t *testing.T) {
@@ -388,4 +389,39 @@ func TestRemoveListElement(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsValidJSONObject(t *testing.T) {
+	validJSON := `{"name":"John", "age":30}`
+	invalidJSON := `{"name":"John", "age":30,}` // Trailing comma
+
+	assert.NoError(t, IsValidJSONObject(validJSON))
+	assert.Error(t, IsValidJSONObject(invalidJSON))
+}
+
+func TestIsValidBase64(t *testing.T) {
+	validBase64 := "SGVsbG8sIFdvcmxkIQ=="
+	invalidBase64 := "SGVsbG8sIFdvcmxkI!" // Invalid character
+
+	assert.True(t, IsValidBase64(validBase64))
+	assert.False(t, IsValidBase64(invalidBase64))
+}
+
+func TestUpdateFieldByPath(t *testing.T) {
+	data := map[string]interface{}{
+		"first": map[string]interface{}{
+			"second": map[string]interface{}{
+				"third": "value",
+			},
+		},
+	}
+
+	// Successful update
+	success := UpdateFieldByPath(data, ".first.second.third", "newValue")
+	assert.True(t, success)
+	assert.Equal(t, "newValue", data["first"].(map[string]interface{})["second"].(map[string]interface{})["third"])
+
+	// Invalid path
+	success = UpdateFieldByPath(data, ".first.invalid_key.third", "newValue")
+	assert.False(t, success)
 }

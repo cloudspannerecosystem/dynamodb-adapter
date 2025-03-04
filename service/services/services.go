@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,6 +81,14 @@ func (s *spannerService) MayIReadOrWrite(table string, IsMutation bool, operatio
 	return true
 }
 
+const (
+	regexPattern = `^[a-zA-Z_][a-zA-Z0-9_.]*(\.[a-zA-Z_][a-zA-Z0-9_.]*)+\s*=\s*@\w+$`
+)
+
+var (
+	re = regexp.MustCompile(regexPattern)
+)
+
 // getSpannerProjections makes a projection array of columns
 func getSpannerProjections(projectionExpression, table string, expressionAttributeNames map[string]string) []string {
 	if projectionExpression == "" {
@@ -103,7 +112,7 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 }
 
 // Put writes an object to Spanner
-func Put(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}) (map[string]interface{}, error) {
+func Put(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, spannerRow map[string]interface{}) (map[string]interface{}, error) {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
 		return nil, err
@@ -114,7 +123,7 @@ func Put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	newResp, err := storage.GetStorageInstance().SpannerPut(ctx, tableName, putObj, e, expr)
+	newResp, err := storage.GetStorageInstance().SpannerPut(ctx, tableName, putObj, e, expr, spannerRow)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +193,7 @@ func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 	}
 	sKey := tableConf.SortKey
 	pKey := tableConf.PartitionKey
-	res, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
+	res, _, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +226,7 @@ func BatchGet(ctx context.Context, tableName string, keyMapArray []map[string]in
 }
 
 // BatchPut writes bulk records to Spanner
-func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]interface{}) error {
+func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]interface{}, spannerRow []map[string]interface{}) error {
 	if len(arrAttrMap) <= 0 {
 		return errors.New("ValidationException")
 	}
@@ -231,7 +240,7 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 		return err
 	}
 	tableName = tableConf.ActualTable
-	err = storage.GetStorageInstance().SpannerBatchPut(ctx, tableName, arrAttrMap)
+	err = storage.GetStorageInstance().SpannerBatchPut(ctx, tableName, arrAttrMap, spannerRow)
 	if err != nil {
 		return err
 	}
@@ -251,13 +260,13 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 }
 
 // GetWithProjection get table data with projection
-func GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error) {
+func GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, map[string]interface{}, error) {
 	if primaryKeyMap == nil {
-		return nil, errors.New("ValidationException")
+		return nil, nil, errors.New("ValidationException")
 	}
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tableName = tableConf.ActualTable
@@ -459,8 +468,8 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 func createWhereClause(whereClause string, expression string, queryVar string, RangeValueMap map[string]interface{}, params map[string]interface{}) (string, string) {
 	_, _, expression = utils.ParseBeginsWith(expression)
 	expression = strings.ReplaceAll(expression, "begins_with", "STARTS_WITH")
-
-	if whereClause != "WHERE " {
+	trimmedString := strings.TrimSpace(whereClause)
+	if whereClause != "WHERE " && !strings.HasSuffix(trimmedString, "AND") {
 		whereClause += " AND "
 	}
 	count := 1
@@ -472,7 +481,19 @@ func createWhereClause(whereClause string, expression string, queryVar string, R
 			count++
 		}
 	}
-	whereClause += expression
+	// Handle JSON paths if the expression is structured correctly
+	if re.MatchString(expression) {
+		expression := strings.TrimSpace(expression)
+		expressionParts := strings.Split(expression, "=")
+		expressionParts[0] = strings.TrimSpace(expressionParts[0])
+		jsonFields := strings.Split(expressionParts[0], ".")
+
+		// Construct new JSON_VALUE expression
+		newExpression := fmt.Sprintf("JSON_VALUE(%s, '$.%s') = %s", jsonFields[0], strings.Join(jsonFields[1:], "."), expressionParts[1])
+		whereClause = whereClause + " " + newExpression
+	} else if expression != "" {
+		whereClause = whereClause + expression
+	}
 	return whereClause, expression
 }
 

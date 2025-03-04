@@ -161,11 +161,11 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	pKey := tableConf.PartitionKey
 	var oldResp map[string]interface{}
 
-	oldResp, err = storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
+	oldResp, spannerRow, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, putObj[pKey], putObj[sKey], nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp)
+	res, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,6 @@ func queryResponse(query models.Query, c *gin.Context, svc services.Service) {
 				c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
 			}
 		}
-
 		c.JSON(http.StatusOK, finalResult)
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
@@ -305,7 +304,7 @@ func (h *APIHandler) GetItemMeta(c *gin.Context) {
 			return
 		}
 		getItemMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getItemMeta.TableName, getItemMeta.ExpressionAttributeNames)
-		res, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
+		res, _, rowErr := services.GetWithProjection(c.Request.Context(), getItemMeta.TableName, getItemMeta.PrimaryKeyMap, getItemMeta.ProjectionExpression, getItemMeta.ExpressionAttributeNames)
 		if rowErr == nil {
 			changedColumns := ChangeResponseToOriginalColumns(getItemMeta.TableName, res)
 			output, err := ChangeMaptoDynamoMap(changedColumns)
@@ -446,7 +445,7 @@ func (h *APIHandler) DeleteItem(c *gin.Context) {
 			deleteItem.ConditionExpression = strings.ReplaceAll(deleteItem.ConditionExpression, k, v)
 		}
 
-		oldRes, _ := services.GetWithProjection(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
+		oldRes, _, _ := services.GetWithProjection(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, "", nil)
 		err := services.Delete(c.Request.Context(), deleteItem.TableName, deleteItem.PrimaryKeyMap, deleteItem.ConditionExpression, deleteItem.ExpressionAttributeMap, nil)
 		if err == nil {
 			output, _ := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
@@ -632,6 +631,15 @@ func (h *APIHandler) BatchWriteItem(c *gin.Context) {
 				if err != nil {
 					for _, v := range value {
 						if v.PutReq.Item != nil {
+							if unprocessedBatchWriteItems.UnprocessedItems == nil {
+								unprocessedBatchWriteItems.UnprocessedItems = make(map[string][]models.BatchWriteSubItems) // Adjust type as needed
+							}
+
+							// Ensure that the specific key's slice is initialized
+							if _, exists := unprocessedBatchWriteItems.UnprocessedItems[key]; !exists {
+								unprocessedBatchWriteItems.UnprocessedItems[key] = []models.BatchWriteSubItems{} // Instantiate the slice
+							}
+
 							unprocessedBatchWriteItems.UnprocessedItems[key] = append(unprocessedBatchWriteItems.UnprocessedItems[key], v)
 						}
 					}
@@ -673,7 +681,7 @@ func batchUpdateItems(con context.Context, batchMetaUpdate models.BatchMetaUpdat
 	if err != nil {
 		return err
 	}
-	err = services.BatchPut(con, batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap)
+	err = services.BatchPut(con, batchMetaUpdate.TableName, batchMetaUpdate.ArrAttrMap, nil)
 	if err != nil {
 		return err
 	}
