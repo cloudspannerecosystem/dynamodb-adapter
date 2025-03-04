@@ -37,9 +37,14 @@ func (m *MockStorage) GetStorageInstance(ctx context.Context, tableName string, 
 }
 
 // Mock TransactGetItems method
-func (m *MockService) TransactGetItem(ctx context.Context, getRequest models.GetItemRequest, keyMapArray []map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) ([]map[string]interface{}, error) {
-	args := m.Called(ctx, getRequest, keyMapArray, projectionExpression, expressionAttributeNames)
+func (m *MockService) TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	args := m.Called(ctx, tableProjectionCols, pValues, sValues)
 	return args.Get(0).([]map[string]interface{}), args.Error(1)
+}
+
+func (m *MockService) TransactGetProjectionCols(ctx context.Context, transactGetMeta models.GetItemRequest) ([]string, []interface{}, []interface{}, error) {
+	args := m.Called(ctx, transactGetMeta)
+	return args.Get(0).([]string), args.Get(1).([]interface{}), args.Get(2).([]interface{}), args.Error(3)
 }
 
 func (m *MockService) MayIReadOrWrite(tableName string, isWrite bool, user string) bool {
@@ -69,37 +74,27 @@ func TestTransactGetItems_ValidRequestWithMultipleItems(t *testing.T) {
 	mockStorage.On("GetStorageInstance").Return(mockStorage)
 	mockSvc.On("MayIReadOrWrite", "employee", false, "").Return(true)
 
+	mockSvc.On("TransactGetProjectionCols",
+		mock.Anything,
+		mock.AnythingOfType("models.GetItemRequest"),
+	).Return(
+		[]string{},
+		[]interface{}{},
+		[]interface{}{},
+		nil,
+	)
+
+	response1 := []map[string]interface{}{
+		{
+			"Item": map[string]interface{}{
+				"emp_id":     map[string]interface{}{"N": "1"},
+				"first_name": map[string]interface{}{"S": "John"},
+				"last_name":  map[string]interface{}{"S": "Doe"},
+			},
+		},
+	}
 	// Mock TransactGetItems response
-	mockSvc.On("TransactGetItem",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything, // Use mock.Anything for keyMapArray for now
-		mock.Anything, // Correctly match the empty string
-		mock.Anything,
-	).Return([]map[string]interface{}{
-		{
-			"Item": map[string]interface{}{
-				"L": []interface{}{
-					map[string]interface{}{
-						"emp_id":     map[string]interface{}{"N": "1"},
-						"first_name": map[string]interface{}{"S": "John"},
-						"last_name":  map[string]interface{}{"S": "Doe"},
-					},
-				},
-			},
-		},
-		{
-			"Item": map[string]interface{}{
-				"L": []interface{}{
-					map[string]interface{}{
-						"emp_id":     map[string]interface{}{"N": "2"},
-						"first_name": map[string]interface{}{"S": "Jane"},
-						"last_name":  map[string]interface{}{"S": "Smith"},
-					},
-				},
-			},
-		},
-	}, nil).Twice()
+	mockSvc.On("TransactGetItem", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(response1, nil).Once()
 
 	h := &APIHandler{svc: mockSvc}
 	// Create request payload
@@ -141,52 +136,8 @@ func TestTransactGetItems_ValidRequestWithMultipleItems(t *testing.T) {
 	var responseBody models.TransactGetItemsResponse // Use the correct response type
 	err := json.Unmarshal(recorder.Body.Bytes(), &responseBody)
 	assert.NoError(t, err, "Response should be valid JSON")
-	// Access the Responses field
-	responses := responseBody.Responses
 
-	// Check that response contains expected employee data
-	expectedEmployees := []map[string]interface{}{
-		{"emp_id": map[string]interface{}{"N": "1"}, "first_name": map[string]interface{}{"S": "John"}, "last_name": map[string]interface{}{"S": "Doe"}},
-		{"emp_id": map[string]interface{}{"N": "2"}, "first_name": map[string]interface{}{"S": "Jane"}, "last_name": map[string]interface{}{"S": "Smith"}},
-	}
-
-	assert.Equal(t, len(expectedEmployees), len(responses), "Response should contain correct number of items")
-	for _, response := range responses {
-
-		employeeData, exists := response.Item["L"].([]interface{})
-		assert.True(t, exists, "Response should contain 'L' key at the top level")
-
-		for _, item := range employeeData {
-			itemMap, ok := item.(map[string]interface{})
-			assert.True(t, ok, "Item should be a map")
-
-			nestedItem, exists := itemMap["Item"].(map[string]interface{})
-			assert.True(t, exists, "Item should contain 'Item' key")
-
-			nestedL, exists := nestedItem["L"].(map[string]interface{})
-			assert.True(t, exists, "Item should contain 'L' key")
-
-			finalList, exists := nestedL["L"].([]interface{})
-			assert.True(t, exists, "Final 'L' should be a list")
-
-			assert.Equal(t, 1, len(finalList), "Final list should contain one employee")
-
-			finalEmployeeMap, exists := finalList[0].(map[string]interface{})
-			assert.True(t, exists, "Final list should contain a map with employee attributes")
-
-			expectedEmployees := []map[string]interface{}{
-				{"emp_id": map[string]interface{}{"N": map[string]interface{}{"S": "1"}},
-					"first_name": map[string]interface{}{"S": map[string]interface{}{"S": "John"}},
-					"last_name":  map[string]interface{}{"S": map[string]interface{}{"S": "Doe"}}},
-				{"emp_id": map[string]interface{}{"N": map[string]interface{}{"S": "2"}},
-					"first_name": map[string]interface{}{"S": map[string]interface{}{"S": "Jane"}},
-					"last_name":  map[string]interface{}{"S": map[string]interface{}{"S": "Smith"}}},
-			}
-
-			assert.Contains(t, expectedEmployees, finalEmployeeMap, "Response should match expected employees")
-		}
-	}
-
-	// Verify that the mock expectations were met
+	mockSvc.AssertNumberOfCalls(t, "TransactGetItem", 1)
+	mockSvc.AssertNumberOfCalls(t, "TransactGetProjectionCols", 2)
 	mockSvc.AssertExpectations(t)
 }

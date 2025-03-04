@@ -35,11 +35,11 @@ import (
 )
 
 type Storage interface {
-	SpannerTransactGetItems(ctx context.Context, tableName string, pValues, sValues []interface{}, projectionCols []string) ([]map[string]interface{}, error)
+	SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
 }
-
 type Service interface {
-	TransactGetItem(ctx context.Context, getRequest models.GetItemRequest, keyMapArray []map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) ([]map[string]interface{}, error)
+	TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
+	TransactGetProjectionCols(ctx context.Context, transactGetMeta models.GetItemRequest) ([]string, []interface{}, []interface{}, error)
 	MayIReadOrWrite(tableName string, isWrite bool, user string) bool
 }
 
@@ -647,35 +647,36 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 	return updateResp, nil
 }
 
-// TransactGetItem - fetch data from Spanner using Spanner TransactGetItems function
-//
-// This function takes a context, a GetItemRequest, a slice of keyMap, a projection expression string, and an expression attribute names map, and returns a slice of maps and an error.
-//
-// The function first gets the table configuration using the table name from the GetItemRequest.
-// Then it converts the projection expression to a slice of column names.
-// Then it creates two slices, pValues and sValues, to store the partition key and the sort key values.
-// Finally, it calls the SpannerTransactGetItems function on the Storage interface to fetch the data from Spanner.
-func (s *spannerService) TransactGetItem(ctx context.Context, getRequest models.GetItemRequest, keyMapArray []map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) ([]map[string]interface{}, error) {
-	if len(keyMapArray) == 0 {
-		var resp = make([]map[string]interface{}, 0)
-		return resp, nil
-	}
+// TransactGetProjectionCols gets the projection columns from the TransactGet request
+func (s *spannerService) TransactGetProjectionCols(ctx context.Context, getRequest models.GetItemRequest) ([]string, []interface{}, []interface{}, error) {
+	// Get the table configuration
 	tableConf, err := config.GetTableConf(getRequest.TableName)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	tableName := tableConf.ActualTable
-	projectionCols := getSpannerProjections(projectionExpression, tableName, expressionAttributeNames)
+
+	// Get the projection columns
+	projectionCols := getSpannerProjections(getRequest.ProjectionExpression, tableConf.ActualTable, getRequest.ExpressionAttributeNames)
+
+	// Get the partition and sort keys
 	var pValues []interface{}
 	var sValues []interface{}
-	for i := 0; i < len(keyMapArray); i++ {
-		pValue := keyMapArray[i][tableConf.PartitionKey]
+	for i := 0; i < len(getRequest.KeyArray); i++ {
+		pValue := getRequest.KeyArray[i][tableConf.PartitionKey]
 		if tableConf.SortKey != "" {
-			sValue := keyMapArray[i][tableConf.SortKey]
+			sValue := getRequest.KeyArray[i][tableConf.SortKey]
 			sValues = append(sValues, sValue)
 		}
 		pValues = append(pValues, pValue)
 	}
 
-	return s.st.SpannerTransactGetItems(ctx, tableName, pValues, sValues, projectionCols)
+	// Return the projection columns and the keys
+	return projectionCols, pValues, sValues, nil
+}
+
+func (s *spannerService) TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	// Call the SpannerTransactGetItems method on the Storage interface
+	// This method fetches data from Spanner based on the provided table projection columns,
+	// partition key values, and sort key values.
+	return s.st.SpannerTransactGetItems(ctx, tableProjectionCols, pValues, sValues)
 }

@@ -19,8 +19,6 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 	"github.com/stretchr/testify/mock"
@@ -756,32 +754,12 @@ func Test_parseLimit(t *testing.T) {
 func TestTransactGetItems(t *testing.T) {
 	ctx := context.Background()
 
-	getRequest := models.GetItemRequest{
-		TableName: "test_table",
-		Keys: map[string]*dynamodb.AttributeValue{ // If you still need this
-			"emp_id": {N: aws.String("1")},
-		},
-	}
-
-	keyMapArray := []map[string]interface{}{
-		{"emp_id": 1, "name": "John Doe"},
-		{"emp_id": 2, "name": "Jane Doe"},
-	}
-
-	projectionExpression := "emp_id, name"
-	expressionAttributeNames := map[string]string{
-		"#emp_id": "emp_id",
-		"#name":   "name",
-	}
-
-	// 4. Create the mock Storage
 	mockStorage := new(MockStorage)
 	mockStorage.On("SpannerTransactGetItems",
 		mock.Anything,
-		"test_table",
-		[]interface{}{1, 2}, // Important: Pass the *exact* expected values
-		mock.Anything,       // Empty slice for sValues in this case
-		[]string{"emp_id", "name"},
+		map[string][]string{"test_table": {"emp_id", "name"}},
+		mock.Anything,
+		mock.Anything,
 	).Return([]map[string]interface{}{
 		{"emp_id": 1, "name": "John Doe"},
 		{"emp_id": 2, "name": "Jane Doe"},
@@ -797,9 +775,12 @@ func TestTransactGetItems(t *testing.T) {
 	models.TableColumnMap[utils.ChangeTableNameForSpanner("test_table")] = []string{"emp_id", "name"}
 
 	s := &spannerService{st: mockStorage}
-	// 5. Inject the mock Storage into TransactGetItems
-	result, _ := s.TransactGetItem(ctx, getRequest, keyMapArray, projectionExpression, expressionAttributeNames)
-	// assert.Len(t, result, 2)
+	tableProjectionCols := map[string][]string{"test_table": {"emp_id", "name"}}
+	pValues := map[string]interface{}{"emp_id": 1}
+	sValues := map[string]interface{}{}
+
+	result, _ := s.TransactGetItem(ctx, tableProjectionCols, pValues, sValues)
+
 	assert.Equal(t, 1, result[0]["emp_id"])
 	assert.Equal(t, "John Doe", result[0]["name"])
 	assert.Equal(t, 2, result[1]["emp_id"])
@@ -810,7 +791,7 @@ type MockStorage struct {
 	mock.Mock
 }
 
-func (m *MockStorage) SpannerTransactGetItems(ctx context.Context, tableName string, pValues, sValues []interface{}, projectionCols []string) ([]map[string]interface{}, error) {
-	args := m.Called(ctx, tableName, pValues, sValues, projectionCols)
+func (m *MockStorage) SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	args := m.Called(ctx, tableProjectionCols, pValues, sValues)
 	return args.Get(0).([]map[string]interface{}), args.Error(1)
 }

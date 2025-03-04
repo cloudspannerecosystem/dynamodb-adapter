@@ -328,3 +328,8 @@ type TransactGetItemResponse struct {
 type TransactGetItemsResponse struct {
 	Responses []TransactGetItemResponse `json:"Responses"`
 }
+
+type ResponseItem struct {
+	TableName interface{}            `json:"TableName"`
+	Item      map[string]interface{} `json:"Item"`
+}

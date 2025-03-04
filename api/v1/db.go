@@ -700,10 +700,6 @@ func (h *APIHandler) TransactGetItems(c *gin.Context) {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(transactGetMeta))
 		return
 	}
-
-	// Initialize output with empty slice
-	output := make([]models.TransactGetItemResponse, 0)
-
 	// Iterate over each transact item
 	for _, transactItem := range transactGetMeta.TransactItems {
 		getRequest := transactItem.Get
@@ -713,30 +709,37 @@ func (h *APIHandler) TransactGetItems(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"Responses": []gin.H{}})
 			return
 		}
-
-		// Fetch data from Spanner
-		singleOutput, err := transactGetDataSingleTable(ctx, getRequest, h.svc)
-		if err != nil {
-			c.JSON(errors.HTTPResponse(err, transactGetMeta))
-			return
-		}
-
-		// Convert Spanner output to DynamoDB format
-		currOutput, err := ChangeMaptoDynamoMap(singleOutput)
-		if err != nil {
-			c.JSON(errors.HTTPResponse(err, transactGetMeta))
-			return
-		}
-
-		// Append structured response including table name
-		output = append(output, models.TransactGetItemResponse{
-			TableName: getRequest.TableName,
-			Item:      currOutput,
-		})
+	}
+	// Fetch data from Spanner
+	output, err := transactGetDataSingleTable(ctx, transactGetMeta, h.svc)
+	if err != nil {
+		c.JSON(errors.HTTPResponse(err, transactGetMeta))
+		return
 	}
 
+	var currOutput []models.ResponseItem
+	for _, row := range output {
+		if row["Item"] != nil {
+			dataMap, ok := row["Item"].(map[string]interface{})
+			if !ok {
+				c.JSON(errors.New("Invalid data format").HTTPResponse(transactGetMeta))
+				return
+			}
+			convertedMap, err := ChangeMaptoDynamoMap(dataMap)
+			if err != nil {
+				c.JSON(errors.HTTPResponse(err, transactGetMeta))
+				return
+			}
+			currOutput = append(currOutput, models.ResponseItem{
+				TableName: row["TableName"],
+				Item:      map[string]interface{}{"L": []interface{}{convertedMap}},
+			})
+		} else {
+			c.JSON(errors.New("ValidationException").HTTPResponse(transactGetMeta))
+		}
+	}
 	// Send final response
-	c.JSON(http.StatusOK, models.TransactGetItemsResponse{Responses: output})
+	c.JSON(http.StatusOK, gin.H{"Responses": currOutput})
 
 	// Log slow transactions
 	if time.Since(start) > time.Second*1 {
@@ -744,28 +747,42 @@ func (h *APIHandler) TransactGetItems(c *gin.Context) {
 	}
 }
 
-// TransactGetDataSingleTable is a utility function to fetch data for a single Get operation within TransactGetItems.
-// It takes a context, a GetItemRequest, and a Service interface, and returns a slice of maps and an error.
-// The function first converts the DynamoDB-style Keys to a Spanner-style KeyArray.
-// Then it calls the TransactGetItem function on the Service interface to fetch the data from Spanner.
-// Finally, it converts the Spanner-style output to DynamoDB-style and returns it.
-func transactGetDataSingleTable(ctx context.Context, getRequest models.GetItemRequest, svc services.Service) ([]map[string]interface{}, error) {
+// TransactGetDataSingleTable - fetch data from Spanner using Spanner TransactGetItems function
+//
+// This function takes a context, a TransactGetItemsRequest, a service, and returns a slice of maps and an error.
+// The function first gets the table configuration using the table name from the TransactGetItemsRequest.
+// Then it converts the projection expression to a slice of column names.
+// Then it creates two slices, pValues and sValues, to store the partition key and the sort key values.
+// Finally, it calls the SpannerTransactGetItems function on the Storage interface to fetch the data from Spanner.
+func transactGetDataSingleTable(ctx context.Context, transactGetMeta models.TransactGetItemsRequest, svc services.Service) ([]map[string]interface{}, error) {
 	// Convert DynamoDB Keys to Spanner KeyArray
 	var err1 error
-	getRequest.KeyArray, err1 = ConvertDynamoArrayToMapArray(getRequest.TableName, []map[string]*dynamodb.AttributeValue{getRequest.Keys})
-	if err1 != nil {
-		return nil, nil
-	}
 
-	// Change ExpressionAttributeNames to Spanner-style
-	getRequest.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getRequest.TableName, getRequest.ExpressionAttributeNames)
+	tableProjectionCols := make(map[string][]string)
+	pValues := make(map[string]interface{})
+	sValues := make(map[string]interface{})
+
+	// Iterate over the TransactGetItemsRequest
+	for _, transactItem := range transactGetMeta.TransactItems {
+		// Get the GetItemRequest
+		getRequest := transactItem.Get
+
+		// Convert the DynamoDB KeyArray to a Spanner-style KeyArray
+		getRequest.KeyArray, err1 = ConvertDynamoArrayToMapArray(getRequest.TableName, []map[string]*dynamodb.AttributeValue{getRequest.Keys})
+		if err1 != nil {
+			return nil, nil
+		}
+
+		// Change ExpressionAttributeNames to Spanner-style
+		getRequest.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(getRequest.TableName, getRequest.ExpressionAttributeNames)
+
+		// Get the projection columns
+		projectionCols, pvalues, svalues, _ := svc.TransactGetProjectionCols(ctx, getRequest)
+		tableProjectionCols[getRequest.TableName] = projectionCols
+		pValues[getRequest.TableName] = pvalues
+		sValues[getRequest.TableName] = svalues
+	}
 
 	// Fetch data from Spanner
-	rows, err := svc.TransactGetItem(ctx, getRequest, getRequest.KeyArray, getRequest.ProjectionExpression, getRequest.ExpressionAttributeNames)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert Spanner-style output to DynamoDB-style
-	return ChangesArrayResponseToOriginalColumns(getRequest.TableName, rows), nil
+	return svc.TransactGetItem(ctx, tableProjectionCols, pValues, sValues)
 }
