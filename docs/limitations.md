@@ -5,6 +5,7 @@ This document outlines the known limitations of the `ExecuteStatement` API when 
 ## Limitations
 
 1. **Does Not Support OR Operator**
+
 The `ExecuteStatement` API does not accommodate queries that utilize the OR operator. Queries must be constructed using AND conditions only.
 
 2. **Does Not Support Complex Conditions in WHERE Clause**
