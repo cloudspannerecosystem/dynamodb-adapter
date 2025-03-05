@@ -92,6 +92,47 @@
                 }
             }
         },
+        "/executeStatement/": {
+            "post": {
+                "description": "Execute PartiQL queries using dynamoDB API.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Execute PartiQL statements on spanner",
+                "operationId": "execute partiQLStatement",
+                "parameters": [
+                    {
+                        "description": "Please add request body of type models.ExecuteStatement",
+                        "name": "requestBody",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ExecuteStatement"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "{\"errorMessage\":\"API access not allowed\",\"errorCode\": \"E0005\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "{\"errorMessage\":\"We had a problem with our server. Try again later.\",\"errorCode\":\"E0001\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/batchGetWithProjection/": {
             "post": {
                 "description": "Request items in a batch with projections.",
@@ -578,6 +619,76 @@
                     "type": "string"
                 },
                 "tableName": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ExecuteStatement": {
+            "type": "object",
+            "properties": {
+                "Limit": {
+                    "type": "number"
+                },
+                "NextToken": {
+                    "type": "string"
+                },
+                "Parameters": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "B": {
+                                "type": "string",
+                                "format": "binary"
+                            },
+                            "BOOL": {
+                                "type": "boolean"
+                            },
+                            "BS": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "L": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "description": "AttributeValue"
+                                }
+                            },
+                            "M": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "$ref": "#/definitions/dynamodb.AttributeValue"
+                                }
+                            },
+                            "N": {
+                                "type": "string"
+                            },
+                            "NS": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "NULL": {
+                                "type": "boolean"
+                            },
+                            "S": {
+                                "type": "string"
+                            },
+                            "SS": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "Statement": {
                     "type": "string"
                 }
             }

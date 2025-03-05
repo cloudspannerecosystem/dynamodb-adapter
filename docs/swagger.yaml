@@ -41,6 +41,75 @@ definitions:
       tableName:
         type: string
     type: object
+  models.ExecuteStatement:
+    "type": "object",
+    "properties": {
+      "Limit": {
+        "type": "number"
+      },
+      "NextToken": {
+        "type": "string"
+      },
+      "Parameters": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "B": {
+              "type": "string",
+              "format": "binary"
+            },
+            "BOOL": {
+              "type": "boolean"
+            },
+            "BS": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "L": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "AttributeValue"
+              }
+            },
+            "M": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/dynamodb.AttributeValue"
+              }
+            },
+            "N": {
+              "type": "string"
+            },
+            "NS": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "NULL": {
+              "type": "boolean"
+            },
+            "S": {
+              "type": "string"
+            },
+            "SS": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Statement": {
+        "type": "string"
+      }
+    }
   models.BatchMetaUpdate:
     properties:
       arrAttrMap:
@@ -277,7 +346,7 @@ paths:
   /batchGet/:
     post:
       description: Request items in a batch.
-      operationId: query-table
+      operationId: batchGet
       parameters:
       - description: Please add request body of type models.BatchMeta
         in: body
@@ -382,6 +451,33 @@ paths:
           schema:
             $ref: '#/definitions/gin.H'
       summary: Delete Item from table
+  /ExecuteStatement/:
+    post:
+      description: Delete Item from table
+      operationId: executeStatement
+      parameters:
+      - description: Please add request body of type models.ExecuteStatement
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/models.ExecuteStatement'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: '{"errorMessage":"API access not allowed","errorCode": "E0005"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: '{"errorMessage":"We had a problem with our server. Try again later.","errorCode":"E0001"}'
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: ExecuteStatement executes PartiQL statements on Spanner.
   /get/:
     post:
       description: Get record from table
@@ -574,7 +670,7 @@ paths:
   /updateAttribute:
     post:
       description: update attribute a record in Spanner
-      operationId: update
+      operationId: updateAttribute
       parameters:
       - description: Please add request body of type models.UpdateAttr
         in: body

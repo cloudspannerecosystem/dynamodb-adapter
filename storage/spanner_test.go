@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	translator "github.com/cloudspannerecosystem/dynamodb-adapter/translator/utils"
 )
 
 func Test_parseRow(t *testing.T) {
@@ -320,5 +321,54 @@ func Test_parseRow(t *testing.T) {
 				t.Errorf("parseRow() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildStmt(t *testing.T) {
+	// Set up the test data
+	query := &translator.DeleteUpdateQueryMap{
+		SpannerQuery: "UPDATE Users SET age = @age WHERE name = @name",
+		Params: map[string]interface{}{
+			"age":  30,
+			"name": "John Doe",
+		},
+	}
+
+	// Expected result
+	expectedStmt := &spanner.Statement{
+		SQL:    query.SpannerQuery,
+		Params: query.Params,
+	}
+
+	// Call the function
+	result := buildStmt(query)
+
+	// Assert that the result matches the expected statement
+	if result.SQL != expectedStmt.SQL {
+		t.Errorf("Expected SQL: %s, but got: %s", expectedStmt.SQL, result.SQL)
+	}
+
+	for key, expectedValue := range expectedStmt.Params {
+		if result.Params[key] != expectedValue {
+			t.Errorf("Expected param[%s]: %v, but got: %v", key, expectedValue, result.Params[key])
+		}
+	}
+}
+
+func TestBuildCommitOptions(t *testing.T) {
+	storage := Storage{}
+
+	// Call the function to test
+	options := storage.BuildCommitOptions()
+
+	// Verify that MaxCommitDelay is not nil
+	if options.MaxCommitDelay == nil {
+		t.Fatal("Expected MaxCommitDelay to be non-nil")
+	}
+
+	// Verify that it matches the expected default commit delay
+	expectedDelay := defaultCommitDelay
+	if *options.MaxCommitDelay != expectedDelay {
+		t.Errorf("Expected MaxCommitDelay: %v, but got: %v", expectedDelay, *options.MaxCommitDelay)
 	}
 }

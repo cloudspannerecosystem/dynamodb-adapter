@@ -26,11 +26,13 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/ahmetb/go-linq"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
+	translator "github.com/cloudspannerecosystem/dynamodb-adapter/translator/utils"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
 
@@ -40,6 +42,14 @@ const (
 
 var (
 	re = regexp.MustCompile(regexPattern)
+)
+
+var (
+	// Regular expressions to match the beginning of the query
+	selectRegex = regexp.MustCompile(`(?i)^\s*SELECT`)
+	insertRegex = regexp.MustCompile(`(?i)^\s*INSERT`)
+	updateRegex = regexp.MustCompile(`(?i)^\s*UPDATE`)
+	deleteRegex = regexp.MustCompile(`(?i)^\s*DELETE`)
 )
 
 // getSpannerProjections makes a projection array of columns
@@ -620,4 +630,300 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		}
 	}
 	return updateResp, nil
+}
+
+// ExecuteStatement service API handler function
+func ExecuteStatement(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+
+	query := strings.TrimSpace(executeStatement.Statement) // Remove any leading or trailing whitespace
+	queryUpper := strings.ToUpper(query)
+
+	switch {
+	case selectRegex.MatchString(queryUpper):
+		return ExecuteStatementForSelect(ctx, executeStatement)
+	case insertRegex.MatchString(queryUpper):
+		return ExecuteStatementForInsert(ctx, executeStatement)
+	case updateRegex.MatchString(queryUpper):
+		return ExecuteStatementForUpdate(ctx, executeStatement)
+	case deleteRegex.MatchString(queryUpper):
+		return ExecuteStatementForDelete(ctx, executeStatement)
+	default:
+		return nil, nil
+	}
+
+}
+
+// parsePartiQlToSpannerforSelect converts a PartiQL statement with parameters to a Spanner SQL statement with parameters.
+// Parameters:
+// - ctx: The context for managing request-scoped values, cancelations, and timeouts.
+// - executeStatement: The object containing the PartiQL query string and parameters to be translated.
+//
+// Returns:
+// - spanner.Statement: A Google Cloud Spanner statement ready to be executed.
+// - error: An error object, if an error occurs during translation or parameter conversion.
+func parsePartiQlToSpannerforSelect(ctx context.Context, executeStatement models.ExecuteStatement) (spanner.Statement, error) {
+	stmt := spanner.Statement{}
+	paramMap := make(map[string]interface{})
+	var err error
+
+	translatorObj := translator.Translator{}
+
+	queryMap, err := translatorObj.ToSpannerSelect(executeStatement.Statement)
+	if err != nil {
+		return stmt, err
+	}
+
+	queryStmt := queryMap.SpannerQuery
+	if executeStatement.Limit != 0 {
+		queryMap.Limit = strconv.FormatInt(executeStatement.Limit, 10)
+	}
+
+	err = handleParameters(executeStatement.Parameters, queryMap.Where, &paramMap, &queryStmt)
+	if err != nil {
+		return stmt, err
+	}
+
+	stmt.SQL = queryMap.SpannerQuery
+	stmt.Params = paramMap
+	return stmt, nil
+}
+func handleParameters(parameters []*dynamodb.AttributeValue, whereConditions []translator.Condition, paramMap *map[string]interface{}, queryStmt *string) error {
+	for i, val := range parameters {
+		if val.S != nil {
+			(*paramMap)[whereConditions[i].Column] = *val.S
+			*queryStmt = strings.Replace(*queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.N != nil {
+			floatVal, err := strconv.ParseFloat(*val.N, 64)
+			if err != nil {
+				return fmt.Errorf("failed to convert the string type to the float")
+			}
+			(*paramMap)[whereConditions[i].Column] = floatVal
+			*queryStmt = strings.Replace(*queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.BOOL != nil {
+			(*paramMap)[whereConditions[i].Column] = *val.BOOL
+			*queryStmt = strings.Replace(*queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else if val.SS != nil {
+			ss := make([]interface{}, len(val.SS))
+			for index, v := range val.SS {
+				ss[index] = *v
+			}
+			(*paramMap)[whereConditions[i].Column] = ss
+			*queryStmt = strings.Replace(*queryStmt, "?", "@val"+strconv.Itoa(i), 1)
+		} else {
+			return fmt.Errorf("unsupported datatype")
+		}
+	}
+	return nil
+}
+
+// ExecuteStatementForSelect executes a select statement on a Spanner database, converting a PartiQL statement to a Spanner statement.
+//
+// Parameters:
+// - ctx: Context for managing request-scoped values, cancellations, and timeouts.
+// - executeStatement: Contains the PartiQL select statement and parameters to be executed.
+//
+// Returns:
+// - map[string]interface{}: A map containing the fetched items under the key "Items".
+// - error: An error object, if any issues arise during the execution process.
+func ExecuteStatementForSelect(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	spannerStatement, err := parsePartiQlToSpannerforSelect(ctx, executeStatement)
+	if err != nil {
+		return nil, err
+
+	}
+	resp, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, executeStatement.TableName, []string{}, false, spannerStatement)
+	if err != nil {
+		return nil, err
+	}
+	finalResp := make(map[string]interface{})
+	finalResp["Items"] = resp
+	return finalResp, nil
+}
+
+// ExecuteStatementForInsert executes an insert statement on a Spanner database by converting a PartiQL insert statement
+// to a Spanner compatible format and then performing the insert operation.
+//
+// Parameters:
+// - ctx: The context for managing request-scoped values, cancellations, and timeouts.
+// - executeStatement: Contains the PartiQL insert statement and the attributes to be inserted.
+//
+// Returns:
+// - map[string]interface{}: A map containing the result of the insert operation.
+// - error: An error object, if any issues arise during the execution process.
+func ExecuteStatementForInsert(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerInsert(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+
+	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+	if !ok {
+		return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+	}
+
+	newMap := make(map[string]interface{})
+	attrParams := executeStatement.AttrParams
+
+	columns := parsedQueryObj.Columns
+	values := parsedQueryObj.Values
+
+	// Determine the number of parameters to use and iterate accordingly
+	var paramsCount int
+	if len(attrParams) > 0 {
+		paramsCount = len(attrParams)
+	} else {
+		paramsCount = len(columns)
+	}
+
+	for i := 0; i < paramsCount; i++ {
+		var value interface{}
+		if len(attrParams) > 0 {
+			value = attrParams[i]
+		} else {
+			value = values[i]
+		}
+
+		columnName := columns[i]
+		columnType := colDLL[columnName]
+
+		convertedValue, err := convertType(columnName, value, columnType)
+		if err != nil {
+			return nil, err
+		}
+		newMap[columnName] = convertedValue
+	}
+	result, err := Put(ctx, executeStatement.TableName, newMap, nil, "", nil, nil, nil)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+// ExecuteStatementForUpdate executes an update statement on a Spanner database by converting a PartiQL update statement
+// to a Spanner compatible format and performing the update operation.
+//
+// Parameters:
+// - ctx: The context for managing request-scoped values, cancellations, and timeouts.
+// - executeStatement: Contains the PartiQL update statement and the parameters for the update.
+//
+// Returns:
+// - map[string]interface{}: A map containing the result of the update operation or nil if successful.
+// - error: An error object, if any issues arise during the execution process.
+func ExecuteStatementForUpdate(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerUpdate(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+	paramMap := make(map[string]interface{})
+	if len(executeStatement.Parameters) > 0 {
+		j := len(parsedQueryObj.UpdateSetValues)
+		for i, val := range parsedQueryObj.UpdateSetValues {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[i], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			paramMap[val.Column] = convertedValue
+
+		}
+		for _, val := range parsedQueryObj.Clauses {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[j], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			paramMap[val.Column] = convertedValue
+			j++
+		}
+		parsedQueryObj.Params = paramMap
+	}
+	res, err := storage.GetStorageInstance().InsertUpdateOrDeleteStatement(ctx, parsedQueryObj)
+	if err != nil {
+		return res, err
+	}
+	return nil, err
+}
+
+// ExecuteStatementForDelete executes a delete statement on a Spanner database by converting a PartiQL delete statement
+// to a Spanner compatible format and performing the delete operation.
+//
+// Parameters:
+// - ctx: The context for managing request-scoped values, cancellations, and timeouts.
+// - executeStatement: Contains the PartiQL delete statement and the parameters for the deletion.
+//
+// Returns:
+// - map[string]interface{}: A map containing the result of the delete operation.
+// - error: An error object, if any issues arise during the execution process.
+func ExecuteStatementForDelete(ctx context.Context, executeStatement models.ExecuteStatement) (map[string]interface{}, error) {
+
+	translatorObj := translator.Translator{}
+	parsedQueryObj, err := translatorObj.ToSpannerDelete(executeStatement.Statement)
+	if err != nil {
+		return nil, err
+	}
+	newMap := make(map[string]interface{})
+	if len(executeStatement.AttrParams) > 0 {
+		for i, val := range parsedQueryObj.Clauses {
+			colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(executeStatement.TableName)]
+			if !ok {
+				return nil, fmt.Errorf("ResourceNotFoundException: %s", executeStatement.TableName)
+			}
+			convertedValue, err := convertType(val.Column, executeStatement.AttrParams[i], colDLL[val.Column])
+			if err != nil {
+				return nil, err
+			}
+			newMap[val.Column] = convertedValue
+		}
+		parsedQueryObj.Params = newMap
+	}
+
+	res, err := storage.GetStorageInstance().InsertUpdateOrDeleteStatement(ctx, parsedQueryObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func convertType(columnName string, val interface{}, columntype string) (interface{}, error) {
+	switch columntype {
+	case "S":
+		// Ensure the value is a string
+		return utils.TrimSingleQuotes(fmt.Sprintf("%v", val)), nil
+
+	case "N":
+		// Convert to float64
+		floatValue, err := strconv.ParseFloat(fmt.Sprintf("%v", val), 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting to float64: %v", err)
+		}
+		return floatValue, nil
+
+	case "BOOL":
+		// Convert to boolean
+		boolValue, err := strconv.ParseBool(fmt.Sprintf("%v", val))
+		if err != nil {
+			return nil, fmt.Errorf("error converting to bool: %v", err)
+		}
+		return boolValue, nil
+	case "L":
+		// Convert to list (array or slice in Go)
+		listValue, ok := val.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("expected a list for column %s, but got: %v", columnName, val)
+		}
+		return listValue, nil // Return the slice as is or manipulate as neede
+
+	default:
+		return nil, fmt.Errorf("unsupported data type: %s", columntype)
+	}
+
 }

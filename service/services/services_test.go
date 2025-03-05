@@ -15,9 +15,12 @@
 package services
 
 import (
+	"context"
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"gopkg.in/go-playground/assert.v1"
 )
@@ -746,4 +749,83 @@ func Test_parseLimit(t *testing.T) {
 		assert.Equal(t, got, tc.want)
 	}
 
+}
+
+func TestParsePartiQlToSpannerforSelect(t *testing.T) {
+
+	// Set up the ExecuteStatement for the test case
+	executeStatement := models.ExecuteStatement{
+		Statement: "SELECT * FROM my_table WHERE column_name = ?",
+		Parameters: []*dynamodb.AttributeValue{
+			{
+				S: aws.String("test_value"),
+			},
+		},
+	}
+
+	// Override the Translator with the mock
+	// translatorObj := &translator.Translator{}
+	// translatorObj = mockTranslator // replace with actual dependency injection if required
+
+	// Call the function to test
+	ctx := context.Background()
+	stmt, err := parsePartiQlToSpannerforSelect(ctx, executeStatement)
+
+	// Validate results
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+
+	// Validate structure of stmt
+	expectedSQL := "SELECT * FROM my_table WHERE column_name = @column_name;"
+	if stmt.SQL != expectedSQL {
+		t.Errorf("Expected SQL: %s, but got: %s", expectedSQL, stmt.SQL)
+	}
+
+	expectedParams := map[string]interface{}{
+		"column_name": "test_value",
+	}
+	if len(stmt.Params) != len(expectedParams) {
+		t.Errorf("Expected Params length: %d, but got: %d", len(expectedParams), len(stmt.Params))
+	}
+
+	for k, v := range expectedParams {
+		if stmt.Params[k] != v {
+			t.Errorf("Expected Params[%s]: %v, but got: %v", k, v, stmt.Params[k])
+		}
+	}
+}
+
+func TestConvertType(t *testing.T) {
+	tests := []struct {
+		columnName string
+		val        interface{}
+		columntype string
+		expected   interface{}
+		expectErr  bool
+	}{
+		{"name", "'Hello World'", "S", "Hello World", false},
+		{"age", "25", "N", 25.0, false},
+		{"weight", "70.5", "N", 70.5, false},
+		{"score", "100.00", "N", 100.0, false},
+		{"isActive", "true", "BOOL", true, false},
+		{"isEnabled", "false", "BOOL", false, false},
+		{"invalid", "abc", "N", nil, true},
+		{"invalid", "xyz", "N", nil, true},
+		{"unsupported", "test", "UNKNOWN_TYPE", nil, true},
+	}
+
+	for _, test := range tests {
+		result, err := convertType(test.columnName, test.val, test.columntype)
+
+		if test.expectErr && err == nil {
+			t.Errorf("Expected an error for input %v, but got none", test)
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("Did not expect an error for input %v, but got: %v", test, err)
+		}
+		if !test.expectErr && result != test.expected {
+			t.Errorf("Expected result for input %v: %v, but got: %v", test, test.expected, result)
+		}
+	}
 }
