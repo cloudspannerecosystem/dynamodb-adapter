@@ -20,11 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
+	"github.com/opentracing/opentracing-go"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -76,6 +78,8 @@ func (h *APIHandler) RouteRequest(c *gin.Context) {
 		h.Update(c)
 	case "TransactGetItems":
 		h.TransactGetItems(c)
+	case "ExecuteStatement":
+		h.ExecuteStatement(c)
 	default:
 		c.JSON(errors.New("ValidationException", "Invalid X-Amz-Target header value of "+amzTarget).
 			HTTPResponse("X-Amz-Target Header not supported"))
@@ -959,4 +963,80 @@ func recordMetrics(ctx context.Context, o *otelgo.OpenTelemetry, method string, 
 	o.RecordLatencyMetric(ctx, start, otelgo.Attributes{
 		Method: method,
 	})
+}
+
+// ExecuteStatement handles the API endpoint for executing PartiQL statements on a specified DynamoDB table.
+// It processes the incoming HTTP request, extracts the JSON body into an ExecuteStatement model,
+// and performs necessary transformations before calling the service to execute the statement.
+//
+// Parameters:
+// - c: The Gin context, which provides methods for handling HTTP requests and responses.
+//
+// The function handles:
+// - Tracing using OpenTracing for request performance tracking.
+// - JSON binding and validation of the request body into the ExecuteStatement structure.
+// - Extracting the table name from the provided statement and converting parameter values accordingly.
+// - Executing the statement through a service call and managing the response, including changing the response format as needed.
+// - Error handling for various stages of execution.
+func (h *APIHandler) ExecuteStatement(c *gin.Context) {
+	defer PanicHandler(c)
+	defer c.Request.Body.Close()
+	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
+	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
+	if err != nil || spanContext == nil {
+		logger.LogDebug(err)
+	}
+	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
+	c.Request = c.Request.WithContext(ctx)
+	defer span.Finish()
+	addParentSpanID(c, span)
+	var execStmt models.ExecuteStatement
+	if err := c.ShouldBindJSON(&execStmt); err != nil {
+		c.JSON(errors.New("ValidationException", err).HTTPResponse(execStmt))
+	} else {
+		execStmt.TableName = extractTableName(execStmt.Statement)
+		for _, val := range execStmt.Parameters {
+			execStmt.AttrParams = append(execStmt.AttrParams, convertFrom(val, execStmt.TableName, 1))
+		}
+		res, err := services.ExecuteStatement(c.Request.Context(), execStmt)
+		if err == nil {
+			changedOutput := ChangeQueryResponseColumn(execStmt.TableName, res)
+			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
+				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
+				}
+				changedOutput["Items"] = itemsOutput["L"]
+			}
+			if _, ok := changedOutput["LastEvaluatedKey"]; ok && changedOutput["LastEvaluatedKey"] != nil {
+				changedOutput["LastEvaluatedKey"], err = ChangeMaptoDynamoMap(changedOutput["LastEvaluatedKey"])
+				if err != nil {
+					c.JSON(errors.HTTPResponse(err, "LastEvaluatedKeyChangeError"))
+				}
+			}
+			c.JSON(http.StatusOK, changedOutput)
+		} else {
+			c.JSON(errors.HTTPResponse(err, execStmt))
+		}
+
+	}
+}
+
+// extractTableName extracts the table name from a PartiQL query.
+func extractTableName(query string) string {
+	patterns := []string{
+		`(?i)FROM\s+"?(\w+)"?`,          // Matches SELECT and DELETE queries
+		`(?i)INSERT\s+INTO\s+"?(\w+)"?`, // Matches INSERT queries
+		`(?i)UPDATE\s+"?(\w+)"?`,        // Matches UPDATE queries
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(query)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+	}
+
+	return ""
 }

@@ -408,3 +408,12 @@ func UpdateFieldByPath(data map[string]interface{}, path string, newValue interf
 	}
 	return false
 }
+
+func TrimSingleQuotes(s string) string {
+	// Check if the string starts and ends with single quotes
+	if strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'") {
+		// Remove the quotes from the beginning and end
+		s = s[1 : len(s)-1]
+	}
+	return s
+}

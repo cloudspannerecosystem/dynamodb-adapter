@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	limitKeyWord  = "LIMIT"
-	offsetKeyWord = "OFFSET"
+	limitKeyWord        = "LIMIT"
+	offsetKeyWord       = "OFFSET"
+	questionMarkLiteral = "?"
 )
 
 // Funtion to create lexer and parser object for the partiql query
@@ -56,6 +57,9 @@ func formSpannerSelectQuery(selectQueryMap *SelectQueryMap, whereConditions []Co
 	if len(whereConditions) > 0 {
 		var whereClauses []string
 		for i, cond := range whereConditions {
+			if cond.Value == questionMarkLiteral {
+				cond.Value = "@" + cond.Column
+			}
 			clause := fmt.Sprintf("%s %s %s", cond.Column, cond.Operator, cond.Value)
 
 			// Add logical operators if it's not the first condition
@@ -104,5 +108,5 @@ func formSpannerSelectQuery(selectQueryMap *SelectQueryMap, whereConditions []Co
 		spannerQuery += " OFFSET " + trimmedOffset
 	}
 
-	return spannerQuery, nil
+	return spannerQuery + ";", nil
 }

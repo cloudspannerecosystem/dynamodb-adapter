@@ -62,12 +62,12 @@ func TestToSpannerUpdate(t *testing.T) {
 func TestFormSpannerUpdateQuery(t *testing.T) {
 	tests := []struct {
 		name           string
-		updateQueryMap UpdateQueryMap
+		updateQueryMap DeleteUpdateQueryMap
 		expectedQuery  string
 	}{
 		{
 			name: "Basic Update Query with Where Clause",
-			updateQueryMap: UpdateQueryMap{
+			updateQueryMap: DeleteUpdateQueryMap{
 				Table: "employee",
 				UpdateSetValues: []UpdateSetValue{
 					{Column: "status", Value: "'active'"},
@@ -81,7 +81,7 @@ func TestFormSpannerUpdateQuery(t *testing.T) {
 		},
 		{
 			name: "Update Query without Where Clause",
-			updateQueryMap: UpdateQueryMap{
+			updateQueryMap: DeleteUpdateQueryMap{
 				Table: "employee",
 				UpdateSetValues: []UpdateSetValue{
 					{Column: "status", Value: "'inactive'"},
@@ -92,7 +92,7 @@ func TestFormSpannerUpdateQuery(t *testing.T) {
 		},
 		{
 			name: "Update Query with IN Clause",
-			updateQueryMap: UpdateQueryMap{
+			updateQueryMap: DeleteUpdateQueryMap{
 				Table: "employee",
 				UpdateSetValues: []UpdateSetValue{
 					{Column: "status", Value: "'active'"},

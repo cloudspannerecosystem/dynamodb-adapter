@@ -55,8 +55,8 @@ func (l *UpdateQueryListener) EnterExprAnd(ctx *parser.ExprAndContext) {
 func (l *UpdateQueryListener) EnterExprOr(ctx *parser.ExprOrContext) {
 }
 
-func (t *Translator) ToSpannerUpdate(query string) (*UpdateQueryMap, error) {
-	updateQueryMap := &UpdateQueryMap{}
+func (t *Translator) ToSpannerUpdate(query string) (*DeleteUpdateQueryMap, error) {
+	updateQueryMap := &DeleteUpdateQueryMap{}
 
 	// Lexer and parser setup
 	lexer := parser.NewPartiQLLexer(antlr.NewInputStream(query))
@@ -89,7 +89,7 @@ func (t *Translator) ToSpannerUpdate(query string) (*UpdateQueryMap, error) {
 	return updateQueryMap, nil
 }
 
-func formSpannerUpdateQuery(updateQueryMap *UpdateQueryMap) string {
+func formSpannerUpdateQuery(updateQueryMap *DeleteUpdateQueryMap) string {
 	return "UPDATE " + updateQueryMap.Table + buildSetValues(updateQueryMap.UpdateSetValues) + buildWhereClause(updateQueryMap.Clauses) + ";"
 }
 
@@ -97,6 +97,9 @@ func buildSetValues(updateSetValues []UpdateSetValue) string {
 	setValues := ""
 	for _, val := range updateSetValues {
 		column := "`" + val.Column + "`"
+		if val.Value == questionMarkLiteral {
+			val.Value = "@" + val.Column
+		}
 		value := val.Value
 
 		if setValues != "" {
@@ -114,6 +117,9 @@ func buildWhereClause(clauses []Clause) string {
 	whereClause := ""
 	for _, val := range clauses {
 		column := "`" + val.Column + "`"
+		if val.Value == questionMarkLiteral {
+			val.Value = "@" + val.Column
+		}
 		value := val.Value
 
 		if val.Operator == "IN" {
