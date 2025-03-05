@@ -864,6 +864,7 @@ func recordMetrics(ctx context.Context, o *otelgo.OpenTelemetry, method string, 
 func ExecuteStatement(c *gin.Context) {
 	startTime := time.Now()
 	ctx := c.Request.Context()
+	var err error
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
 	otelInstance := models.GlobalProxy.OtelInst
@@ -879,7 +880,7 @@ func ExecuteStatement(c *gin.Context) {
 	defer models.GlobalProxy.OtelInst.EndSpan(span)
 	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "BatchWriteItem", startTime, err)
 	var execStmt models.ExecuteStatement
-	if err := c.ShouldBindJSON(&execStmt); err != nil {
+	if err = c.ShouldBindJSON(&execStmt); err != nil {
 		otelgo.AddAnnotation(ctx, "Validation failed for ExecuteStatement request")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(execStmt))
 	} else {
