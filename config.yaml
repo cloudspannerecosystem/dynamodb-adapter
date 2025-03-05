@@ -4,3 +4,43 @@ spanner:
   database_name: ${DATABASE_ID}
   query_limit: ${QUERY_LIMIT}
   dynamo_query_limit: ${DYNAMODB_QUERY_LIMIT}
+  Session:
+    # Minimum number of sessions that Spanner pool will always maintain by the session pool.
+    # Defaults to 100.
+    min: 100
+    # Maximum number of sessions that Spanner pool will have.
+    # Defaults to 400.
+    max: 200
+    # Number of channels utilized by the Spanner client.
+    # Defaults to 4.
+    grpcChannels: 4
+otel:
+  # Set enabled to true or false for OTEL metrics and traces
+  enabled: True
+  # Whether or not to enable client side metrics (such as sessions, gfe latency etc.)
+  enabledClientSideMetrics: False
+  # Name of the collector service to be setup as a sidecar
+  serviceName: YOUR_OTEL_COLLECTOR_SERVICE_NAME
+  healthcheck:
+    # Enable the health check in this proxy application config only if the
+    # "health_check" extension is added to the OTEL collector service configuration.
+    #
+    # Recommendation:
+    # Enable the OTEL health check if you need to verify the collector's availability
+    # at the start of the application. For development or testing environments, it can
+    # be safely disabled to reduce complexity.
+
+    # Enable/Disable Health Check for OTEL, Default 'False'.
+    enabled: False
+    # Health check endpoint for the OTEL collector service
+    endpoint: YOUR_OTEL_COLLECTOR_HEALTHCHECK_ENDPOINT
+  metrics:
+    # Collector service endpoint
+    enabled: False
+    endpoint: YOUR_OTEL_COLLECTOR_SERVICE_ENDPOINT
+  traces:
+    # Collector service endpoint
+    enabled: False
+    endpoint: YOUR_OTEL_COLLECTOR_SERVICE_ENDPOINT
+    #Sampling ratio should be between 0 and 1. Here 0.05 means 5/100 Sampling ratio.
+    samplingRatio: YOUR_SAMPLING_RATIO
