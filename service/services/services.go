@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/spanner"
 	"github.com/ahmetb/go-linq"
@@ -33,6 +34,52 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
+
+type Storage interface {
+	SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
+}
+type Service interface {
+	TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
+	TransactGetProjectionCols(ctx context.Context, transactGetMeta models.GetItemRequest) ([]string, []interface{}, []interface{}, error)
+	MayIReadOrWrite(tableName string, isWrite bool, user string) bool
+}
+
+type spannerService struct {
+	spannerClient *spanner.Client
+	st            Storage
+}
+
+var (
+	service Service
+	once    sync.Once
+)
+
+// SetServiceInstance sets the service instance (for dependency injection)
+func SetServiceInstance(s Service) {
+	service = s
+}
+
+func GetServiceInstance() Service {
+	once.Do(func() {
+		storageInstance := storage.GetStorageInstance()
+		spannerClient, err := storageInstance.GetSpannerClient()
+		if err != nil {
+			//logger.LogErrorf("Failed to initialize Spanner client: %v", err)
+			panic(err)
+		}
+
+		service = &spannerService{
+			spannerClient: spannerClient,
+			st:            storageInstance,
+		}
+	})
+	return service
+}
+
+// MayIReadOrWrite for checking the operation is allowed or not
+func (s *spannerService) MayIReadOrWrite(table string, IsMutation bool, operation string) bool {
+	return true
+}
 
 const (
 	regexPattern = `^[a-zA-Z_][a-zA-Z0-9_.]*(\.[a-zA-Z_][a-zA-Z0-9_.]*)+\s*=\s*@\w+$`
@@ -58,7 +105,6 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 			projectionCols = append(projectionCols, pro)
 		}
 	}
-
 	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
 		return str
 	}).ToSlice(&projectionCols)
@@ -620,4 +666,38 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		}
 	}
 	return updateResp, nil
+}
+
+// TransactGetProjectionCols gets the projection columns from the TransactGet request
+func (s *spannerService) TransactGetProjectionCols(ctx context.Context, getRequest models.GetItemRequest) ([]string, []interface{}, []interface{}, error) {
+	// Get the table configuration
+	tableConf, err := config.GetTableConf(getRequest.TableName)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Get the projection columns
+	projectionCols := getSpannerProjections(getRequest.ProjectionExpression, tableConf.ActualTable, getRequest.ExpressionAttributeNames)
+
+	// Get the partition and sort keys
+	var pValues []interface{}
+	var sValues []interface{}
+	for i := 0; i < len(getRequest.KeyArray); i++ {
+		pValue := getRequest.KeyArray[i][tableConf.PartitionKey]
+		if tableConf.SortKey != "" {
+			sValue := getRequest.KeyArray[i][tableConf.SortKey]
+			sValues = append(sValues, sValue)
+		}
+		pValues = append(pValues, pValue)
+	}
+
+	// Return the projection columns and the keys
+	return projectionCols, pValues, sValues, nil
+}
+
+func (s *spannerService) TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	// Call the SpannerTransactGetItems method on the Storage interface
+	// This method fetches data from Spanner based on the provided table projection columns,
+	// partition key values, and sort key values.
+	return s.st.SpannerTransactGetItems(ctx, tableProjectionCols, pValues, sValues)
 }

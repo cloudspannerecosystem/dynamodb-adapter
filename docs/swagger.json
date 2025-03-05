@@ -10,6 +10,47 @@
     "host": "localhost:9050",
     "basePath": "/v1",
     "paths": {
+        "/transactGetItems":{
+            "post": {
+                "description": "Request items in a batch within a transaction.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Batch Get Items from table",
+                "operationId": "transact-get-items",
+                "parameters": [
+                    {
+                        "description": "Please add request body of type models.TransactGetItemsRequest",
+                        "name": "requestBody",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.TransactGetItemsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "{\"errorMessage\":\"API access not allowed\",\"errorCode\": \"E0005\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "{\"errorMessage\":\"We had a problem with our server. Try again later.\",\"errorCode\":\"E0001\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/batchDelete/": {
             "post": {
                 "description": "Batch Delete Item from table",

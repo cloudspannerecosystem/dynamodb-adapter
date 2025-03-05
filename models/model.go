@@ -337,3 +337,44 @@ type StreamDataModel struct {
 	EventID        string                 `json:"EventId"`
 	EventSourceArn string                 `json:"EventSourceArn"`
 }
+
+// TransactGetItemsRequest represents the input structure for TransactGetItems API.
+type TransactGetItemsRequest struct {
+	TransactItems          []TransactGetItem `json:"TransactItems"`
+	ReturnConsumedCapacity string            `json:"ReturnConsumedCapacity,omitempty"`
+}
+
+// TransactGetItem represents a single Get operation inside TransactGetItems.
+type TransactGetItem struct {
+	Get GetItemRequest `json:"Get"`
+}
+
+// GetItemRequest represents the structure of a Get request.
+type GetItemRequest struct {
+	TableName                string                              `json:"TableName"`
+	Keys                     map[string]*dynamodb.AttributeValue `json:"Key"`
+	KeyArray                 []map[string]interface{}            `json:"KeyArray"`
+	ProjectionExpression     string                              `json:"ProjectionExpression,omitempty"`
+	ExpressionAttributeNames map[string]string                   `json:"ExpressionAttributeNames,omitempty"`
+}
+
+// ConsumedCapacity represents the consumed capacity of a DynamoDB operation.
+type ConsumedCapacity struct {
+	TableName     string  `json:"TableName"`
+	CapacityUnits float64 `json:"CapacityUnits"`
+}
+
+type TransactGetItemResponse struct {
+	TableName string                 `json:"TableName"`
+	Item      map[string]interface{} `json:"Item"`
+}
+
+// TransactGetItemsResponse represents the overall response structure for multiple TransactGetItems.
+type TransactGetItemsResponse struct {
+	Responses []TransactGetItemResponse `json:"Responses"`
+}
+
+type ResponseItem struct {
+	TableName interface{}            `json:"TableName"`
+	Item      map[string]interface{} `json:"Item"`
+}
