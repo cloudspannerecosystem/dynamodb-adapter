@@ -862,22 +862,25 @@ func recordMetrics(ctx context.Context, o *otelgo.OpenTelemetry, method string, 
 // - Executing the statement through a service call and managing the response, including changing the response format as needed.
 // - Error handling for various stages of execution.
 func ExecuteStatement(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
-	ctx := c.Request.Context()
 	otelInstance := models.GlobalProxy.OtelInst
 	if otelInstance == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
 		return
 	}
-
 	ctx, span := otelInstance.StartSpan(ctx, "ExecuteStatement", []attribute.KeyValue{
 		attribute.String("request.method", c.Request.Method),
 		attribute.String("request.url", c.Request.URL.Path),
 	})
 	addParentSpanID(c, span)
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "BatchWriteItem", startTime, err)
 	var execStmt models.ExecuteStatement
 	if err := c.ShouldBindJSON(&execStmt); err != nil {
+		otelgo.AddAnnotation(ctx, "Validation failed for ExecuteStatement request")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(execStmt))
 	} else {
 		execStmt.TableName = extractTableName(execStmt.Statement)
@@ -890,6 +893,7 @@ func ExecuteStatement(c *gin.Context) {
 			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
 				if err != nil {
+					otelgo.AddAnnotation(ctx, "ItemsChangeError")
 					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
 				}
 				changedOutput["Items"] = itemsOutput["L"]
@@ -902,6 +906,7 @@ func ExecuteStatement(c *gin.Context) {
 			}
 			c.JSON(http.StatusOK, changedOutput)
 		} else {
+			otelgo.AddAnnotation(ctx, "Successfully processed ExecuteStatement request")
 			c.JSON(errors.HTTPResponse(err, execStmt))
 		}
 
