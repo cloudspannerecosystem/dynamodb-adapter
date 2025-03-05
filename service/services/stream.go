@@ -34,7 +34,7 @@ var mux = &sync.Mutex{}
 // InitStream for initializing the stream
 func InitStream() {
 	var err error
-	pubsubClient, err = pubsub.NewClient(context.Background(), "cassandra-to-spanner")
+	pubsubClient, err = pubsub.NewClient(context.Background(), config.ConfigurationMap.GoogleProjectID)
 	if err != nil {
 		logger.LogFatal(err)
 	}
