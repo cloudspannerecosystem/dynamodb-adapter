@@ -26,7 +26,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
-	"github.com/opentracing/opentracing-go"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -973,25 +972,31 @@ func recordMetrics(ctx context.Context, o *otelgo.OpenTelemetry, method string, 
 // - c: The Gin context, which provides methods for handling HTTP requests and responses.
 //
 // The function handles:
-// - Tracing using OpenTracing for request performance tracking.
+// - Tracing using OpenTelemetry for request performance tracking.
 // - JSON binding and validation of the request body into the ExecuteStatement structure.
 // - Extracting the table name from the provided statement and converting parameter values accordingly.
 // - Executing the statement through a service call and managing the response, including changing the response format as needed.
 // - Error handling for various stages of execution.
 func (h *APIHandler) ExecuteStatement(c *gin.Context) {
+	startTime := time.Now()
+	ctx := c.Request.Context()
 	defer PanicHandler(c)
 	defer c.Request.Body.Close()
-	carrier := opentracing.HTTPHeadersCarrier(c.Request.Header)
-	spanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
-	if err != nil || spanContext == nil {
-		logger.LogDebug(err)
+	otelInstance := models.GlobalProxy.OtelInst
+	if otelInstance == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "OpenTelemetry instance not initialized"})
+		return
 	}
-	span, ctx := opentracing.StartSpanFromContext(c.Request.Context(), c.Request.URL.RequestURI(), opentracing.ChildOf(spanContext))
-	c.Request = c.Request.WithContext(ctx)
-	defer span.Finish()
+	ctx, span := otelInstance.StartSpan(ctx, "ExecuteStatement", []attribute.KeyValue{
+		attribute.String("request.method", c.Request.Method),
+		attribute.String("request.url", c.Request.URL.Path),
+	})
 	addParentSpanID(c, span)
+	defer models.GlobalProxy.OtelInst.EndSpan(span)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "BatchWriteItem", startTime, err)
 	var execStmt models.ExecuteStatement
 	if err := c.ShouldBindJSON(&execStmt); err != nil {
+		otelgo.AddAnnotation(ctx, "Validation failed for ExecuteStatement request")
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(execStmt))
 	} else {
 		execStmt.TableName = extractTableName(execStmt.Statement)
@@ -1004,6 +1009,7 @@ func (h *APIHandler) ExecuteStatement(c *gin.Context) {
 			if _, ok := changedOutput["Items"]; ok && changedOutput["Items"] != nil {
 				itemsOutput, err := ChangeMaptoDynamoMap(changedOutput["Items"])
 				if err != nil {
+					otelgo.AddAnnotation(ctx, "ItemsChangeError")
 					c.JSON(errors.HTTPResponse(err, "ItemsChangeError"))
 				}
 				changedOutput["Items"] = itemsOutput["L"]
@@ -1016,6 +1022,7 @@ func (h *APIHandler) ExecuteStatement(c *gin.Context) {
 			}
 			c.JSON(http.StatusOK, changedOutput)
 		} else {
+			otelgo.AddAnnotation(ctx, "Successfully processed ExecuteStatement request")
 			c.JSON(errors.HTTPResponse(err, execStmt))
 		}
 
