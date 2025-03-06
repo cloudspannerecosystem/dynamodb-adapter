@@ -182,7 +182,6 @@ go run main.go
 ```
 
 ```
-
 ## API Documentation
 
 This is can be imported in Postman or can be used for Swagger UI.
