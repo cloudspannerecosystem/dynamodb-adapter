@@ -675,8 +675,7 @@ func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[stri
 // - An error if the operation fails or nil if the operation succeeds.
 func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, spannerRow map[string]interface{}) error {
 	ddl := models.TableDDL[table]
-	newMap := make(map[string]interface{})
-	newMap = m
+	newMap := m
 	for k, v := range m {
 		if strings.Contains(k, ".") {
 			pathfeilds := strings.Split(k, ".")
