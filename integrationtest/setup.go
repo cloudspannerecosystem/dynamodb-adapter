@@ -125,6 +125,13 @@ func createDatabase(w io.Writer, db string) error {
 				id STRING(MAX),
 				list_type JSON,
 			  ) PRIMARY KEY(rank_list)`,
+			`CREATE TABLE mapdynamo (
+				guid STRING(MAX) NOT NULL,
+				context STRING(MAX) NOT NULL,
+				contact_ranking_list STRING(MAX),
+				name STRING(MAX),
+				address JSON
+			) PRIMARY KEY (guid)`,
 		},
 	})
 	if err != nil {
@@ -162,8 +169,8 @@ func initData(w io.Writer, db string) error {
 
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
-			SQL: `INSERT INTO dynamodb_adapter_table_ddl 
-			(tableName, column, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType) 
+			SQL: `INSERT INTO dynamodb_adapter_table_ddl
+			(tableName, column, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType)
 			VALUES
 			('employee', 'emp_id', 'N', 'emp_id', 'emp_id', '', 'emp_id', 'employee', 'FLOAT64'),
 			('employee', 'address', 'S', 'address', 'emp_id', '', 'address', 'employee', 'STRING(MAX)'),
@@ -180,7 +187,12 @@ func initData(w io.Writer, db string) error {
 			('test_table', 'rank_list', 'S', 'rank_list', 'rank_list', '', 'rank_list', 'test_table', 'STRING(MAX)'),
 			('test_table', 'category', 'S', 'category', 'rank_list', '', 'category', 'test_table', 'STRING(MAX)'),
 			('test_table', 'id', 'S', 'id', 'rank_list', '', 'id', 'test_table', 'STRING(MAX)'),
-			('test_table', 'list_type', 'L', 'list_type', 'rank_list', '', 'list_type', 'test_table', 'JSON');`,
+			('test_table', 'list_type', 'L', 'list_type', 'rank_list', '', 'list_type', 'test_table', 'JSON'),
+			('mapdynamo', 'guid', 'S', 'guid', 'guid', '', 'guid', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'context', 'S', 'context', 'guid', '', 'context', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'contact_ranking_list', 'S', 'contact_ranking_list', 'guid', '', 'contact_ranking_list', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'name', 'S', 'name', 'guid', '', 'name', 'mapdynamo', 'STRING(MAX)'),
+			('mapdynamo', 'address', 'M', 'address', 'guid', '', 'address', 'mapdynamo', 'JSON');`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {
@@ -196,25 +208,25 @@ func initData(w io.Writer, db string) error {
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT INTO employee (emp_id, address, age, first_name, last_name, phone_numbers, profile_pics, salaries) VALUES
-				(1, 'Shamli', 10, 'Marc', 'Richards', 
-				['+1111111111', '+1222222222'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTE='), FROM_BASE64('U29tZUJ5dGVzRGF0YTI=')], 
-				[1000.50, 2000.75]),				
-				(2, 'New York', 20, 'Catalina', 'Smith', 
-				['+1333333333'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTM=')], 
+				(1, 'Shamli', 10, 'Marc', 'Richards',
+				['+1111111111', '+1222222222'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTE='), FROM_BASE64('U29tZUJ5dGVzRGF0YTI=')],
+				[1000.50, 2000.75]),
+				(2, 'New York', 20, 'Catalina', 'Smith',
+				['+1333333333'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTM=')],
 				[3000.00]),
-				(3, 'Pune', 30, 'Alice', 'Trentor', 
-				['+1444444444', '+1555555555'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTQ='), FROM_BASE64('U29tZUJ5dGVzRGF0YTU=')], 
+				(3, 'Pune', 30, 'Alice', 'Trentor',
+				['+1444444444', '+1555555555'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTQ='), FROM_BASE64('U29tZUJ5dGVzRGF0YTU=')],
 				[4000.25, 5000.50, 6000.75]),
-				(4, 'Silicon Valley', 40, 'Lea', 'Martin', 
-				['+1666666666'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTY=')], 
+				(4, 'Silicon Valley', 40, 'Lea', 'Martin',
+				['+1666666666'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTY=')],
 				[7000.00, 8000.25]),
-				(5, 'London', 50, 'David', 'Lomond', 
-				['+1777777777', '+1888888888', '+1999999999'], 
-				[FROM_BASE64('U29tZUJ5dGVzRGF0YTc='), FROM_BASE64('U29tZUJ5dGVzRGF0YTg=')], 
+				(5, 'London', 50, 'David', 'Lomond',
+				['+1777777777', '+1888888888', '+1999999999'],
+				[FROM_BASE64('U29tZUJ5dGVzRGF0YTc='), FROM_BASE64('U29tZUJ5dGVzRGF0YTg=')],
 				[9000.50]);`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
@@ -249,9 +261,9 @@ func initData(w io.Writer, db string) error {
 	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `INSERT INTO test_table (updated_at, rank_list, category, id, list_type) VALUES
-    ('2024-12-04T11:02:02Z', 'rank_list', 'category', 'testing', JSON '[ "John Doe", "62536", true ]'),
-    ('2024-12-04T11:02:02Z', 'rank_list1', 'category1', 'id', JSON '["string_value","12345",true,[1, 2, 3],"testing"]'),
-    ('2024-12-04T11:02:02Z', 'rank_list2', 'category2', 'id2', JSON '["test","dummy_value","62536"]')`,
+				('2024-12-04T11:02:02Z', 'rank_list', 'category', 'testing', JSON '[ "John Doe", "62536", true ]'),
+				('2024-12-04T11:02:02Z', 'rank_list1', 'category1', 'id', JSON '["string_value","12345",true,[1, 2, 3],"testing"]'),
+				('2024-12-04T11:02:02Z', 'rank_list2', 'category2', 'id2', JSON '["test","dummy_value","62536"]')`,
 		}
 		rowCount, err := txn.Update(ctx, stmt)
 		if err != nil {
@@ -263,6 +275,76 @@ func initData(w io.Writer, db string) error {
 	if err != nil {
 		return err
 	}
+
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT INTO mapdynamo (guid, context, contact_ranking_list, name, address)
+						VALUES (
+						'123e4567-e89b-12d3-a456-value001',
+						'user-profile',
+						'1,2,3',
+						'Jane Smith',
+						JSON'''{
+						"active": true,
+						"additional_details": {
+						"additional_details_2": {
+							"landmark_field": "near water tank road",
+							"landmark_field_number": 1001
+						},
+						"apartment_number": "5B",
+						"landmark": "Near Central Park",
+						"landmark notes": "YmluYXJ5X2RhdGE="
+						},
+						"mobilenumber": 9035599089,
+						"notes": "YmluYXJ5X2RhdGE=",
+						"permanent_address": "789 Elm St, Springfield, SP",
+						"present_address": "101 Maple Ave, Metropolis, MP"
+						}'''
+						)`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_, err = client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `INSERT INTO mapdynamo (guid, context, contact_ranking_list, name, address)
+						VALUES (
+						'123e4567-e89b-12d3-a456-value011',
+						'user-profile',
+						'1,2,3',
+						'Jane Smith',
+						JSON'''{
+						"active": true,
+						"additional_details": {
+						"additional_details_2": {
+							"landmark_field": "near factory road",
+							"landmark_field_number": 1001
+						},
+						"apartment_number": "5B",
+						"landmark": "Near Central Park",
+						"landmark notes": "YmluYXJ5X2RhdGE="
+						},
+						"mobilenumber": 9035599089,
+						"notes": "YmluYXJ5X2RhdGE=",
+						"permanent_address": "789 Elm St, Springfield, SP",
+						"present_address": "101 Maple Ave, Metropolis, MP"
+						}'''
+						)`,
+		}
+		rowCount, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%d record(s) inserted.\n", rowCount)
+		return err
+	})
 
 	return err
 }

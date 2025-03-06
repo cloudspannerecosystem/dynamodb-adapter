@@ -15,18 +15,23 @@
 package utils
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"cloud.google.com/go/spanner"
 	"github.com/antonmedv/expr"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 )
 
 var listRemoveTargetRegex = regexp.MustCompile(`(.*)\[(\d+)\]`)
+var base64Regexp = regexp.MustCompile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$")
 
 // GetFieldNameFromConditionalExpression returns the field name from conditional expression
 func GetFieldNameFromConditionalExpression(conditionalExpression string) string {
@@ -277,4 +282,129 @@ func RemoveListElement(list []interface{}, idx int) []interface{} {
 		return list // Return original list for invalid indices
 	}
 	return append(list[:idx], list[idx+1:]...)
+}
+
+// IsValidJSONObject checks if a string is a valid JSON object
+func IsValidJSONObject(s string) error {
+	var js map[string]interface{}
+	err := json.Unmarshal([]byte(s), &js)
+	return err
+}
+
+func IsValidBase64(s string) bool {
+	if _, err := base64.StdEncoding.DecodeString(s); err != nil {
+		return false
+	}
+	return true
+}
+func ParseBytes(r *spanner.Row, i int, k string) (map[string]interface{}, error) {
+	var s []byte
+	singleRowImg := make(map[string]interface{})
+	err := r.Column(i, &s)
+	if err != nil {
+		if strings.Contains(err.Error(), "ambiguous column name") {
+			return nil, err
+		}
+		return nil, errors.New("ValidationException", err, k)
+	}
+	if len(s) > 0 {
+		var m interface{}
+		err := json.Unmarshal(s, &m)
+		if err != nil {
+			logger.LogError(err, string(s))
+			singleRowImg[k] = string(s)
+		}
+		val1, ok := m.(string)
+		if ok {
+			if base64Regexp.MatchString(val1) {
+				ba, err := base64.StdEncoding.DecodeString(val1)
+				if err == nil {
+					var sample interface{}
+					err = json.Unmarshal(ba, &sample)
+					if err == nil {
+						singleRowImg[k] = sample
+
+					} else {
+						singleRowImg[k] = string(s)
+
+					}
+				}
+			}
+		}
+
+		if mp, ok := m.(map[string]interface{}); ok {
+			for k, v := range mp {
+				if val, ok := v.(string); ok {
+					if base64Regexp.MatchString(val) {
+						ba, err := base64.StdEncoding.DecodeString(val)
+						if err == nil {
+							var sample interface{}
+							err = json.Unmarshal(ba, &sample)
+							if err == nil {
+								mp[k] = sample
+								m = mp
+							}
+						}
+					}
+				}
+			}
+		}
+		singleRowImg[k] = m
+
+	}
+	return singleRowImg, err
+}
+
+func ParseNestedJSON(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		m := make(map[string]interface{})
+		for key, val := range v {
+			m[key] = ParseNestedJSON(val)
+		}
+		return map[string]interface{}{"M": m} // Wrap around with "M"
+	case []interface{}:
+		for i, item := range v {
+			v[i] = ParseNestedJSON(item)
+		}
+		return v
+	case string:
+		// Check for base64 encoding
+		if base64Regexp.MatchString(v) {
+			ba, err := base64.StdEncoding.DecodeString(v)
+			if err == nil {
+				return ParseNestedJSON(string(ba)) // Convert bytes back to string
+			}
+		}
+		return v // Keep string as is
+	case float64:
+		return v
+	default:
+		return v
+	}
+}
+
+// UpdateFieldByPath navigates the nested JSON structure to update the desired field.
+func UpdateFieldByPath(data map[string]interface{}, path string, newValue interface{}) bool {
+	keys := strings.Split(path, ".")
+	keys = keys[1:]
+	// Traverse to the deepest map
+	current := data
+	for i, key := range keys {
+		if i == len(keys)-1 {
+			// If it's the last key, perform the update
+			current[key] = newValue
+			return true
+		}
+
+		// Traverse deeper into the map structure
+		if next, ok := current[key].(map[string]interface{}); ok {
+			current = next
+		} else {
+			// Path is invalid if we can't find the next map level
+			log.Printf("Invalid path: key %s not found\n", key)
+			return false
+		}
+	}
+	return false
 }
