@@ -54,7 +54,7 @@ func fetchConfigData() {
 	logger.LogDebug("Fetching starts")
 	stmt := spanner.Statement{}
 	stmt.SQL = "SELECT * FROM dynamodb_adapter_config_manager"
-	data, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, "dynamodb_adapter_config_manager", []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream", "pubsubTopic"}, false, stmt)
+	data, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, "dynamodb_adapter_config_manager", []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream"}, false, stmt)
 	if err != nil {
 		models.ConfigController.StopConfigManager = true
 		logger.LogDebug(err)
@@ -109,18 +109,6 @@ func fetchConfigData() {
 		} else {
 			delete(models.ConfigController.StreamEnable, tableName)
 		}
-		pubsubTopic, ok := tableConf["pubsubTopic"].(string)
-		if ok {
-			if pubsubTopic == "1" {
-				models.ConfigController.PubSubTopic[tableName] = "dynamodb-adapter-" + strings.ReplaceAll(strings.ToLower(tableName), "_", "-") + "-stream"
-			} else if pubsubTopic == "" {
-				delete(models.ConfigController.PubSubTopic, tableName)
-			} else {
-				models.ConfigController.PubSubTopic[tableName] = pubsubTopic
-			}
-		} else {
-			delete(models.ConfigController.StreamEnable, tableName)
-		}
 
 		count++
 	}
@@ -153,12 +141,4 @@ func IsStreamEnabled(tableName string) bool {
 	defer models.ConfigController.Mux.RUnlock()
 	_, ok := models.ConfigController.StreamEnable[tableName]
 	return ok
-}
-
-// IsPubSubAllowed to check if PubSub is allowed or not for a table
-func IsPubSubAllowed(tableName string) (string, bool) {
-	models.ConfigController.Mux.RLock()
-	defer models.ConfigController.Mux.RUnlock()
-	topicName, status := models.ConfigController.PubSubTopic[tableName]
-	return topicName, status
 }

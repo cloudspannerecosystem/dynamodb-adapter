@@ -185,11 +185,10 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	res, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
+	_, err = services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
 	if err != nil {
 		return nil, err
 	}
-	go services.StreamDataToThirdParty(oldResp, res, tableName)
 	return oldResp, nil
 }
 
@@ -553,7 +552,6 @@ func (h *APIHandler) DeleteItem(c *gin.Context) {
 			otelgo.AddAnnotation(ctx, "Item deleted successfully")
 			output, _ := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(deleteItem.TableName, oldRes))
 			c.JSON(http.StatusOK, map[string]interface{}{"Attributes": output})
-			go services.StreamDataToThirdParty(oldRes, nil, deleteItem.TableName)
 		} else {
 			otelgo.AddAnnotation(ctx, "Failed to delete item")
 			c.JSON(errors.HTTPResponse(err, deleteItem))
