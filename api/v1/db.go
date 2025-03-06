@@ -994,7 +994,7 @@ func (h *APIHandler) ExecuteStatement(c *gin.Context) {
 	})
 	addParentSpanID(c, span)
 	defer models.GlobalProxy.OtelInst.EndSpan(span)
-	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "BatchWriteItem", startTime, err)
+	defer recordMetrics(ctx, models.GlobalProxy.OtelInst, "ExecuteStatement", startTime, err)
 	var execStmt models.ExecuteStatement
 	if err = c.ShouldBindJSON(&execStmt); err != nil {
 		otelgo.AddAnnotation(ctx, "Validation failed for ExecuteStatement request")

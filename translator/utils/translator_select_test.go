@@ -18,7 +18,7 @@ func TestToSpannerSelect(t *testing.T) {
 	expectedColumns := []string{"age", "address"}
 	expectedWhereConditions := []Condition{
 		{Column: "age", Operator: ">", Value: "30"},
-		{Column: "address", Operator: "=", Value: `'abc'`},
+		{Column: "address", Operator: "=", Value: `"abc"`},
 	}
 	expectedOrderBy := []string{"age"}
 	expectedLimit := "LIMIT10"
