@@ -1373,3 +1373,73 @@ func checkInifinty(value float64, logData interface{}) error {
 
 	return nil
 }
+
+// SpannerTransactGetItems is a utility function to fetch data for a single TransactGetItems operation.
+// It takes a context, a table name, a map of projection columns, a map of primary keys, and a map of secondary keys.
+// It returns a slice of maps and an error.
+// The function first gets a Spanner client and then performs a transaction read operation.
+// It then iterates over the results and parses the Spanner rows into DynamoDB-style rows.
+// Finally, it returns the parsed rows.
+func (s Storage) SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	client := s.getSpannerClient("") // Get a generic client
+	txn := client.ReadOnlyTransaction()
+	defer txn.Close()
+
+	// Initialize the result slice
+	allRows := []map[string]interface{}{}
+	// Iterate over the tables
+	for tableName, projectionCols := range tableProjectionCols {
+		// Get the column definitions for the table
+		colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
+		if !ok {
+			return nil, errors.New("ResourceNotFoundException", tableName)
+		}
+		// Get the primary keys, secondary keys, and construct the key set
+		pKeys := pValues[tableName].([]interface{})
+		sKeys := sValues[tableName].([]interface{})
+		var keySet []spanner.KeySet
+
+		for i := range pKeys {
+			if len(sKeys) == 0 || sKeys[i] == nil {
+				keySet = append(keySet, spanner.Key{pKeys[i]})
+			} else {
+				keySet = append(keySet, spanner.Key{pKeys[i], sKeys[i]})
+			}
+		}
+		// If no projection columns are specified, then get all columns
+		if len(projectionCols) == 0 {
+			var ok bool
+			projectionCols, ok = models.TableColumnMap[utils.ChangeTableNameForSpanner(tableName)]
+			if !ok {
+				return nil, errors.New("ResourceNotFoundException", tableName)
+			}
+		}
+		// Perform the transaction read operation
+		itr := txn.Read(ctx, tableName, spanner.KeySets(keySet...), projectionCols)
+		defer itr.Stop()
+		// Iterate over the results
+		for {
+			r, err := itr.Next()
+			if err != nil {
+				if err == iterator.Done {
+					break
+				}
+				return nil, errors.New("ValidationException", err)
+			}
+			// Parse the Spanner row into a DynamoDB-style row
+			singleRow, _, err := parseRow(r, colDDL)
+			if err != nil {
+				return nil, err
+			}
+			// If the row is not empty, add it to the result slice
+			if len(singleRow) > 0 {
+				rowWithTable := map[string]interface{}{
+					"Item":      singleRow,
+					"TableName": tableName,
+				}
+				allRows = append(allRows, rowWithTable)
+			}
+		}
+	}
+	return allRows, nil
+}
