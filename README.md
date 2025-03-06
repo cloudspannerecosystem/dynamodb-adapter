@@ -45,6 +45,7 @@ DynamoDB Adapter currently supports the folowing operations:
 | Query |
 | Scan |
 | UpdateItem |
+| TransactGetItems |
 
 ### Supported Data Types
 
