@@ -40,6 +40,12 @@ func init() {
 	ConfigurationMap = new(Configuration)
 }
 
+type DefaultConfigProvider struct{}
+
+type ConfigProvider interface {
+	GetTableConf(tableName string) (models.TableConfig, error)
+}
+
 var readFile = os.ReadFile
 
 func InitConfig(filepath string) {

@@ -57,7 +57,7 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 			return nil, errors.New("ResourceNotFoundException", tableName)
 		}
 	}
-	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", tableName)
 	}
@@ -74,7 +74,7 @@ func (s Storage) SpannerBatchGet(ctx context.Context, tableName string, pKeys, s
 			}
 			return nil, errors.New("ValidationException", err)
 		}
-		singleRow, err := parseRow(r, colDLL)
+		singleRow, err := parseRow(r, colDDL)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +100,7 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 			return nil, errors.New("ResourceNotFoundException", tableName)
 		}
 	}
-	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(tableName)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", tableName)
 	}
@@ -111,13 +111,13 @@ func (s Storage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys 
 		return nil, errors.New("ResourceNotFoundException", tableName, key, err)
 	}
 
-	return parseRow(row, colDLL)
+	return parseRow(row, colDDL)
 }
 
 // ExecuteSpannerQuery - this will execute query on spanner database
 func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []string, isCountQuery bool, stmt spanner.Statement) ([]map[string]interface{}, error) {
 
-	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", table)
@@ -145,7 +145,7 @@ func (s Storage) ExecuteSpannerQuery(ctx context.Context, table string, cols []s
 			allRows = append(allRows, singleRow)
 			break
 		}
-		singleRow, err := parseRow(r, colDLL)
+		singleRow, err := parseRow(r, colDDL)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 	if err != nil {
 		return nil, err
 	}
-	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException", table)
 	}
@@ -337,7 +337,7 @@ func (s Storage) SpannerAdd(ctx context.Context, table string, m map[string]inte
 		if err != nil {
 			return errors.New("ResourceNotFoundException", err)
 		}
-		rs, err := parseRow(r, colDLL)
+		rs, err := parseRow(r, colDDL)
 		if err != nil {
 			return err
 		}
@@ -429,7 +429,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 	if err != nil {
 		return err
 	}
-	colDLL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
 	if !ok {
 		return errors.New("ResourceNotFoundException", table)
 	}
@@ -484,7 +484,7 @@ func (s Storage) SpannerDel(ctx context.Context, table string, m map[string]inte
 		if err != nil {
 			return errors.New("ResourceNotFoundException", err)
 		}
-		rs, err := parseRow(r, colDLL)
+		rs, err := parseRow(r, colDDL)
 		if err != nil {
 			return err
 		}
@@ -1237,4 +1237,571 @@ func checkInifinty(value float64, logData interface{}) error {
 	}
 
 	return nil
+}
+
+// SpannerTransactWritePut performs a transactional write operation in Spanner.
+// It checks for conditional expressions and updates the database accordingly.
+//
+// Args:
+//
+//	ctx: The context for managing request deadlines and cancellations.
+//	table: The name of the table to update.
+//	m: The map containing the data to be inserted or updated.
+//	eval: The evaluation criteria for processing conditional expressions.
+//	expr: The UpdateExpressionCondition to be checked before writing.
+//	txn: The Spanner ReadWriteTransaction.
+//
+// Returns:
+//
+//	A map of updated data, a Spanner mutation, and an error if any occurs.
+func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	// Initialize the update map and mutation
+	update := map[string]interface{}{}
+	var mutation *spanner.Mutation
+
+	// Copy input map to a temporary map for processing
+	tmpMap := map[string]interface{}{}
+	for k, v := range m {
+		tmpMap[k] = v
+	}
+
+	// Evaluate conditional expressions if present
+	if len(eval.Attributes) > 0 || expr != nil {
+		status, err := evaluateConditionalExpression(ctx, txn, table, tmpMap, eval, expr)
+		if err != nil {
+			return m, nil, err
+		}
+		if !status {
+			return m, nil, errors.New("ConditionalCheckFailedException", eval, expr)
+		}
+	}
+
+	// Update table name to match Spanner's naming convention
+	table = utils.ChangeTableNameForSpanner(table)
+
+	// Update the map with processed data
+	for k, v := range tmpMap {
+		update[k] = v
+	}
+
+	// Perform the transactional put operation
+	mutation, err := s.performTransactPutOperation(table, tmpMap)
+	return update, mutation, err
+}
+
+// performTransactPutOperation performs a transactional put operation in Spanner.
+//
+// ctx: The context of the transaction.
+//
+// txn: The Spanner ReadWriteTransaction.
+//
+// table: The name of the Spanner table.
+//
+// m: The input map of data to be inserted or updated.
+//
+// Returns:
+//
+//	A Spanner mutation and an error if any occurs.
+func (s Storage) performTransactPutOperation(table string, m map[string]interface{}) (*spanner.Mutation, error) {
+	ddl := models.TableDDL[table]
+
+	// Iterate through the map and process each column
+	for k, v := range m {
+		// If the column is a BYTES(MAX) type, marshal the data to JSON
+		t, ok := ddl[k]
+		if t == "BYTES(MAX)" && ok {
+			ba, err := json.Marshal(v)
+			if err != nil {
+				// Return a ValidationException error if there is an issue with marshaling
+				return nil, errors.New("ValidationException", err)
+			}
+			// Update the map with the marshaled data
+			m[k] = ba
+		}
+	}
+
+	// Create a Spanner mutation for the InsertOrUpdateMap operation
+	mutation := spanner.InsertOrUpdateMap(table, m)
+
+	return mutation, nil
+}
+
+func (s Storage) TransactWriteSpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+	tableConf, err := config.GetTableConf(table)
+	if err != nil {
+		return nil, err
+	}
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	if !ok {
+		return nil, errors.New("ResourceNotFoundException", table)
+	}
+	pKey := tableConf.PartitionKey
+	var pValue interface{}
+	var sValue interface{}
+	sKey := tableConf.SortKey
+
+	cols := []string{}
+	var key spanner.Key
+	var m1 = make(map[string]interface{})
+
+	for k, v := range m {
+		m1[k] = v
+		if k == pKey {
+			pValue = v
+			delete(m, k)
+			continue
+		}
+		if k == sKey {
+			delete(m, k)
+			sValue = v
+			continue
+		}
+		cols = append(cols, k)
+	}
+	if sValue != nil {
+		key = spanner.Key{pValue, sValue}
+	} else {
+		key = spanner.Key{pValue}
+	}
+	tmpMap := map[string]interface{}{}
+	for k, v := range m {
+		tmpMap[k] = v
+	}
+	if len(eval.Attributes) > 0 || expr != nil {
+		status, _ := evaluateConditionalExpression(ctx, txn, table, m1, eval, expr)
+		if !status {
+			return nil, errors.New("ConditionalCheckFailedException")
+		}
+	}
+	table = utils.ChangeTableNameForSpanner(table)
+
+	r, err := txn.ReadRow(ctx, table, key, cols)
+	if err != nil {
+		return nil, errors.New("ResourceNotFoundException", err)
+	}
+	rs, err := parseRow(r, colDDL)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range tmpMap {
+		v1, ok := rs[k]
+		if ok {
+			switch v1.(type) {
+			case []interface{}:
+				var ifaces1 []interface{}
+				ba, ok := v.([]byte)
+				if ok {
+					err = json.Unmarshal(ba, &ifaces1)
+					if err != nil {
+						logger.LogError(err, string(ba))
+					}
+				} else {
+					ifaces1 = v.([]interface{})
+				}
+				m1 := map[interface{}]struct{}{}
+				ifaces := v1.([]interface{})
+				for i := 0; i < len(ifaces); i++ {
+					m1[reflect.ValueOf(ifaces[i]).Interface()] = struct{}{}
+				}
+				for i := 0; i < len(ifaces1); i++ {
+
+					delete(m1, reflect.ValueOf(ifaces1[i]).Interface())
+				}
+				ifaces = []interface{}{}
+				for k := range m1 {
+					ifaces = append(ifaces, k)
+				}
+				tmpMap[k] = ifaces
+			default:
+				logger.LogDebug(reflect.TypeOf(v).String())
+			}
+		}
+	}
+	tmpMap[pKey] = pValue
+	if sValue != nil {
+		tmpMap[sKey] = sValue
+	}
+	ddl := models.TableDDL[table]
+
+	for k, v := range tmpMap {
+		t, ok := ddl[k]
+		if t == "BYTES(MAX)" && ok {
+			ba, err := json.Marshal(v)
+			if err != nil {
+				return nil, errors.New("ValidationException", err)
+			}
+			tmpMap[k] = ba
+		}
+	}
+	mutation := spanner.InsertOrUpdateMap(table, tmpMap)
+
+	return mutation, err
+}
+
+func (s Storage) TransactWriteSpannerAdd(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	tableConf, err := config.GetTableConf(table)
+	if err != nil {
+		return nil, nil, err
+	}
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	if !ok {
+		return nil, nil, errors.New("ResourceNotFoundException", table)
+	}
+	pKey := tableConf.PartitionKey
+	var pValue interface{}
+	var sValue interface{}
+	sKey := tableConf.SortKey
+
+	cols := []string{}
+	var key spanner.Key
+	var m1 = make(map[string]interface{})
+
+	for k, v := range m {
+		m1[k] = v
+		if k == pKey {
+			pValue = v
+			delete(m, k)
+			continue
+		}
+		if k == sKey {
+			delete(m, k)
+			sValue = v
+			continue
+		}
+		cols = append(cols, k)
+	}
+	if sValue != nil {
+		key = spanner.Key{pValue, sValue}
+	} else {
+		key = spanner.Key{pValue}
+	}
+	updatedObj := map[string]interface{}{}
+
+	tmpMap := map[string]interface{}{}
+	for k, v := range m1 {
+		tmpMap[k] = v
+	}
+	if len(eval.Attributes) > 0 || expr != nil {
+		status, _ := evaluateConditionalExpression(ctx, txn, table, tmpMap, eval, expr)
+		if !status {
+			return nil, nil, errors.New("ConditionalCheckFailedException")
+		}
+	}
+	table = utils.ChangeTableNameForSpanner(table)
+
+	r, err := txn.ReadRow(ctx, table, key, cols)
+	if err != nil {
+		return nil, nil, errors.New("ResourceNotFoundException", err)
+	}
+	rs, err := parseRow(r, colDDL)
+	if err != nil {
+		return nil, nil, err
+	}
+	for k, v := range tmpMap {
+		v1, ok := rs[k]
+		if ok {
+			switch v1.(type) {
+			case int64:
+				v2, ok := v.(float64)
+				if !ok {
+					strV, ok := v.(string)
+					if !ok {
+						return nil, nil, errors.New("ValidationException", reflect.TypeOf(v).String())
+					}
+					v2, err = strconv.ParseFloat(strV, 64)
+					if err != nil {
+						return nil, nil, errors.New("ValidationException", reflect.TypeOf(v).String())
+					}
+					err = checkInifinty(v2, strV)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+				tmpMap[k] = v1.(int64) + int64(v2)
+				err = checkInifinty(float64(m[k].(int64)), m)
+				if err != nil {
+					return nil, nil, err
+				}
+			case float64:
+				v2, ok := v.(float64)
+				if !ok {
+					strV, ok := v.(string)
+					if !ok {
+						return nil, nil, errors.New("ValidationException", reflect.TypeOf(v).String())
+					}
+					v2, err = strconv.ParseFloat(strV, 64)
+					if err != nil {
+						return nil, nil, errors.New("ValidationException", reflect.TypeOf(v).String())
+					}
+					err = checkInifinty(v2, strV)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+				tmpMap[k] = v1.(float64) + v2
+				err = checkInifinty(m[k].(float64), m)
+				if err != nil {
+					return nil, nil, err
+				}
+
+			case []interface{}:
+				var ifaces1 []interface{}
+				ba, ok := v.([]byte)
+				if ok {
+					err = json.Unmarshal(ba, &ifaces1)
+					if err != nil {
+						logger.LogError(err, string(ba))
+					}
+				} else {
+					ifaces1 = v.([]interface{})
+				}
+				m1 := map[interface{}]struct{}{}
+				ifaces := v1.([]interface{})
+				for i := 0; i < len(ifaces); i++ {
+					m1[ifaces[i]] = struct{}{}
+				}
+				for i := 0; i < len(ifaces1); i++ {
+					m1[ifaces1[i]] = struct{}{}
+				}
+				ifaces = []interface{}{}
+				for k := range m1 {
+					ifaces = append(ifaces, k)
+				}
+				tmpMap[k] = ifaces
+			default:
+				logger.LogDebug(reflect.TypeOf(v).String())
+			}
+		}
+	}
+	tmpMap[pKey] = pValue
+	if sValue != nil {
+		tmpMap[sKey] = sValue
+	}
+	ddl := models.TableDDL[table]
+
+	for k, v := range tmpMap {
+		updatedObj[k] = v
+		t, ok := ddl[k]
+		if t == "BYTES(MAX)" && ok {
+			ba, err := json.Marshal(v)
+			if err != nil {
+				return nil, nil, errors.New("ValidationException", err)
+			}
+			tmpMap[k] = ba
+		}
+	}
+
+	mutation := spanner.InsertOrUpdateMap(table, tmpMap)
+
+	return updatedObj, mutation, err
+}
+
+// TransactWriteSpannerRemove - Spanner Remove functionality like update attribute inside a transaction
+//
+// This is used in the context of a transaction, and it will remove the given columns from the given
+// table. The condition expression in the eval and expr parameters will be evaluated and if it fails,
+// this will return an error.
+//
+// The colsToRemove parameter should contain the names of the columns to be removed.
+func (s Storage) TransactWriteSpannerRemove(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, colsToRemove []string, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+
+	tmpMap := map[string]interface{}{}
+	for k, v := range m {
+		tmpMap[k] = v
+	}
+	if len(eval.Attributes) > 0 || expr != nil {
+		status, _ := evaluateConditionalExpression(ctx, txn, table, m, eval, expr)
+		if !status {
+			return nil, errors.New("ConditionalCheckFailedException")
+		}
+	}
+	var null spanner.NullableValue
+	for _, col := range colsToRemove {
+		tmpMap[col] = null
+	}
+	table = utils.ChangeTableNameForSpanner(table)
+	mutation := spanner.InsertOrUpdateMap(table, tmpMap)
+
+	return mutation, nil
+}
+
+func (s Storage) TransactWriteSpannerDelete(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+
+	tmpMap := map[string]interface{}{}
+	for k, v := range m {
+		tmpMap[k] = v
+	}
+	if len(eval.Attributes) > 0 || expr != nil {
+		status, err := evaluateConditionalExpression(ctx, txn, table, tmpMap, eval, expr)
+		if err != nil {
+			return nil, err
+		}
+		if !status {
+			return nil, errors.New("ConditionalCheckFailedException", tmpMap, expr)
+		}
+	}
+	tableConf, err := config.GetTableConf(table)
+	if err != nil {
+		return nil, err
+	}
+	table = utils.ChangeTableNameForSpanner(table)
+
+	pKey := tableConf.PartitionKey
+	pValue, ok := tmpMap[pKey]
+	if !ok {
+		return nil, errors.New("ResourceNotFoundException", pKey)
+	}
+	var key spanner.Key
+	sKey := tableConf.SortKey
+	if sKey != "" {
+		sValue, ok := tmpMap[sKey]
+		if !ok {
+			return nil, errors.New("ResourceNotFoundException", pKey)
+		}
+		key = spanner.Key{pValue, sValue}
+
+	} else {
+		key = spanner.Key{pValue}
+	}
+
+	mutation := spanner.Delete(table, key)
+
+	return mutation, nil
+}
+
+// EvaluateConditionalExpression evaluates a conditional expression for a given Spanner transaction.
+// It checks for the presence of necessary table schema and configuration, handles conditional fields,
+// and updates the map with computed values if conditions are met. It returns a boolean status indicating
+// whether the condition was satisfied and an error if any occurs during processing.
+
+func EvaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
+	// Retrieve table schema DDL
+	colDDL, ok := models.TableDDL[utils.ChangeTableNameForSpanner(table)]
+	if !ok {
+		return false, errors.New("ResourceNotFoundException", table)
+	}
+
+	// Get table configuration
+	tableConf, err := config.GetTableConf(table)
+	if err != nil {
+		return false, err
+	}
+
+	// Validate primary key presence
+	pKey := tableConf.PartitionKey
+	pValue, ok := m[pKey]
+	if !ok {
+		return false, errors.New("ValidationException", pKey)
+	}
+
+	// Construct Spanner key based on primary and sort keys
+	var key spanner.Key
+	sKey := tableConf.SortKey
+	if sKey != "" {
+		sValue, ok := m[sKey]
+		if !ok {
+			return false, errors.New("ValidationException", sKey)
+		}
+		key = spanner.Key{pValue, sValue}
+	} else {
+		key = spanner.Key{pValue}
+	}
+
+	// Determine columns to read
+	var cols []string
+	if expr != nil {
+		cols = append(e.Cols, expr.Field...)
+		for k := range expr.AddValues {
+			cols = append(e.Cols, k)
+		}
+	} else {
+		cols = e.Cols
+	}
+
+	// Filter columns based on table schema
+	linq.From(cols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
+		return str
+	}).ToSlice(&cols)
+
+	// Read row from Spanner
+	r, err := t.ReadRow(ctx, utils.ChangeTableNameForSpanner(table), key, cols)
+	if e := errors.AssignError(err); e != nil {
+		return false, e
+	}
+
+	// Parse row into a map
+	rowMap, err := parseRow(r, colDDL)
+	if err != nil {
+		return false, err
+	}
+
+	// Evaluate conditions
+	if expr != nil {
+		for index := 0; index < len(expr.Field); index++ {
+			colName := expr.Field[index]
+			if strings.HasPrefix(colName, "size(") {
+				// Extract attribute name from size function
+				sizeRegex := regexp.MustCompile(`size\((\w+)\)`)
+				matches := sizeRegex.FindStringSubmatch(colName)
+				if len(matches) == 2 {
+					colName = matches[1] // Extracted column name
+				}
+			}
+			status := evaluateStatementFromRowMap(expr.Condition[index], colName, rowMap)
+			tmp, ok := status.(bool)
+			if !ok || !tmp {
+				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
+					tmp, ok := rowMap[expr.Field[index]].(float64)
+					if ok {
+						m[expr.Field[index]] = tmp + v1
+						err = checkInifinty(m[expr.Field[index]].(float64), expr)
+						if err != nil {
+							return false, err
+						}
+					}
+				} else {
+					delete(m, expr.Field[index])
+				}
+			} else {
+				if v1, ok := expr.AddValues[expr.Field[index]]; ok {
+					tmp, ok := m[expr.Field[index]].(float64)
+					if ok {
+						m[expr.Field[index]] = tmp + v1
+						err = checkInifinty(m[expr.Field[index]].(float64), expr)
+						if err != nil {
+							return false, err
+						}
+					}
+				}
+			}
+			delete(expr.AddValues, expr.Field[index])
+		}
+
+		// Apply additional values
+		for k, v := range expr.AddValues {
+			val, ok := rowMap[k].(float64)
+			if ok {
+				m[k] = val + v
+				err = checkInifinty(m[k].(float64), expr)
+				if err != nil {
+					return false, err
+				}
+			} else {
+				m[k] = v
+			}
+		}
+	}
+
+	// Evaluate main attributes
+	for i := 0; i < len(e.Attributes); i++ {
+		e.ValueMap[e.Tokens[i]] = evaluateStatementFromRowMap(e.Attributes[i], e.Cols[i], rowMap)
+	}
+
+	// Execute the expression evaluation
+	status, err := utils.EvaluateExpression(e)
+	if err != nil {
+		return false, err
+	}
+
+	return status, nil
 }

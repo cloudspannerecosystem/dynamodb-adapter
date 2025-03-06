@@ -10,6 +10,47 @@
     "host": "localhost:9050",
     "basePath": "/v1",
     "paths": {
+        "/transactWriteItems/": {
+            "post": {
+                "description": "TransactWriteItems",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "TransactWriteItems",
+                "operationId": "transact-write-items",
+                "parameters": [
+                    {
+                        "description": "Please add request body of type models.TransactWriteItem",
+                        "name": "requestBody",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.TransactWriteItem"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "{\"errorMessage\":\"API access not allowed\",\"errorCode\": \"E0005\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "{\"errorMessage\":\"We had a problem with our server. Try again later.\",\"errorCode\":\"E0001\"}",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/batchDelete/": {
             "post": {
                 "description": "Batch Delete Item from table",

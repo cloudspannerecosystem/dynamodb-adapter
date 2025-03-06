@@ -28,6 +28,8 @@ import (
 
 var listRemoveTargetRegex = regexp.MustCompile(`(.*)\[(\d+)\]`)
 
+var CreateConditionExpressionFunc = CreateConditionExpression
+
 // GetFieldNameFromConditionalExpression returns the field name from conditional expression
 func GetFieldNameFromConditionalExpression(conditionalExpression string) string {
 	if strings.Contains(conditionalExpression, "attribute_exists") {

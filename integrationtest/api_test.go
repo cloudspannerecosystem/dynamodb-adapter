@@ -1475,6 +1475,97 @@ var (
 	}`
 )
 
+var (
+	TestTransactWrite1Name = "1: wrong url"
+	TestTransactWrite1     = models.TransactWriteItemsRequest{
+		TransactItems: []models.TransactWriteItem{
+			{Put: models.PutItemRequest{
+				TableName: "your_table_name", // add the actual table name here
+				Item: map[string]*dynamodb.AttributeValue{
+					"emp_id": {N: aws.String("1")},
+					// ... other attributes
+				},
+			}},
+		},
+	}
+
+	TestTransactWrite2Name = "2: valid request with one Put item"
+	TestTransactWrite2     = models.TransactWriteItemsRequest{
+		TransactItems: []models.TransactWriteItem{
+			{Put: models.PutItemRequest{
+				TableName: "employee",
+				Item: map[string]*dynamodb.AttributeValue{
+					"emp_id":     {N: aws.String("5")},
+					"first_name": {S: aws.String("John")},
+					"last_name":  {S: aws.String("Doe")},
+					"age":        {N: aws.String("30")},
+					"address":    {S: aws.String("123 Main St")},
+				},
+			}},
+		},
+	}
+	TestTransactWrite2Output = `[{"Put":{"address":{"S":"123 Main St"},"age":{"N":"30"},"emp_id":{"N":"5"},"first_name":{"S":"John"},"last_name":{"S":"Doe"}}}]`
+
+	TestTransactWrite3Name = "3: valid request with multiple items (Put, Update, Delete)"
+	TestTransactWrite3     = models.TransactWriteItemsRequest{
+		TransactItems: []models.TransactWriteItem{
+			{Put: models.PutItemRequest{
+				TableName: "employee",
+				Item: map[string]*dynamodb.AttributeValue{
+					"emp_id":     {N: aws.String("6")},
+					"first_name": {S: aws.String("Alice")},
+					"last_name":  {S: aws.String("Smith")},
+					"age":        {N: aws.String("25")},
+					"address":    {S: aws.String("456 Oak Ave")},
+				},
+			}},
+			{Update: models.UpdateAttr{
+				TableName: "employee",
+				Key: map[string]*dynamodb.AttributeValue{
+					"emp_id": {N: aws.String("5")},
+				},
+				UpdateExpression: "SET age = :age",
+				ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+					":age": {N: aws.String("31")},
+				},
+			}},
+			{Delete: models.DeleteItemRequest{
+				TableName: "employee",
+				Key: map[string]*dynamodb.AttributeValue{
+					"emp_id": {N: aws.String("1")},
+				},
+			}},
+		},
+	}
+	TestTransactWrite3Output = `[{"Put":{"address":{"S":"456 Oak Ave"},"age":{"N":"25"},"emp_id":{"N":"6"},"first_name":{"S":"Alice"},"last_name":{"S":"Smith"}}},{"Update":{"Attributes":{}}},{"Delete":{}}]`
+	TestTransactWrite4Name   = "4: valid request with ConditionCheck"
+	TestTransactWrite4       = models.TransactWriteItemsRequest{
+		TransactItems: []models.TransactWriteItem{
+			{ConditionCheck: models.ConditionCheckRequest{
+				TableName: "employee",
+				Key: map[string]*dynamodb.AttributeValue{
+					"emp_id": {N: aws.String("5")},
+				},
+				ConditionExpression: "age = :age",
+				ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+					":age": {N: aws.String("30")},
+				},
+			}},
+			{Put: models.PutItemRequest{
+				TableName: "employee",
+				Item: map[string]*dynamodb.AttributeValue{
+					"emp_id":     {N: aws.String("7")},
+					"first_name": {S: aws.String("Bob")},
+					"last_name":  {S: aws.String("Johnson")},
+					"age":        {N: aws.String("40")},
+					"address":    {S: aws.String("789 Elm St")},
+				},
+			}},
+		},
+	}
+	TestTransactWrite4Output = `[{"Put":{"address":{"S":"789 Elm St"},"age":{"N":"40"},"emp_id":{"N":"7"},"first_name":{"S":"Bob"},"last_name":{"S":"Johnson"}}}]`
+)
+
 func handlerInitFunc() *gin.Engine {
 	initErr := initializer.InitAll("../config.yaml")
 	if initErr != nil {
@@ -1901,6 +1992,36 @@ func testBatchWriteItemAPI(t *testing.T) {
 	apitest.RunTests(t, tests)
 }
 
+func testTransactWriteItemsAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return handlerInitFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		{
+			Name:    TestTransactWrite1Name,
+			ReqType: "POST",
+			PopulateHeaders: func(ctx context.Context, t *testing.T) map[string]string {
+				return map[string]string{
+					"Content-Type": "application/json",
+					"X-Amz-Target": "DynamoDB_20120810.TransactWriteItems",
+				}
+			},
+			ResourcePath: func(ctx context.Context, t *testing.T) string { return "/v1/WrongPath" },
+			PopulateJSON: func(ctx context.Context, t *testing.T) interface{} {
+				return TestTransactWrite1
+			},
+			ExpHTTPStatus: http.StatusNotFound,
+		},
+		createPostTestCase(TestTransactWrite2Name, "/v1", "TransactWriteItems", TestTransactWrite2Output, TestTransactWrite2),
+		createPostTestCase(TestTransactWrite3Name, "/v1", "TransactWriteItems", TestTransactWrite3Output, TestTransactWrite3),
+		createPostTestCase(TestTransactWrite4Name, "/v1", "TransactWriteItems", TestTransactWrite4Output, TestTransactWrite4),
+		// ... add more test cases here
+	}
+	apitest.RunTests(t, tests)
+}
+
 func TestApi(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration tests in short mode")
@@ -1926,17 +2047,19 @@ func TestApi(t *testing.T) {
 		"PutItemAPI",
 		"DeleteItemAPI",
 		"BatchWriteItemAPI",
+		"TestTransactWriteItemsAPI",
 	}
 
 	var tests = map[string]func(t *testing.T){
-		"GetItemAPI":        testGetItemAPI,
-		"GetBatchAPI":       testGetBatchAPI,
-		"QueryAPI":          testQueryAPI,
-		"ScanAPI":           testScanAPI,
-		"UpdateItemAPI":     testUpdateItemAPI,
-		"PutItemAPI":        testPutItemAPI,
-		"DeleteItemAPI":     testDeleteItemAPI,
-		"BatchWriteItemAPI": testBatchWriteItemAPI,
+		"GetItemAPI":                testGetItemAPI,
+		"GetBatchAPI":               testGetBatchAPI,
+		"QueryAPI":                  testQueryAPI,
+		"ScanAPI":                   testScanAPI,
+		"UpdateItemAPI":             testUpdateItemAPI,
+		"PutItemAPI":                testPutItemAPI,
+		"DeleteItemAPI":             testDeleteItemAPI,
+		"BatchWriteItemAPI":         testBatchWriteItemAPI,
+		"TestTransactWriteItemsAPI": testTransactWriteItemsAPI,
 	}
 
 	// run the tests

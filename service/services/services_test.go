@@ -15,10 +15,15 @@
 package services
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"cloud.google.com/go/spanner"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
+	"github.com/stretchr/testify/mock"
 	"gopkg.in/go-playground/assert.v1"
 )
 
@@ -746,4 +751,196 @@ func Test_parseLimit(t *testing.T) {
 		assert.Equal(t, got, tc.want)
 	}
 
+}
+
+type MockStorage struct {
+	mock.Mock
+}
+
+func (m *MockStorage) SpannerTransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	args := m.Called(ctx, tableName, putObj, e, expr, txn)
+	return args.Get(0).(map[string]interface{}), args.Get(1).(*spanner.Mutation), args.Error(2)
+}
+
+func (m *MockStorage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error) {
+	args := m.Called(ctx, tableName, pKeys, sKeys, projectionCols)
+	return args.Get(0).(map[string]interface{}), args.Error(1)
+}
+
+func (m *MockStorage) TransactWriteSpannerDel(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+	args := m.Called(ctx, table, n, eval, expr, txn)
+	return args.Get(0).(*spanner.Mutation), args.Error(1)
+}
+
+func (m *MockStorage) TransactWriteSpannerAdd(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	args := m.Called(ctx, table, n, eval, expr, txn)
+	return args.Get(0).(map[string]interface{}), args.Get(1).(*spanner.Mutation), args.Error(2)
+}
+
+func (m *MockStorage) TransactWriteSpannerRemove(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, colsToRemove []string, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+	args := m.Called(ctx, table, n, eval, expr, txn)
+	return args.Get(0).(*spanner.Mutation), args.Error(1)
+}
+
+type MockConfig struct{}
+
+func (m *MockConfig) GetTableConf(tableName string) (models.TableConfig, error) {
+	return models.TableConfig{ActualTable: tableName}, nil
+}
+
+func mockCreateConditionExpression(conditionExp string, expressionAttr map[string]interface{}) (*models.Eval, error) {
+	return &models.Eval{}, nil
+}
+
+type MockServices struct {
+	mock.Mock
+}
+
+func (m *MockStorage) GetSpannerClient() (*spanner.Client, error) {
+	args := m.Called()
+	client, _ := args.Get(0).(*spanner.Client)
+	return client, args.Error(1)
+}
+
+func TestTransactWritePut(t *testing.T) {
+	ctx := context.Background()
+	mockTxn := &spanner.ReadWriteTransaction{}
+	utils.CreateConditionExpressionFunc = mockCreateConditionExpression
+
+	// Ensure the mock is reset after the test
+	defer func() { utils.CreateConditionExpressionFunc = utils.CreateConditionExpression }()
+
+	tableName := "TestTable"
+	putObj := map[string]interface{}{"Name": "John"}
+	oldRes := map[string]interface{}{"Age": 30}
+	expr := &models.UpdateExpressionCondition{}
+	conditionExp := "#age > :minAge"
+	expressionAttr := map[string]interface{}{":minAge": 18}
+	mockStorage := new(MockStorage)
+
+	models.DbConfigMap = map[string]models.TableConfig{
+		"TestTable": {
+			ActualTable:  "TestTable",
+			PartitionKey: "id",
+		},
+	}
+	models.TableDDL = make(map[string]map[string]string)
+	models.TableDDL["TestTable"] = map[string]string{
+		"id":   "INT64",
+		"Name": "STRING",
+		"Age":  "INT64",
+	}
+
+	mockStorageInstance := &storage.Storage{}
+	storage.SetStorageInstance(mockStorageInstance)
+
+	mockStorage.On("SpannerTransactWritePut", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
+		Return(map[string]interface{}{"Name": "John", "Age": 30}, &spanner.Mutation{}, nil)
+
+	svc := &spannerService{
+		st: mockStorage, // Assign the mock storage to the struct field
+	}
+	result, _, _ := svc.TransactWritePut(ctx, tableName, putObj, expr, conditionExp, expressionAttr, oldRes, mockTxn)
+
+	expected := map[string]interface{}{
+		"Name": "John",
+		"Age":  30,
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Expected result %+v, got %+v", expected, result)
+	}
+
+	mockStorage.AssertExpectations(t)
+}
+
+func TestTransactWriteDel(t *testing.T) {
+	ctx := context.Background()
+	mockTxn := &spanner.ReadWriteTransaction{}
+	utils.CreateConditionExpressionFunc = mockCreateConditionExpression
+
+	defer func() { utils.CreateConditionExpressionFunc = utils.CreateConditionExpression }()
+
+	tableName := "TestTable"
+	attrMap := map[string]interface{}{"id": 1}
+	conditionExp := "#age > :minAge"
+	expressionAttr := map[string]interface{}{":minAge": 18}
+	expr := &models.UpdateExpressionCondition{}
+	mockStorage := new(MockStorage)
+
+	models.DbConfigMap = map[string]models.TableConfig{
+		"TestTable": {
+			ActualTable:  "TestTable",
+			PartitionKey: "id",
+		},
+	}
+
+	mockStorage.On("TransactWriteSpannerDel", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
+		Return(&spanner.Mutation{}, nil)
+	mockStorage.On("SpannerGet", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(map[string]interface{}{"Age": 30, "Name": "John"}, nil)
+
+	svc := &spannerService{st: mockStorage}
+	result, _, _ := svc.TransactWriteDel(ctx, tableName, attrMap, conditionExp, expressionAttr, expr, mockTxn)
+
+	expected := map[string]interface{}{"Age": 30, "Name": "John"}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Expected result %+v, got %+v", expected, result)
+	}
+
+	mockStorage.AssertExpectations(t)
+}
+
+func TestTransactWriteAdd(t *testing.T) {
+	ctx := context.Background()
+	mockTxn := &spanner.ReadWriteTransaction{}
+	utils.CreateConditionExpressionFunc = mockCreateConditionExpression
+	defer func() { utils.CreateConditionExpressionFunc = utils.CreateConditionExpression }()
+
+	tableName := "TestTable"
+	attrMap := map[string]interface{}{"Name": "John"}
+	oldRes := map[string]interface{}{"Age": 30}
+	conditionExp := "#age > :minAge"
+	expressionAttr := map[string]interface{}{":minAge": 18}
+	expr := &models.UpdateExpressionCondition{}
+	mockStorage := new(MockStorage)
+
+	mockStorage.On("TransactWriteSpannerAdd", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
+		Return(map[string]interface{}{"Name": "John"}, &spanner.Mutation{}, nil)
+
+	svc := &spannerService{st: mockStorage}
+	result, _, _ := svc.TransactWriteAdd(ctx, tableName, attrMap, conditionExp, attrMap, expressionAttr, expr, oldRes, mockTxn)
+
+	expected := map[string]interface{}{"Name": "John", "Age": 30}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Expected result %+v, got %+v", expected, result)
+	}
+
+	mockStorage.AssertExpectations(t)
+}
+
+func TestTransactWriteRemove(t *testing.T) {
+	ctx := context.Background()
+	mockTxn := &spanner.ReadWriteTransaction{}
+	utils.CreateConditionExpressionFunc = mockCreateConditionExpression
+	defer func() { utils.CreateConditionExpressionFunc = utils.CreateConditionExpression }()
+
+	tableName := "TestTable"
+	oldRes := map[string]interface{}{"Age": 30, "Name": "John"}
+	expr := &models.UpdateExpressionCondition{}
+	actionValue := "Name"
+	updateAttr := models.UpdateAttr{PrimaryKeyMap: map[string]interface{}{}}
+	mockStorage := new(MockStorage)
+
+	mockStorage.On("TransactWriteSpannerRemove", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
+		Return(&spanner.Mutation{}, nil)
+
+	svc := &spannerService{st: mockStorage}
+	result, _, _ := svc.TransactWriteRemove(ctx, tableName, updateAttr, actionValue, expr, oldRes, mockTxn)
+
+	expected := map[string]interface{}{"Age": 30}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Expected result %+v, got %+v", expected, result)
+	}
+
+	mockStorage.AssertExpectations(t)
 }

@@ -22,6 +22,7 @@ import (
 	"hash/fnv"
 	"strconv"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/spanner"
 	"github.com/ahmetb/go-linq"
@@ -32,6 +33,58 @@ import (
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
 )
+
+type Storage interface {
+	GetSpannerClient() (*spanner.Client, error)
+	SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error)
+	TransactWriteSpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error)
+	TransactWriteSpannerAdd(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	TransactWriteSpannerRemove(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, colsToRemove []string, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error)
+}
+type Service interface {
+	MayIReadOrWrite(tableName string, isWrite bool, user string) bool
+	TransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	TransactWriteDel(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	TransactWriteAdd(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, m, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	TransactWriteRemove(ctx context.Context, tableName string, updateAttr models.UpdateAttr, actionValue string, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error)
+}
+
+type spannerService struct {
+	spannerClient *spanner.Client
+	st            Storage
+}
+
+var service Service // Service interface variable
+
+var once sync.Once
+
+func SetServiceInstance(s Service) {
+	service = s
+}
+
+func GetServiceInstance() Service {
+	once.Do(func() {
+		storageInstance := storage.GetStorageInstance()
+		spannerClient, err := storageInstance.GetSpannerClient()
+		if err != nil {
+			logger.LogError("Failed to initialize Spanner client: %v", err)
+			panic(err)
+		}
+
+		service = &spannerService{
+			spannerClient: spannerClient,
+			st:            storageInstance,
+		}
+	})
+	return service
+}
+
+// MayIReadOrWrite for checking the operation is allowed or not
+func (s *spannerService) MayIReadOrWrite(table string, IsMutation bool, operation string) bool {
+	return true
+}
 
 // getSpannerProjections makes a projection array of columns
 func getSpannerProjections(projectionExpression, table string, expressionAttributeNames map[string]string) []string {
@@ -205,7 +258,7 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 }
 
 // GetWithProjection get table data with projection
-func GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error) {
+func (s *spannerService) GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error) {
 	if primaryKeyMap == nil {
 		return nil, errors.New("ValidationException")
 	}
@@ -599,4 +652,178 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 		}
 	}
 	return updateResp, nil
+}
+
+// TransactWritePut manages a transactional put operation in Spanner, ensuring old data is fetched and conditions are evaluated.
+func (s *spannerService) TransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	// Fetch the table configuration to retrieve partition and sort keys
+	tableConf, err := config.GetTableConf(tableName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Update tableName to its actual value from the table configuration
+	tableName = tableConf.ActualTable
+
+	// Create the condition expression for the transaction
+	e, err := utils.CreateConditionExpression(conditionExp, expressionAttr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Perform the transactional write operation
+	newResp, mut, err := s.st.SpannerTransactWritePut(ctx, tableName, putObj, e, expr, txn)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If there is no old response, return early with nil mutation
+	if oldRes == nil {
+		return oldRes, nil, nil
+	}
+
+	// Combine the old response with the new response
+	updateResp := map[string]interface{}{}
+	for k, v := range oldRes {
+		updateResp[k] = v
+	}
+	for k, v := range newResp {
+		updateResp[k] = v
+	}
+
+	// Return the updated response and the mutation
+	return newResp, mut, nil
+}
+
+// TransactWriteDel performs a transactional delete on Spanner
+func (s *spannerService) TransactWriteDel(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	// Fetch the table configuration and update the table name
+	tableConf, err := config.GetTableConf(tableName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tableName = tableConf.ActualTable
+
+	// Create the condition expression for the transaction
+	e, err := utils.CreateConditionExpression(condExpression, expressionAttr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Perform the transactional write operation
+	mut, err := s.st.TransactWriteSpannerDel(ctx, tableName, expressionAttr, e, expr, txn)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Retrieve the previous response before the delete operation
+	sKey := tableConf.SortKey
+	pKey := tableConf.PartitionKey
+	res, err := s.st.SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return res, mut, nil
+}
+
+// TransactWriteAdd performs a transactional add operation in Spanner, ensuring old data is fetched and conditions are evaluated.
+func (s *spannerService) TransactWriteAdd(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, m, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	// Fetch the table configuration to retrieve the actual table name
+	tableConf, err := config.GetTableConf(tableName)
+	if err != nil {
+		return nil, nil, err
+	}
+	tableName = tableConf.ActualTable
+
+	// Create the condition expression for the transaction
+	e, err := utils.CreateConditionExpression(condExpression, expressionAttr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Perform the transactional add operation
+	newResp, mut, err := s.st.TransactWriteSpannerAdd(ctx, tableName, m, e, expr, txn)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If there is no old response, return early with nil mutation
+	if oldRes == nil {
+		return newResp, nil, nil
+	}
+
+	// Combine the old response with the new response
+	updateResp := map[string]interface{}{}
+	for k, v := range oldRes {
+		updateResp[k] = v
+	}
+	for k, v := range newResp {
+		updateResp[k] = v
+	}
+
+	// Return the updated response and the mutation
+	return updateResp, mut, nil
+}
+
+// TransactWriteRemove performs a transactional remove operation in Spanner, ensuring old data is fetched and conditions are evaluated.
+//
+// It takes the following parameters:
+// - ctx: the context of the request
+// - tableName: the name of the table
+// - updateAttr: the update attribute
+// - actionValue: the action value
+// - expr: the expression
+// - oldRes: the old response
+// - txn: the transaction
+//
+// It returns a map of the updated response, a mutation, and an error.
+func (s *spannerService) TransactWriteRemove(ctx context.Context, tableName string, updateAttr models.UpdateAttr, actionValue string, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+	actionValue = strings.ReplaceAll(actionValue, " ", "")
+	colsToRemove := strings.Split(actionValue, ",")
+	tableConf, err := config.GetTableConf(tableName)
+	if err != nil {
+		return nil, nil, err
+	}
+	tableName = tableConf.ActualTable
+	e, err := utils.CreateConditionExpression(updateAttr.ConditionExpression, updateAttr.ExpressionAttributeMap)
+	if err != nil {
+		return nil, nil, err
+	}
+	mut, err := s.st.TransactWriteSpannerRemove(ctx, tableName, updateAttr.PrimaryKeyMap, e, expr, colsToRemove, txn)
+	if err != nil {
+		return nil, nil, err
+	}
+	if oldRes == nil {
+		return oldRes, nil, nil
+	}
+	updateResp := map[string]interface{}{}
+	for k, v := range oldRes {
+		updateResp[k] = v
+	}
+
+	// remove the columns from the old response
+	for i := 0; i < len(colsToRemove); i++ {
+		delete(updateResp, colsToRemove[i])
+	}
+	return updateResp, mut, nil
+}
+
+// TransactWriteDelete - This function is used to delete an item in a table.
+// It takes the context of the request, the name of the table, the primary key map,
+// the condition expression, the attribute map, the expression, and the transaction.
+// It returns a mutation and an error.
+func TransactWriteDelete(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, condExpression string, attrMap map[string]interface{}, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
+	tableConf, err := config.GetTableConf(tableName)
+	if err != nil {
+		return nil, err
+	}
+	tableName = tableConf.ActualTable
+	e, err := utils.CreateConditionExpression(condExpression, attrMap)
+	if err != nil {
+		return nil, err
+	}
+	// Call the storage instance to delete the item
+	mut, err := storage.GetStorageInstance().TransactWriteSpannerDelete(ctx, tableName, primaryKeyMap, e, expr, txn)
+	return mut, err
 }
