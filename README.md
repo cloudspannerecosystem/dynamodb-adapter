@@ -45,6 +45,7 @@ DynamoDB Adapter currently supports the folowing operations:
 | Query |
 | Scan |
 | UpdateItem |
+| TransactGetItems |
 | TransactWriteItems |
 
 ### Supported Data Types
@@ -61,6 +62,9 @@ DynamoDB Adapter currently supports the following DynamoDB data types
 | `NS` (number set)             | `ARRAY<FLOAT64>` |
 | `BS` (binary set)             | `ARRAY<BYTES(MAX)>` |
 | `L` (List Type)               | `JSON` |
+| `M` (Map Type)                | `JSON` |
+
+Note: Map and List datatypes does not support the Set datatypes.
 
 ## Configuration
 

@@ -16,23 +16,68 @@
 package models
 
 import (
+	"context"
 	"sync"
 
 	"github.com/antonmedv/expr/vm"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
 )
 
 type SpannerConfig struct {
-	ProjectID        string `yaml:"project_id"`
-	InstanceID       string `yaml:"instance_id"`
-	DatabaseName     string `yaml:"database_name"`
-	QueryLimit       int64  `yaml:"query_limit"`
-	DynamoQueryLimit int32  `yaml:"dynamo_query_limit"` //dynamo_query_limit
+	ProjectID        string  `yaml:"project_id"`
+	InstanceID       string  `yaml:"instance_id"`
+	DatabaseName     string  `yaml:"database_name"`
+	QueryLimit       int64   `yaml:"query_limit"`
+	DynamoQueryLimit int32   `yaml:"dynamo_query_limit"` //dynamo_query_limit
+	Session          Session `yaml:"Session"`
+}
+
+type Session struct {
+	Min          uint64 `yaml:"min"`
+	Max          uint64 `yaml:"max"`
+	GrpcChannels int    `yaml:"grpcChannels"`
+}
+
+// Spanner read/write operation settings.
+type Operation struct {
+	MaxCommitDelay   uint64 `yaml:"maxCommitDelay"`
+	ReplayProtection bool   `yaml:"replayProtection"`
+}
+
+// OtelConfig defines the structure of the YAML configuration
+type OtelConfig struct {
+	Enabled                  bool   `yaml:"enabled"`
+	EnabledClientSideMetrics bool   `yaml:"enabledClientSideMetrics"`
+	ServiceName              string `yaml:"serviceName"`
+	HealthCheck              struct {
+		Enabled  bool   `yaml:"enabled"`
+		Endpoint string `yaml:"endpoint"`
+	} `yaml:"healthcheck"`
+	Metrics struct {
+		Enabled  bool   `yaml:"enabled"`
+		Endpoint string `yaml:"endpoint"`
+	} `yaml:"metrics"`
+	Traces struct {
+		Enabled       bool    `yaml:"enabled"`
+		Endpoint      string  `yaml:"endpoint"`
+		SamplingRatio float64 `yaml:"samplingRatio"`
+	} `yaml:"traces"`
 }
 
 type Config struct {
-	Spanner SpannerConfig `yaml:"spanner"`
+	Spanner   SpannerConfig `yaml:"spanner"`
+	Otel      *OtelConfig   `yaml:"otel"`
+	UserAgent string
 }
+
+type Proxy struct {
+	Context      context.Context
+	OtelInst     *otelgo.OpenTelemetry // Exported field (starts with uppercase)
+	OtelShutdown func(context.Context) error
+}
+
+var GlobalProxy *Proxy
 
 var GlobalConfig *Config
 
@@ -293,6 +338,26 @@ type StreamDataModel struct {
 	EventSourceArn string                 `json:"EventSourceArn"`
 }
 
+// TransactGetItemsRequest represents the input structure for TransactGetItems API.
+type TransactGetItemsRequest struct {
+	TransactItems          []TransactGetItem `json:"TransactItems"`
+	ReturnConsumedCapacity string            `json:"ReturnConsumedCapacity,omitempty"`
+}
+
+// TransactGetItem represents a single Get operation inside TransactGetItems.
+type TransactGetItem struct {
+	Get GetItemRequest `json:"Get"`
+}
+
+// GetItemRequest represents the structure of a Get request.
+type GetItemRequest struct {
+	TableName                string                              `json:"TableName"`
+	Keys                     map[string]*dynamodb.AttributeValue `json:"Key"`
+	KeyArray                 []map[string]interface{}            `json:"KeyArray"`
+	ProjectionExpression     string                              `json:"ProjectionExpression,omitempty"`
+	ExpressionAttributeNames map[string]string                   `json:"ExpressionAttributeNames,omitempty"`
+}
+
 // TransactWriteItemsRequest represents the input structure for TransactWriteItems API.
 type TransactWriteItemsRequest struct {
 	TransactItems               []TransactWriteItem `json:"TransactItems"`
@@ -389,7 +454,21 @@ type ConsumedCapacity struct {
 	CapacityUnits float64 `json:"CapacityUnits"`
 }
 
-// TransactWriteItemsResponse represents the overall response structure for TransactWriteItems.
+type TransactGetItemResponse struct {
+	TableName string                 `json:"TableName"`
+	Item      map[string]interface{} `json:"Item"`
+}
+
+// TransactGetItemsResponse represents the overall response structure for multiple TransactGetItems.
+type TransactGetItemsResponse struct {
+	Responses []TransactGetItemResponse `json:"Responses"`
+}
+
+type ResponseItem struct {
+	TableName interface{}            `json:"TableName"`
+	Item      map[string]interface{} `json:"Item"`
+}
+
 type TransactWriteItemsResponse struct {
 	ConsumedCapacity      ConsumedCapacity                 `json:"ConsumedCapacity,omitempty"`      // Added for consistency
 	ItemCollectionMetrics map[string]ItemCollectionMetrics `json:"ItemCollectionMetrics,omitempty"` // Added for consistency

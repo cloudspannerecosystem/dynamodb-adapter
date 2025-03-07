@@ -753,6 +753,47 @@ func Test_parseLimit(t *testing.T) {
 
 }
 
+func TestTransactGetItems(t *testing.T) {
+	ctx := context.Background()
+
+	mockStorage := new(MockStorage)
+	mockStorage.On("SpannerTransactGetItems",
+		mock.Anything,
+		map[string][]string{"test_table": {"emp_id", "name"}},
+		mock.Anything,
+		mock.Anything,
+	).Return([]map[string]interface{}{
+		{"emp_id": 1, "name": "John Doe"},
+		{"emp_id": 2, "name": "Jane Doe"},
+	}, nil)
+
+	models.DbConfigMap = make(map[string]models.TableConfig)
+	models.DbConfigMap["test_table"] = models.TableConfig{
+		ActualTable:  "test_table",
+		PartitionKey: "emp_id",
+	}
+
+	models.TableColumnMap = make(map[string][]string)
+	models.TableColumnMap[utils.ChangeTableNameForSpanner("test_table")] = []string{"emp_id", "name"}
+
+	s := &spannerService{st: mockStorage}
+	tableProjectionCols := map[string][]string{"test_table": {"emp_id", "name"}}
+	pValues := map[string]interface{}{"emp_id": 1}
+	sValues := map[string]interface{}{}
+
+	result, _ := s.TransactGetItem(ctx, tableProjectionCols, pValues, sValues)
+
+	assert.Equal(t, 1, result[0]["emp_id"])
+	assert.Equal(t, "John Doe", result[0]["name"])
+	assert.Equal(t, 2, result[1]["emp_id"])
+	assert.Equal(t, "Jane Doe", result[1]["name"])
+}
+
+func (m *MockStorage) SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	args := m.Called(ctx, tableProjectionCols, pValues, sValues)
+	return args.Get(0).([]map[string]interface{}), args.Error(1)
+}
+
 type MockStorage struct {
 	mock.Mock
 }
@@ -762,9 +803,9 @@ func (m *MockStorage) SpannerTransactWritePut(ctx context.Context, tableName str
 	return args.Get(0).(map[string]interface{}), args.Get(1).(*spanner.Mutation), args.Error(2)
 }
 
-func (m *MockStorage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error) {
+func (m *MockStorage) SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, map[string]interface{}, error) {
 	args := m.Called(ctx, tableName, pKeys, sKeys, projectionCols)
-	return args.Get(0).(map[string]interface{}), args.Error(1)
+	return args.Get(0).(map[string]interface{}), args.Get(1).(map[string]interface{}), args.Error(2)
 }
 
 func (m *MockStorage) TransactWriteSpannerDel(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error) {
@@ -877,7 +918,7 @@ func TestTransactWriteDel(t *testing.T) {
 	mockStorage.On("TransactWriteSpannerDel", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
 		Return(&spanner.Mutation{}, nil)
 	mockStorage.On("SpannerGet", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(map[string]interface{}{"Age": 30, "Name": "John"}, nil)
+		Return(map[string]interface{}{"Age": 30, "Name": "John"}, map[string]interface{}{}, nil)
 
 	svc := &spannerService{st: mockStorage}
 	result, _, _ := svc.TransactWriteDel(ctx, tableName, attrMap, conditionExp, expressionAttr, expr, mockTxn)

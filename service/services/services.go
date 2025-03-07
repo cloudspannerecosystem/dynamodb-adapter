@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,19 +37,22 @@ import (
 
 type Storage interface {
 	GetSpannerClient() (*spanner.Client, error)
+	SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
 	SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
-	SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, error)
+	SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, map[string]interface{}, error)
 	TransactWriteSpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error)
 	TransactWriteSpannerAdd(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
 	TransactWriteSpannerRemove(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, colsToRemove []string, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error)
 }
 type Service interface {
 	MayIReadOrWrite(tableName string, isWrite bool, user string) bool
+	TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
+	TransactGetProjectionCols(ctx context.Context, transactGetMeta models.GetItemRequest) ([]string, []interface{}, []interface{}, error)
 	TransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
 	TransactWriteDel(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
 	TransactWriteAdd(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, m, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
 	TransactWriteRemove(ctx context.Context, tableName string, updateAttr models.UpdateAttr, actionValue string, expr *models.UpdateExpressionCondition, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
-	GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error)
+	GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, map[string]interface{}, error)
 }
 
 type spannerService struct {
@@ -56,10 +60,12 @@ type spannerService struct {
 	st            Storage
 }
 
-var service Service // Service interface variable
+var (
+	service Service
+	once    sync.Once
+)
 
-var once sync.Once
-
+// SetServiceInstance sets the service instance (for dependency injection)
 func SetServiceInstance(s Service) {
 	service = s
 }
@@ -86,6 +92,14 @@ func (s *spannerService) MayIReadOrWrite(table string, IsMutation bool, operatio
 	return true
 }
 
+const (
+	regexPattern = `^[a-zA-Z_][a-zA-Z0-9_.]*(\.[a-zA-Z_][a-zA-Z0-9_.]*)+\s*=\s*@\w+$`
+)
+
+var (
+	re = regexp.MustCompile(regexPattern)
+)
+
 // getSpannerProjections makes a projection array of columns
 func getSpannerProjections(projectionExpression, table string, expressionAttributeNames map[string]string) []string {
 	if projectionExpression == "" {
@@ -102,7 +116,6 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 			projectionCols = append(projectionCols, pro)
 		}
 	}
-
 	linq.From(projectionCols).IntersectByT(linq.From(models.TableColumnMap[utils.ChangeTableNameForSpanner(table)]), func(str string) string {
 		return str
 	}).ToSlice(&projectionCols)
@@ -110,7 +123,7 @@ func getSpannerProjections(projectionExpression, table string, expressionAttribu
 }
 
 // Put writes an object to Spanner
-func Put(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}) (map[string]interface{}, error) {
+func Put(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, spannerRow map[string]interface{}) (map[string]interface{}, error) {
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
 		return nil, err
@@ -121,7 +134,7 @@ func Put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	newResp, err := storage.GetStorageInstance().SpannerPut(ctx, tableName, putObj, e, expr)
+	newResp, err := storage.GetStorageInstance().SpannerPut(ctx, tableName, putObj, e, expr, spannerRow)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +204,7 @@ func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 	}
 	sKey := tableConf.SortKey
 	pKey := tableConf.PartitionKey
-	res, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
+	res, _, err := storage.GetStorageInstance().SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +237,7 @@ func BatchGet(ctx context.Context, tableName string, keyMapArray []map[string]in
 }
 
 // BatchPut writes bulk records to Spanner
-func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]interface{}) error {
+func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]interface{}, spannerRow []map[string]interface{}) error {
 	if len(arrAttrMap) <= 0 {
 		return errors.New("ValidationException")
 	}
@@ -238,7 +251,7 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 		return err
 	}
 	tableName = tableConf.ActualTable
-	err = storage.GetStorageInstance().SpannerBatchPut(ctx, tableName, arrAttrMap)
+	err = storage.GetStorageInstance().SpannerBatchPut(ctx, tableName, arrAttrMap, spannerRow)
 	if err != nil {
 		return err
 	}
@@ -258,13 +271,13 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 }
 
 // GetWithProjection get table data with projection
-func (s *spannerService) GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, error) {
+func (s *spannerService) GetWithProjection(ctx context.Context, tableName string, primaryKeyMap map[string]interface{}, projectionExpression string, expressionAttributeNames map[string]string) (map[string]interface{}, map[string]interface{}, error) {
 	if primaryKeyMap == nil {
-		return nil, errors.New("ValidationException")
+		return nil, nil, errors.New("ValidationException")
 	}
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tableName = tableConf.ActualTable
@@ -466,8 +479,8 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 func createWhereClause(whereClause string, expression string, queryVar string, RangeValueMap map[string]interface{}, params map[string]interface{}) (string, string) {
 	_, _, expression = utils.ParseBeginsWith(expression)
 	expression = strings.ReplaceAll(expression, "begins_with", "STARTS_WITH")
-
-	if whereClause != "WHERE " {
+	trimmedString := strings.TrimSpace(whereClause)
+	if whereClause != "WHERE " && !strings.HasSuffix(trimmedString, "AND") {
 		whereClause += " AND "
 	}
 	count := 1
@@ -479,7 +492,19 @@ func createWhereClause(whereClause string, expression string, queryVar string, R
 			count++
 		}
 	}
-	whereClause += expression
+	// Handle JSON paths if the expression is structured correctly
+	if re.MatchString(expression) {
+		expression := strings.TrimSpace(expression)
+		expressionParts := strings.Split(expression, "=")
+		expressionParts[0] = strings.TrimSpace(expressionParts[0])
+		jsonFields := strings.Split(expressionParts[0], ".")
+
+		// Construct new JSON_VALUE expression
+		newExpression := fmt.Sprintf("JSON_VALUE(%s, '$.%s') = %s", jsonFields[0], strings.Join(jsonFields[1:], "."), expressionParts[1])
+		whereClause = whereClause + " " + newExpression
+	} else if expression != "" {
+		whereClause = whereClause + expression
+	}
 	return whereClause, expression
 }
 
@@ -654,6 +679,40 @@ func Remove(ctx context.Context, tableName string, updateAttr models.UpdateAttr,
 	return updateResp, nil
 }
 
+// TransactGetProjectionCols gets the projection columns from the TransactGet request
+func (s *spannerService) TransactGetProjectionCols(ctx context.Context, getRequest models.GetItemRequest) ([]string, []interface{}, []interface{}, error) {
+	// Get the table configuration
+	tableConf, err := config.GetTableConf(getRequest.TableName)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Get the projection columns
+	projectionCols := getSpannerProjections(getRequest.ProjectionExpression, tableConf.ActualTable, getRequest.ExpressionAttributeNames)
+
+	// Get the partition and sort keys
+	var pValues []interface{}
+	var sValues []interface{}
+	for i := 0; i < len(getRequest.KeyArray); i++ {
+		pValue := getRequest.KeyArray[i][tableConf.PartitionKey]
+		if tableConf.SortKey != "" {
+			sValue := getRequest.KeyArray[i][tableConf.SortKey]
+			sValues = append(sValues, sValue)
+		}
+		pValues = append(pValues, pValue)
+	}
+
+	// Return the projection columns and the keys
+	return projectionCols, pValues, sValues, nil
+}
+
+func (s *spannerService) TransactGetItem(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error) {
+	// Call the SpannerTransactGetItems method on the Storage interface
+	// This method fetches data from Spanner based on the provided table projection columns,
+	// partition key values, and sort key values.
+	return s.st.SpannerTransactGetItems(ctx, tableProjectionCols, pValues, sValues)
+}
+
 // TransactWritePut manages a transactional put operation in Spanner, ensuring old data is fetched and conditions are evaluated.
 func (s *spannerService) TransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, expr *models.UpdateExpressionCondition, conditionExp string, expressionAttr, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
 	// Fetch the table configuration to retrieve partition and sort keys
@@ -720,7 +779,7 @@ func (s *spannerService) TransactWriteDel(ctx context.Context, tableName string,
 	// Retrieve the previous response before the delete operation
 	sKey := tableConf.SortKey
 	pKey := tableConf.PartitionKey
-	res, err := s.st.SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
+	res, _, err := s.st.SpannerGet(ctx, tableName, attrMap[pKey], attrMap[sKey], nil)
 	if err != nil {
 		return nil, nil, err
 	}

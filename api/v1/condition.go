@@ -38,6 +38,7 @@ import (
 
 var operations = map[string]string{"SET": "(?i) SET ", "DELETE": "(?i) DELETE ", "ADD": "(?i) ADD ", "REMOVE": "(?i) REMOVE "}
 var byteSliceType = reflect.TypeOf([]byte(nil))
+var defaultLevel int16 = 1
 var (
 	listRegex             = regexp.MustCompile(`list_append\(([^,]+),\s*([^\)]+)\)`)
 	listIndexRegex        = regexp.MustCompile(`(\w+)\[(\d+)\]`)
@@ -422,7 +423,7 @@ func parseUpdateExpresstion(actionValue string) *models.UpdateExpressionConditio
 	return expr
 }
 
-func performOperation(ctx context.Context, action string, actionValue string, updateAtrr models.UpdateAttr, oldRes map[string]interface{}) (map[string]interface{}, map[string]interface{}, error) {
+func performOperation(ctx context.Context, action string, actionValue string, updateAtrr models.UpdateAttr, oldRes map[string]interface{}, spannerRow map[string]interface{}) (map[string]interface{}, map[string]interface{}, error) {
 	switch {
 	case action == "DELETE":
 		// perform delete
@@ -433,12 +434,12 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 		if strings.Contains(actionValue, "list_append") {
 			// parse list_append operation here
 			m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
-			res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
+			res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes, spannerRow)
 			return res, m, err
 		}
 		// Update data in table
 		m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
-		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes)
+		res, err := services.Put(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes, spannerRow)
 		return res, m, err
 	case action == "ADD":
 		// Add data in table
@@ -458,8 +459,9 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc services.Service) (interface{}, error) {
 	updateAtrr.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(updateAtrr.TableName, updateAtrr.ExpressionAttributeNames)
 	var oldRes map[string]interface{}
+	var spannerRow map[string]interface{}
 	if updateAtrr.ReturnValues != "NONE" {
-		oldRes, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+		oldRes, spannerRow, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
 	}
 	var resp map[string]interface{}
 	var actVal = make(map[string]interface{})
@@ -471,7 +473,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc ser
 	m := extractOperations(updateAtrr.UpdateExpression)
 
 	for k, v := range m {
-		res, acVal, err := performOperation(ctx, k, v, updateAtrr, oldRes)
+		res, acVal, err := performOperation(ctx, k, v, updateAtrr, oldRes, spannerRow)
 		resp = res
 		er = err
 		for k, v := range acVal {
@@ -681,7 +683,7 @@ func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	return rs
 }
 
-func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
+func convertFrom(a *dynamodb.AttributeValue, tableName string, level int16) interface{} {
 	if a.S != nil {
 		return *a.S
 	}
@@ -716,7 +718,12 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 	if a.M != nil {
 		m := make(map[string]interface{})
 		for k, v := range a.M {
-			m[k] = convertFrom(v, tableName)
+			if level == 0 {
+				level = 2
+			} else {
+				level++
+			}
+			m[k] = convertFrom(v, tableName, level)
 		}
 		return m
 	}
@@ -724,7 +731,7 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 	if a.L != nil {
 		l := make([]interface{}, len(a.L))
 		for index, v := range a.L {
-			l[index] = convertFrom(v, tableName)
+			l[index] = convertFrom(v, tableName, 0)
 		}
 		return l
 	}
@@ -733,46 +740,58 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string) interface{} {
 		return a.B
 	}
 	if a.SS != nil {
-		uniqueStrings := make(map[string]struct{})
-		for _, v := range a.SS {
-			uniqueStrings[*v] = struct{}{}
-		}
+		if level > 1 {
+			panic("The Map and List types do not support String Set (SS) values. Please use the List type instead.")
+		} else {
+			uniqueStrings := make(map[string]struct{})
+			for _, v := range a.SS {
+				uniqueStrings[*v] = struct{}{}
+			}
 
-		// Convert map keys to a slice
-		l := make([]string, 0, len(uniqueStrings))
-		for str := range uniqueStrings {
-			l = append(l, str)
+			// Convert map keys to a slice
+			l := make([]string, 0, len(uniqueStrings))
+			for str := range uniqueStrings {
+				l = append(l, str)
+			}
+			return l
 		}
-
-		return l
 	}
 	if a.NS != nil {
-		l := []float64{}
-		numberMap := make(map[string]struct{})
-		for _, v := range a.NS {
-			if _, exists := numberMap[*v]; !exists {
-				numberMap[*v] = struct{}{}
-				n, err := strconv.ParseFloat(*v, 64)
-				if err != nil {
-					panic(fmt.Sprintf("Invalid number in NS: %s", *v))
+		if level > 1 {
+			panic("The Map and List types do not support Number Set (NS) values. Please use the List type instead.")
+		} else {
+			l := []float64{}
+			numberMap := make(map[string]struct{})
+			for _, v := range a.NS {
+				if _, exists := numberMap[*v]; !exists {
+					numberMap[*v] = struct{}{}
+					n, err := strconv.ParseFloat(*v, 64)
+					if err != nil {
+						panic(fmt.Sprintf("Invalid number in NS: %s", *v))
+					}
+					l = append(l, n)
 				}
-				l = append(l, n)
 			}
+			return l
 		}
-		return l
 	}
 	if a.BS != nil {
-		// Handle Binary Set
-		binarySet := [][]byte{}
-		binaryMap := make(map[string]struct{})
-		for _, v := range a.BS {
-			key := string(v)
-			if _, exists := binaryMap[key]; !exists {
-				binaryMap[key] = struct{}{}
-				binarySet = append(binarySet, v)
+		if level > 1 {
+			panic("The Map and List types do not support Binary Set (BS) values. Please use the List type instead.")
+		} else {
+			// Handle Binary Set
+			binarySet := [][]byte{}
+			binaryMap := make(map[string]struct{})
+			for _, v := range a.BS {
+				key := string(v)
+				if _, exists := binaryMap[key]; !exists {
+					binaryMap[key] = struct{}{}
+					binarySet = append(binarySet, v)
+				}
 			}
+			return binarySet
 		}
-		return binarySet
+
 	}
 	panic(fmt.Sprintf("%#v is not a supported dynamodb.AttributeValue", a))
 }
@@ -808,7 +827,7 @@ func ConvertFromMap(item map[string]*dynamodb.AttributeValue, v interface{}, tab
 
 	m := make(map[string]interface{})
 	for k, v := range item {
-		m[k] = convertFrom(v, tableName)
+		m[k] = convertFrom(v, tableName, defaultLevel)
 	}
 
 	if isTyped(reflect.TypeOf(v)) {
@@ -1037,7 +1056,7 @@ func TransactWriteUpdateExpression(ctx context.Context, updateAtrr models.Update
 	var oldRes map[string]interface{}
 	var mut *spanner.Mutation
 	if updateAtrr.ReturnValues != "NONE" {
-		oldRes, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+		oldRes, _, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
 	}
 	// loop through each operation and perform it
 	var resp map[string]interface{}
