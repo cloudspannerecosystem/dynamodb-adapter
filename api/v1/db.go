@@ -83,16 +83,17 @@ func (h *APIHandler) RouteRequest(c *gin.Context) {
 }
 
 func addParentSpanID(c *gin.Context, span trace.Span) trace.Span {
-	parentSpanID := c.Request.Header.Get("X-B3-Spanid")
-	traceID := c.Request.Header.Get("X-B3-Traceid")
-	serviceName := c.Request.Header.Get("service-name")
+	if span != nil {
+		parentSpanID := c.Request.Header.Get("X-B3-Spanid")
+		traceID := c.Request.Header.Get("X-B3-Traceid")
+		serviceName := c.Request.Header.Get("service-name")
 
-	span.SetAttributes(
-		attribute.String("parentSpanId", parentSpanID),
-		attribute.String("traceId", traceID),
-		attribute.String("service-name", serviceName),
-	)
-
+		span.SetAttributes(
+			attribute.String("parentSpanId", parentSpanID),
+			attribute.String("traceId", traceID),
+			attribute.String("service-name", serviceName),
+		)
+	}
 	return span
 }
 
@@ -257,7 +258,7 @@ func queryResponse(query models.Query, c *gin.Context, svc services.Service) {
 	} else {
 		c.JSON(errors.HTTPResponse(err, query))
 	}
-	if hash != "" {
+	if hash != "" && span != nil {
 		span.SetAttributes(
 			attribute.String("qHash", hash),
 		)
@@ -344,9 +345,11 @@ func (h *APIHandler) GetItemMeta(c *gin.Context) {
 		otelgo.AddAnnotation(ctx, "Binding GetItemMeta JSON Request")
 
 		// Set the table name as a tag for better observability
-		span.SetAttributes(
-			attribute.String("table", getItemMeta.TableName),
-		)
+		if span != nil {
+			span.SetAttributes(
+				attribute.String("table", getItemMeta.TableName),
+			)
+		}
 		logger.LogDebug(getItemMeta)
 		if allow := h.svc.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
@@ -466,11 +469,13 @@ func batchGetDataSingleTable(ctx context.Context, batchGetWithProjectionMeta mod
 	batchGetWithProjectionMeta.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.ExpressionAttributeNames)
 	res, err2 := services.BatchGetWithProjection(ctx, batchGetWithProjectionMeta.TableName, batchGetWithProjectionMeta.KeyArray, batchGetWithProjectionMeta.ProjectionExpression, batchGetWithProjectionMeta.ExpressionAttributeNames)
 
-	span.SetAttributes(
-		attribute.String("table", batchGetWithProjectionMeta.TableName),
-		attribute.Int("batchRequestCount", len(batchGetWithProjectionMeta.Keys)),
-		attribute.Int("batchResponseCount", len(res)),
-	)
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("table", batchGetWithProjectionMeta.TableName),
+			attribute.Int("batchRequestCount", len(batchGetWithProjectionMeta.Keys)),
+			attribute.Int("batchResponseCount", len(res)),
+		)
+	}
 
 	if err2 != nil {
 		return nil, span, err2
@@ -805,9 +810,11 @@ func (h *APIHandler) BatchWriteItem(c *gin.Context) {
 		}
 
 		otelgo.AddAnnotation(ctx, "Successfully processed BatchWriteItem request")
-		span.SetAttributes(
-			attribute.Int("unprocessedBatchWriteItems", len(unprocessedBatchWriteItems.UnprocessedItems)),
-		)
+		if span != nil {
+			span.SetAttributes(
+				attribute.Int("unprocessedBatchWriteItems", len(unprocessedBatchWriteItems.UnprocessedItems)),
+			)
+		}
 		c.JSON(http.StatusOK, unprocessedBatchWriteItems)
 	}
 }
