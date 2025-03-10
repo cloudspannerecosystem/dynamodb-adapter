@@ -24,8 +24,8 @@ func (l *DeleteQueryListener) EnterPredicateComparison(ctx *parser.PredicateComp
 		Value:    value,
 	})
 }
-func (t *Translator) ToSpannerDelete(query string) (*DeleteQueryMap, error) {
-	deleteQueryMap := &DeleteQueryMap{}
+func (t *Translator) ToSpannerDelete(query string) (*DeleteUpdateQueryMap, error) {
+	deleteQueryMap := &DeleteUpdateQueryMap{}
 	deleteListener := &DeleteQueryListener{}
 
 	// Lexer and parser setup
@@ -47,7 +47,8 @@ func (t *Translator) ToSpannerDelete(query string) (*DeleteQueryMap, error) {
 			})
 		}
 	}
-	deleteQueryMap.PartiQL = query
+	deleteQueryMap.QueryType = "DELETE"
+	deleteQueryMap.PartiQLQuery = query
 	deleteQueryMap.SpannerQuery = createSpannerDeleteQuery(deleteListener.Table, deleteQueryMap.Clauses)
 	return deleteQueryMap, nil
 }
