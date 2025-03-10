@@ -271,10 +271,10 @@ var OriginalColResponse map[string]string
 func init() {
 	TableDDL = make(map[string]map[string]string)
 	TableDDL["dynamodb_adapter_table_ddl"] = map[string]string{"tableName": "S", "column": "S", "dynamoDataType": "S", "originalColumn": "S", "partitionKey": "S", "sortKey": "S", "spannerIndexName": "S", "actualTable": "S", "spannerDataType": "S"}
-	TableDDL["dynamodb_adapter_config_manager"] = map[string]string{"tableName": "STRING(MAX)", "config": "STRING(MAX)", "cronTime": "STRING(MAX)", "uniqueValue": "STRING(MAX)", "enabledStream": "STRING(MAX)", "pubsubTopic": "STRING(MAX)"}
+	TableDDL["dynamodb_adapter_config_manager"] = map[string]string{"tableName": "STRING(MAX)", "config": "STRING(MAX)", "cronTime": "STRING(MAX)", "uniqueValue": "STRING(MAX)", "enabledStream": "STRING(MAX)"}
 	TableColumnMap = make(map[string][]string)
 	TableColumnMap["dynamodb_adapter_table_ddl"] = []string{"tableName", "column", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"}
-	TableColumnMap["dynamodb_adapter_config_manager"] = []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream", "pubsubTopic"}
+	TableColumnMap["dynamodb_adapter_config_manager"] = []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream"}
 	TableColChangeMap = make(map[string]struct{})
 	ColumnToOriginalCol = make(map[string]string)
 	OriginalColResponse = make(map[string]string)
@@ -307,7 +307,6 @@ type ConfigControllerModel struct {
 	ReadMap           map[string]struct{}
 	WriteMap          map[string]struct{}
 	StreamEnable      map[string]struct{}
-	PubSubTopic       map[string]string
 }
 
 // ConfigController object for ConfigControllerModel
@@ -323,7 +322,6 @@ func init() {
 	ConfigController.ReadMap = make(map[string]struct{})
 	ConfigController.WriteMap = make(map[string]struct{})
 	ConfigController.StreamEnable = make(map[string]struct{})
-	ConfigController.PubSubTopic = make(map[string]string)
 }
 
 // StreamDataModel for streaming data

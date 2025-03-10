@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // Package services implements services for getting data from Spanner
-// and streaming data into pubsub
 package services
 
 import (
@@ -240,11 +239,6 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 	if len(arrAttrMap) <= 0 {
 		return errors.New("ValidationException")
 	}
-
-	oldRes, err := BatchGet(ctx, tableName, arrAttrMap)
-	if err != nil {
-		return err
-	}
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
 		return err
@@ -254,18 +248,6 @@ func BatchPut(ctx context.Context, tableName string, arrAttrMap []map[string]int
 	if err != nil {
 		return err
 	}
-	go func() {
-		if len(oldRes) == len(arrAttrMap) {
-			for i := 0; i < len(arrAttrMap); i++ {
-				go StreamDataToThirdParty(oldRes[i], arrAttrMap[i], tableName)
-			}
-		} else {
-			for i := 0; i < len(arrAttrMap); i++ {
-				go StreamDataToThirdParty(nil, arrAttrMap[i], tableName)
-			}
-
-		}
-	}()
 	return nil
 }
 
@@ -588,25 +570,12 @@ func BatchDelete(ctx context.Context, tableName string, keyMapArray []map[string
 	if err != nil {
 		return err
 	}
-	oldRes, _ := BatchGet(ctx, tableName, keyMapArray)
 
 	tableName = tableConf.ActualTable
 	err = storage.GetStorageInstance().SpannerBatchDelete(ctx, tableName, keyMapArray)
 	if err != nil {
 		return err
 	}
-	go func() {
-		if len(oldRes) == len(keyMapArray) {
-			for i := 0; i < len(keyMapArray); i++ {
-				go StreamDataToThirdParty(oldRes[i], keyMapArray[i], tableName)
-			}
-		} else {
-			for i := 0; i < len(keyMapArray); i++ {
-				go StreamDataToThirdParty(nil, keyMapArray[i], tableName)
-			}
-
-		}
-	}()
 	return nil
 }
 
