@@ -33,6 +33,8 @@ import (
 var listRemoveTargetRegex = regexp.MustCompile(`(.*)\[(\d+)\]`)
 var base64Regexp = regexp.MustCompile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$")
 
+var CreateConditionExpressionFunc = CreateConditionExpression
+
 // GetFieldNameFromConditionalExpression returns the field name from conditional expression
 func GetFieldNameFromConditionalExpression(conditionalExpression string) string {
 	if strings.Contains(conditionalExpression, "attribute_exists") {

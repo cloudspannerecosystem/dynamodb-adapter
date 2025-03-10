@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cloud.google.com/go/spanner"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
@@ -455,12 +456,12 @@ func performOperation(ctx context.Context, action string, actionValue string, up
 }
 
 // UpdateExpression performs an expression
-func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr) (interface{}, error) {
+func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc services.Service) (interface{}, error) {
 	updateAtrr.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(updateAtrr.TableName, updateAtrr.ExpressionAttributeNames)
 	var oldRes map[string]interface{}
 	var spannerRow map[string]interface{}
 	if updateAtrr.ReturnValues != "NONE" {
-		oldRes, spannerRow, _ = services.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+		oldRes, spannerRow, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
 	}
 	var resp map[string]interface{}
 	var actVal = make(map[string]interface{})
@@ -1013,6 +1014,8 @@ func convertSingle(output map[string]interface{}, v reflect.Value) error {
 	case reflect.String:
 		s := v.String()
 		output["S"] = s
+	case reflect.Struct:
+		output["NULL"] = true
 	default:
 		if err := convertNumber(output, v); err != nil {
 			return err
@@ -1036,4 +1039,116 @@ func convertNumber(output map[string]interface{}, v reflect.Value) error {
 	}
 	output["N"] = outVal
 	return nil
+}
+
+// TransactWriteUpdateExpression is used to update an item in the database
+// with a transaction. If the condition expression fails, the transaction is
+// rolled back.
+func TransactWriteUpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, txn *spanner.ReadWriteTransaction, svc services.Service) (map[string]interface{}, *spanner.Mutation, error) {
+	// replace the placeholder column names with the original column names
+	updateAtrr.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(updateAtrr.TableName, updateAtrr.ExpressionAttributeNames)
+	// get the old item if it exists
+	var oldRes map[string]interface{}
+	var mut *spanner.Mutation
+	if updateAtrr.ReturnValues != "NONE" {
+		oldRes, _, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+	}
+	// loop through each operation and perform it
+	var resp map[string]interface{}
+	var actVal = make(map[string]interface{})
+	var er error
+	for k, v := range updateAtrr.ExpressionAttributeNames {
+		updateAtrr.UpdateExpression = strings.ReplaceAll(updateAtrr.UpdateExpression, k, v)
+		updateAtrr.ConditionExpression = strings.ReplaceAll(updateAtrr.ConditionExpression, k, v)
+	}
+	m := extractOperations(updateAtrr.UpdateExpression)
+	for k, v := range m {
+		res, acVal, mutation, err := TransactWritePerformOperation(ctx, k, v, updateAtrr, oldRes, txn, svc)
+		resp = res
+		er = err
+		mut = mutation
+		for k, v := range acVal {
+			actVal[k] = v
+		}
+	}
+	// log the result of the transaction
+	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes, mut)
+	// return the result of the transaction
+	switch updateAtrr.ReturnValues {
+	case "NONE":
+		return nil, nil, er
+	case "ALL_NEW":
+		output, errOutput := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
+		return map[string]interface{}{"Attributes": output}, mut, errOutput
+	case "ALL_OLD":
+		if len(oldRes) == 0 {
+			return nil, nil, er
+		}
+		output, errOutput := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
+		return map[string]interface{}{"Attributes": output}, mut, errOutput
+	case "UPDATED_NEW":
+		var resVal = make(map[string]interface{})
+		for k := range actVal {
+			resVal[k] = resp[k]
+		}
+		output, errOutput := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
+		return map[string]interface{}{"Attributes": output}, mut, errOutput
+	case "UPDATED_OLD":
+		if len(oldRes) == 0 {
+			return nil, nil, er
+		}
+		var resVal = make(map[string]interface{})
+		for k := range actVal {
+			resVal[k] = oldRes[k]
+		}
+		output, errOutput := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
+		return map[string]interface{}{"Attributes": output}, mut, errOutput
+	default:
+		output, errOutput := ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
+		return map[string]interface{}{"Attributes": output}, mut, errOutput
+	}
+}
+
+// TransactWritePerformOperation performs a transactional write operation based on the given action and actionValue.
+// The operation is performed based on the given action and actionValue. The UpdateAttr struct contains information about
+// the operation, such as the table name, primary key map, condition expression, and expression attribute map. The oldRes map
+// contains the old values of the item, and the txn is the Spanner transaction object.
+//
+// Args:
+//
+//	ctx: The context.Context object.
+//	action: The action to be performed (e.g., DELETE, SET, ADD, REMOVE).
+//	actionValue: The value of the action (e.g., "count + 1", "name = :newName").
+//	updateAtrr: The UpdateAttr struct containing information about the operation.
+//	oldRes: The old values of the item (map[string]interface{}).
+//	txn: The Spanner transaction object.
+//
+// Returns:
+//
+//	A map of attribute names to their new values (map[string]interface{}), the action value (map[string]interface{}),
+//	a Spanner mutation object, and an error.
+func TransactWritePerformOperation(ctx context.Context, action string, actionValue string, updateAtrr models.UpdateAttr, oldRes map[string]interface{}, txn *spanner.ReadWriteTransaction, svc services.Service) (map[string]interface{}, map[string]interface{}, *spanner.Mutation, error) {
+	switch {
+	case action == "DELETE":
+		// perform delete
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
+		res, mut, err := svc.TransactWriteDel(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, expr, txn)
+		return res, m, mut, err
+	case action == "SET":
+		// Update data in table
+		m, expr := parseActionValue(actionValue, updateAtrr, false, oldRes)
+		res, mut, err := svc.TransactWritePut(ctx, updateAtrr.TableName, m, expr, updateAtrr.ConditionExpression, updateAtrr.ExpressionAttributeMap, oldRes, txn)
+		return res, m, mut, err
+	case action == "ADD":
+		// Add data in table
+		m, expr := parseActionValue(actionValue, updateAtrr, true, oldRes)
+		res, mut, err := svc.TransactWriteAdd(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, updateAtrr.ConditionExpression, m, updateAtrr.ExpressionAttributeMap, expr, oldRes, txn)
+		return res, m, mut, err
+
+	case action == "REMOVE":
+		res, mut, err := svc.TransactWriteRemove(ctx, updateAtrr.TableName, updateAtrr, actionValue, nil, oldRes, txn)
+		return res, updateAtrr.PrimaryKeyMap, mut, err
+	default:
+	}
+	return nil, nil, nil, nil
 }
