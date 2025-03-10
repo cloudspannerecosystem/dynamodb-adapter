@@ -480,11 +480,6 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc ser
 			actVal[k] = v
 		}
 	}
-	if er == nil {
-		go services.StreamDataToThirdParty(oldRes, resp, updateAtrr.TableName)
-	} else {
-		return nil, er
-	}
 	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes)
 
 	var output map[string]interface{}

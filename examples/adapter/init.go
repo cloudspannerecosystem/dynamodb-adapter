@@ -54,7 +54,6 @@ var (
 			config 	      STRING(MAX),
 			cronTime      STRING(MAX),
 			enabledStream STRING(MAX),
-			pubsubTopic   STRING(MAX),
 			uniqueValue   STRING(MAX),
 		) PRIMARY KEY (tableName)`,
 	}

@@ -5,7 +5,6 @@ go 1.22.7
 toolchain go1.23.4
 
 require (
-	cloud.google.com/go/pubsub v1.45.3
 	cloud.google.com/go/spanner v1.75.0
 	github.com/GeertJohan/go.rice v1.0.2
 	github.com/ahmetb/go-linq v3.0.0+incompatible

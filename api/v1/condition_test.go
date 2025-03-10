@@ -17,6 +17,7 @@ package v1
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"cloud.google.com/go/spanner"
@@ -358,6 +359,19 @@ func TestConvertDynamoToMap(t *testing.T) {
 
 	for _, tc := range tests {
 		got, _ := ConvertDynamoToMap("", tc.dynamodbObject)
+		for key, value := range got {
+			if gotSlice, ok := value.([]string); ok {
+				sort.Strings(gotSlice)
+				got[key] = gotSlice
+			}
+		}
+
+		for key, value := range tc.want {
+			if wantSlice, ok := value.([]string); ok {
+				sort.Strings(wantSlice)
+				tc.want[key] = wantSlice
+			}
+		}
 		assert.Equal(t, got, tc.want)
 	}
 }

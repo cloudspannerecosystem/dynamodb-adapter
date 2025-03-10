@@ -698,6 +698,7 @@ func (s Storage) SpannerBatchPut(ctx context.Context, table string, m []map[stri
 // - An error if the operation fails or nil if the operation succeeds.
 func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, spannerRow map[string]interface{}) error {
 	ddl := models.TableDDL[table]
+	newMap := m
 	for k, v := range m {
 		if strings.Contains(k, ".") {
 			pathfeilds := strings.Split(k, ".")
@@ -705,31 +706,34 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 			t, ok := ddl[colName]
 			if t == "M" && ok {
 				var err error
-				m[colName], err = updateMapColumnObject(spannerRow, colName, k, v)
+				newMap[colName], err = updateMapColumnObject(spannerRow, colName, k, v)
 				if err != nil {
 					return errors.New("Error updating the Map:", err)
 				}
-				delete(m, k)
+				delete(newMap, k)
 			}
 		} else {
 			t, ok := ddl[k]
-			if t == "BYTES(MAX)" || t == "B" && ok {
+			if t == "B" && ok {
 				ba, err := json.Marshal(v)
 				if err != nil {
 					return errors.New("ValidationException", err)
 				}
-				m[k] = ba
+				newMap[k] = ba
 			}
-			if t == "JSON" || t == "M" && ok {
+			if t == "M" && ok {
+				if v == nil {
+					continue
+				}
 				ba, err := json.MarshalIndent(v, "", "  ")
 				if err != nil {
 					return errors.New("ValidationException", err)
 				}
-				m[k] = string(ba)
+				newMap[k] = string(ba)
 			}
 		}
 	}
-	mutation := spanner.InsertOrUpdateMap(table, m)
+	mutation := spanner.InsertOrUpdateMap(table, newMap)
 
 	mutations := []*spanner.Mutation{mutation}
 
@@ -741,7 +745,7 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 }
 
 // updateMapColumnObject updates the fields in a given JSON object for the Map Datatype
-func updateMapColumnObject(spannerRow map[string]interface{}, colName string, k string, v interface{}) (string, error) {
+func updateMapColumnObject(spannerRow map[string]interface{}, colName string, k string, v interface{}) (map[string]interface{}, error) {
 	var data map[string]interface{}
 	jsonData := spannerRow[colName]
 
@@ -763,17 +767,7 @@ func updateMapColumnObject(spannerRow map[string]interface{}, colName string, k 
 		log.Println("Update failed: path not found")
 	}
 
-	fmt.Println("data-->", data)
-	// Marshal back to JSON after the update
-	updatedJSON, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return "", errors.New("Error marshaling JSON:", err)
-	}
-	strigngyfiedJSON := string(updatedJSON)
-
-	strigngyfiedJSON = strings.ReplaceAll(strigngyfiedJSON, `\n`, "")
-	strigngyfiedJSON = strings.ReplaceAll(strigngyfiedJSON, `\"`, `"`)
-	return strigngyfiedJSON, nil
+	return data, nil
 }
 
 func evaluateConditionalExpression(ctx context.Context, t *spanner.ReadWriteTransaction, table string, m map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition) (bool, error) {
