@@ -1895,6 +1895,88 @@ var (
 	TestTransactWrite4Output = `[{"Put":{"address":{"S":"789 Elm St"},"age":{"N":"40"},"emp_id":{"N":"7"},"first_name":{"S":"Bob"},"last_name":{"S":"Johnson"}}}]`
 )
 
+// test Data for ExecuteStatement API
+var (
+	ExecuteStatementTestCase1Name = "1: Insert Query for ExecuteStatement"
+	ExecuteStatementCase1         = models.ExecuteStatement{
+		Statement: "INSERT INTO employee VALUE {'emp_id': 9, 'first_name': 'Marc', 'last_name': 'Richards1', 'age': 10, 'address': 'Shamli'}",
+	}
+
+	ExecuteStatementTestCase2Name = "2: Insert Query for ExecuteStatement"
+	ExecuteStatementCase2         = models.ExecuteStatement{
+		Statement: "INSERT INTO employee VALUE {'emp_id': ?, 'first_name': ?, 'last_name': ?, 'age': ?, 'address': ?}",
+		Parameters: []*dynamodb.AttributeValue{
+			{
+				N: aws.String("10"),
+			},
+			{
+				S: aws.String("Shoaib"),
+			},
+			{
+				S: aws.String("Jarman"),
+			},
+			{
+				N: aws.String("32"),
+			},
+			{
+				S: aws.String("Rampur"),
+			},
+		},
+	}
+	ExecuteStatementTestCase3Name = "3: Select Query for ExecuteStatement Non Parameterised"
+	ExecuteStatementCase3         = models.ExecuteStatement{
+		Limit:     10,
+		Statement: "SELECT * FROM employee WHERE emp_id = 1",
+	}
+	ExecuteStatementCase3Output = `{"Items":[{"address":{"S":"Shamli"},"age":{"N":"10"},"emp_id":{"N":"1"},"first_name":{"S":"Marc"},"last_name":{"S":"Richards"}}]}`
+
+	ExecuteStatementTestCase4Name = "4: Select Query for ExecuteStatement Parameterised Statement"
+	ExecuteStatementCase4         = models.ExecuteStatement{
+		Limit:     10,
+		Statement: "SELECT * FROM employee WHERE emp_id = ?",
+		Parameters: []*dynamodb.AttributeValue{
+			{
+				N: aws.String("1"),
+			},
+		},
+	}
+	ExecuteStatementTestCase5Name = "5: Update Query for ExecuteStatement Non Parameterised"
+	ExecuteStatementCase5         = models.ExecuteStatement{
+		Statement: "UPDATE employee SET age = 11, address = 'New Shamli' WHERE emp_id = 9",
+	}
+
+	ExecuteStatementTestCase6Name = "5: Update Query for ExecuteStatement Non Parameterised"
+	ExecuteStatementCase6         = models.ExecuteStatement{
+		Statement: "UPDATE employee SET address = ?, age = ? WHERE emp_id = ?",
+		Parameters: []*dynamodb.AttributeValue{
+			{
+				S: aws.String("Bengaluru"),
+			},
+			{
+				N: aws.String("33"),
+			},
+			{
+				N: aws.String("10"),
+			},
+		},
+	}
+
+	ExecuteStatementTestCase7Name = "5: Delete Query for ExecuteStatement Non Parameterised"
+	ExecuteStatementCase7         = models.ExecuteStatement{
+		Statement: "DELETE FROM employee WHERE emp_id = 9",
+	}
+
+	ExecuteStatementTestCase8Name = "5: Delete Query for ExecuteStatement Non Parameterised"
+	ExecuteStatementCase8         = models.ExecuteStatement{
+		Statement: "DELETE FROM employee WHERE emp_id = ?",
+		Parameters: []*dynamodb.AttributeValue{
+			{
+				N: aws.String("10"),
+			},
+		},
+	}
+)
+
 func handlerInitFunc() *gin.Engine {
 	initErr := initializer.InitAll("../config.yaml")
 	if initErr != nil {
@@ -2325,6 +2407,26 @@ func testBatchWriteItemAPI(t *testing.T) {
 	}
 	apitest.RunTests(t, tests)
 }
+func testExecuteStatementAPI(t *testing.T) {
+	apitest := apitesting.APITest{
+		GetHTTPHandler: func(ctx context.Context, t *testing.T) http.Handler {
+			return handlerInitFunc()
+		},
+	}
+	tests := []apitesting.APITestCase{
+		createStatusCheckPostTestCase(ExecuteStatementTestCase1Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase1),
+		createStatusCheckPostTestCase(ExecuteStatementTestCase2Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase2),
+		createStatusCheckPostTestCase(ExecuteStatementTestCase5Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase5),
+		createStatusCheckPostTestCase(ExecuteStatementTestCase6Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase6),
+
+		createPostTestCase(ExecuteStatementTestCase3Name, "/v1", "ExecuteStatement", ExecuteStatementCase3Output, ExecuteStatementCase3),
+		createPostTestCase(ExecuteStatementTestCase4Name, "/v1", "ExecuteStatement", ExecuteStatementCase3Output, ExecuteStatementCase4),
+
+		createStatusCheckPostTestCase(ExecuteStatementTestCase7Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase7),
+		createStatusCheckPostTestCase(ExecuteStatementTestCase8Name, "/v1", "ExecuteStatement", http.StatusOK, ExecuteStatementCase8),
+	}
+	apitest.RunTests(t, tests)
+}
 
 func testTransactGetAPI(t *testing.T) {
 	apitest := apitesting.APITest{
@@ -2381,7 +2483,6 @@ func testTransactWriteItemsAPI(t *testing.T) {
 		createPostTestCase(TestTransactWrite2Name, "/v1", "TransactWriteItems", TestTransactWrite2Output, TestTransactWrite2),
 		createPostTestCase(TestTransactWrite3Name, "/v1", "TransactWriteItems", TestTransactWrite3Output, TestTransactWrite3),
 		createPostTestCase(TestTransactWrite4Name, "/v1", "TransactWriteItems", TestTransactWrite4Output, TestTransactWrite4),
-		// ... add more test cases here
 	}
 	apitest.RunTests(t, tests)
 }
@@ -2426,6 +2527,7 @@ func TestApi(t *testing.T) {
 		"BatchWriteItemAPI":         testBatchWriteItemAPI,
 		"TransactGetItems":          testTransactGetAPI,
 		"TestTransactWriteItemsAPI": testTransactWriteItemsAPI,
+		"ExecuteStatementAPI":       testExecuteStatementAPI,
 	}
 
 	// run the tests

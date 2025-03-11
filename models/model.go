@@ -19,6 +19,7 @@ import (
 	"context"
 	"sync"
 
+	"cloud.google.com/go/spanner"
 	"github.com/antonmedv/expr/vm"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	otelgo "github.com/cloudspannerecosystem/dynamodb-adapter/otel"
@@ -470,4 +471,20 @@ type ResponseItem struct {
 type TransactWriteItemsResponse struct {
 	ConsumedCapacity      ConsumedCapacity                 `json:"ConsumedCapacity,omitempty"`      // Added for consistency
 	ItemCollectionMetrics map[string]ItemCollectionMetrics `json:"ItemCollectionMetrics,omitempty"` // Added for consistency
+}
+
+type ExecuteStatement struct {
+	Limit        int64                      `json:"Limit"`
+	NextToken    int64                      `json:"NextToken"`
+	Parameters   []*dynamodb.AttributeValue `json:"Parameters"`
+	ReturnValues string                     `json:"ReturnValues"`
+	Statement    string                     `json:"Statement"`
+	TableName    string                     `json:"TableName"`
+	AttrParams   []interface{}              `json:"AttrParams"`
+}
+
+type ExecuteStatementQuery struct {
+	PartiQl      string
+	Params       map[string]interface{}
+	SQLStatement spanner.Statement
 }

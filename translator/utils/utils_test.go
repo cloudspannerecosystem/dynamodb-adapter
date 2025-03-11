@@ -75,7 +75,7 @@ func TestFormSpannerSelectQuery(t *testing.T) {
 				{Column: "age", Operator: ">", Value: "30", ANDOpr: "AND"},
 				{Column: "address", Operator: "=", Value: "'abc'", OROpr: ""},
 			},
-			expectedQuery: "SELECT age, address FROM employee WHERE age > 30 AND address = 'abc' ORDER BY age LIMIT 10 OFFSET 5",
+			expectedQuery: "SELECT age, address FROM employee WHERE age > 30 AND address = 'abc' ORDER BY age LIMIT 10 OFFSET 5;",
 		},
 		{
 			name: "Select All with No Where Clause",
@@ -90,7 +90,7 @@ func TestFormSpannerSelectQuery(t *testing.T) {
 				Offset:            "",
 			},
 			whereConditions: []Condition{},
-			expectedQuery:   "SELECT * FROM employee",
+			expectedQuery:   "SELECT * FROM employee;",
 		},
 		{
 			name: "Select with Multiple Where Conditions",
@@ -108,7 +108,7 @@ func TestFormSpannerSelectQuery(t *testing.T) {
 				{Column: "age", Operator: ">", Value: "30", ANDOpr: "AND"},
 				{Column: "status", Operator: "=", Value: "'active'", OROpr: ""},
 			},
-			expectedQuery: "SELECT age FROM employee WHERE age > 30 AND status = 'active' ORDER BY age",
+			expectedQuery: "SELECT age FROM employee WHERE age > 30 AND status = 'active' ORDER BY age;",
 		},
 	}
 
