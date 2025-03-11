@@ -357,7 +357,97 @@ type GetItemRequest struct {
 	ExpressionAttributeNames map[string]string                   `json:"ExpressionAttributeNames,omitempty"`
 }
 
-// ConsumedCapacity represents the consumed capacity of a DynamoDB operation.
+// TransactWriteItemsRequest represents the input structure for TransactWriteItems API.
+type TransactWriteItemsRequest struct {
+	TransactItems               []TransactWriteItem `json:"TransactItems"`
+	ReturnConsumedCapacity      string              `json:"ReturnConsumedCapacity,omitempty"`
+	ReturnItemCollectionMetrics string              `json:"ReturnItemCollectionMetrics,omitempty"` // Added for consistency with DynamoDB
+}
+
+// TransactWriteItem represents a single Put, Update, or Delete operation inside TransactWriteItems.
+type TransactWriteItem struct {
+	Put            PutItemRequest        `json:"Put,omitempty"`
+	Update         UpdateAttr            `json:"Update,omitempty"`
+	Delete         DeleteItemRequest     `json:"Delete,omitempty"`
+	ConditionCheck ConditionCheckRequest `json:"ConditionCheck,omitempty"`
+}
+
+type PutItem struct {
+	Item map[string]interface{} `json:"Item"`
+}
+
+type UpdateItem struct {
+	Key map[string]interface{} `json:"Key"`
+}
+
+type DeleteItem struct {
+	Key map[string]interface{} `json:"Key"`
+}
+
+type ConditionCheckItem struct {
+	Key map[string]interface{} `json:"Key"`
+}
+type TransactWriteItemOutput struct {
+	Put            *PutItem    `json:"Put,omitempty"`
+	Update         *UpdateItem `json:"Update,omitempty"`
+	Delete         *DeleteItem `json:"Delete,omitempty"`
+	ConditionCheck *struct{}   `json:"ConditionCheck,omitempty"`
+}
+
+type TransactWriteItemsOutput struct {
+	Item []map[string]interface{} `json:"Item"`
+}
+
+type ConditionCheckRequest struct {
+	TableName                 string                              `json:"TableName"`
+	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
+	PrimaryKeyMap             map[string]interface{}              `json:"PrimaryKeyMap"`
+	ReturnValues              string                              `json:"ReturnValuesOnConditionCheckFailure"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+}
+
+// PutItemRequest represents the structure of a Put request.
+type PutItemRequest struct {
+	TableName                 string                              `json:"TableName"`
+	AttrMap                   map[string]interface{}              `json:"AttrMap"`
+	ReturnValues              string                              `json:"ReturnValuesOnConditionCheckFailure"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	Item                      map[string]*dynamodb.AttributeValue `json:"Item"`
+}
+
+// UpdateItemRequest represents the structure of an Update request.
+type UpdateItemRequest struct {
+	TableName                 string                              `json:"TableName"`
+	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
+	KeyArray                  map[string]interface{}              `json:"KeyArray"`
+	UpdateExpression          string                              `json:"UpdateExpression"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames,omitempty"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues,omitempty"`
+	ReturnValues              string                              `json:"ReturnValuesOnConditionCheckFailure"`
+}
+
+// DeleteItemRequest represents the structure of a Delete request.
+type DeleteItemRequest struct {
+	TableName                 string                              `json:"TableName"`
+	PrimaryKeyMap             map[string]interface{}              `json:"PrimaryKeyMap"`
+	ConditionExpression       string                              `json:"ConditionExpression"`
+	ExpressionAttributeMap    map[string]interface{}              `json:"ExpressionAttributeMap"`
+	Key                       map[string]*dynamodb.AttributeValue `json:"Key"`
+	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
+	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
+	ReturnValues              string                              `json:"ReturnValuesOnConditionCheckFailure"`
+}
+
+// ItemCollectionMetrics represents the item collection metrics.  (Add more fields as needed)
+type ItemCollectionMetrics struct {
+	ItemCollectionSizeEstimate int64 `json:"ItemCollectionSizeEstimate"`
+}
 type ConsumedCapacity struct {
 	TableName     string  `json:"TableName"`
 	CapacityUnits float64 `json:"CapacityUnits"`
@@ -377,6 +467,12 @@ type ResponseItem struct {
 	TableName interface{}            `json:"TableName"`
 	Item      map[string]interface{} `json:"Item"`
 }
+
+type TransactWriteItemsResponse struct {
+	ConsumedCapacity      ConsumedCapacity                 `json:"ConsumedCapacity,omitempty"`      // Added for consistency
+	ItemCollectionMetrics map[string]ItemCollectionMetrics `json:"ItemCollectionMetrics,omitempty"` // Added for consistency
+}
+
 type ExecuteStatement struct {
 	Limit        int64                      `json:"Limit"`
 	NextToken    int64                      `json:"NextToken"`

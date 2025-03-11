@@ -47,11 +47,6 @@ func (m *MockService) TransactGetProjectionCols(ctx context.Context, transactGet
 	return args.Get(0).([]string), args.Get(1).([]interface{}), args.Get(2).([]interface{}), args.Error(3)
 }
 
-func (m *MockService) MayIReadOrWrite(tableName string, isWrite bool, user string) bool {
-	args := m.Called(tableName, isWrite, user)
-	return args.Bool(0)
-}
-
 func (m *MockService) ChangeMaptoDynamoMap(input interface{}) (map[string]interface{}, error) {
 	args := m.Called(input)
 	return args.Get(0).(map[string]interface{}), args.Error(1)
