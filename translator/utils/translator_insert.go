@@ -88,6 +88,7 @@ func (t *Translator) ToSpannerInsert(query string) (*InsertStatement, error) {
 	insertListener := &InsertQueryListener{}
 	insertStatement := &InsertStatement{}
 	// Lexer and parser setup
+	query = strings.ReplaceAll(query, `?`, `'?'`)
 	lexer := parser.NewPartiQLLexer(antlr.NewInputStream(query))
 	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := parser.NewPartiQLParser(stream)
