@@ -22,7 +22,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/gin-swagger v1.3.1
 	github.com/swaggo/swag v1.7.1
-	github.com/valyala/fasthttp v1.15.1 // indirect
+	github.com/valyala/fasthttp v1.34.0 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.uber.org/zap v1.19.1
 	golang.org/x/tools v0.22.0 // indirect
