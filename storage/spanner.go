@@ -1517,7 +1517,6 @@ func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m ma
 //
 //	A Spanner mutation and an error if any occurs.
 func (s Storage) performTransactPutOperation(table string, m map[string]interface{}, oldRes map[string]interface{}) (*spanner.Mutation, error) {
-	fmt.Println("oldres", oldRes)
 	ddl := models.TableDDL[table]
 	newMap := m
 	for k, v := range m {
