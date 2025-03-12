@@ -39,7 +39,7 @@ import (
 type Storage interface {
 	GetSpannerClient() (*spanner.Client, error)
 	SpannerTransactGetItems(ctx context.Context, tableProjectionCols map[string][]string, pValues map[string]interface{}, sValues map[string]interface{}) ([]map[string]interface{}, error)
-	SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
+	SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction, oldRes map[string]interface{}) (map[string]interface{}, *spanner.Mutation, error)
 	SpannerGet(ctx context.Context, tableName string, pKeys, sKeys interface{}, projectionCols []string) (map[string]interface{}, map[string]interface{}, error)
 	TransactWriteSpannerDel(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (*spanner.Mutation, error)
 	TransactWriteSpannerAdd(ctx context.Context, table string, n map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error)
@@ -1006,7 +1006,7 @@ func (s *spannerService) TransactWritePut(ctx context.Context, tableName string,
 	}
 
 	// Perform the transactional write operation
-	newResp, mut, err := s.st.SpannerTransactWritePut(ctx, tableName, putObj, e, expr, txn)
+	newResp, mut, err := s.st.SpannerTransactWritePut(ctx, tableName, putObj, e, expr, txn, oldRes)
 	if err != nil {
 		return nil, nil, err
 	}

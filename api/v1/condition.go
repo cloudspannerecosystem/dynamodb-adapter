@@ -643,7 +643,6 @@ func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{
 			rs[k] = v
 		}
 	}
-
 	return rs
 }
 

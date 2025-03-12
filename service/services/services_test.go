@@ -800,7 +800,7 @@ type MockStorage struct {
 	mock.Mock
 }
 
-func (m *MockStorage) SpannerTransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+func (m *MockStorage) SpannerTransactWritePut(ctx context.Context, tableName string, putObj map[string]interface{}, e *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction, oldRes map[string]interface{}) (map[string]interface{}, *spanner.Mutation, error) {
 	args := m.Called(ctx, tableName, putObj, e, expr, txn)
 	return args.Get(0).(map[string]interface{}), args.Get(1).(*spanner.Mutation), args.Error(2)
 }
