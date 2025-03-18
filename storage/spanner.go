@@ -1468,7 +1468,7 @@ func (s Storage) SpannerTransactGetItems(ctx context.Context, tableProjectionCol
 // Returns:
 //
 //	A map of updated data, a Spanner mutation, and an error if any occurs.
-func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction) (map[string]interface{}, *spanner.Mutation, error) {
+func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m map[string]interface{}, eval *models.Eval, expr *models.UpdateExpressionCondition, txn *spanner.ReadWriteTransaction, oldRes map[string]interface{}) (map[string]interface{}, *spanner.Mutation, error) {
 	// Initialize the update map and mutation
 	update := map[string]interface{}{}
 	var mutation *spanner.Mutation
@@ -1499,7 +1499,7 @@ func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m ma
 	}
 
 	// Perform the transactional put operation
-	mutation, err := s.performTransactPutOperation(table, tmpMap)
+	mutation, err := s.performTransactPutOperation(table, tmpMap, oldRes)
 	return update, mutation, err
 }
 
@@ -1516,27 +1516,56 @@ func (s Storage) SpannerTransactWritePut(ctx context.Context, table string, m ma
 // Returns:
 //
 //	A Spanner mutation and an error if any occurs.
-func (s Storage) performTransactPutOperation(table string, m map[string]interface{}) (*spanner.Mutation, error) {
+func (s Storage) performTransactPutOperation(table string, m map[string]interface{}, oldRes map[string]interface{}) (*spanner.Mutation, error) {
 	ddl := models.TableDDL[table]
-
-	// Iterate through the map and process each column
+	newMap := m
 	for k, v := range m {
-		// If the column is a BYTES(MAX) type, marshal the data to JSON
-		t, ok := ddl[k]
-		if t == "BYTES(MAX)" && ok {
-			ba, err := json.Marshal(v)
-			if err != nil {
-				// Return a ValidationException error if there is an issue with marshaling
-				return nil, errors.New("ValidationException", err)
+		if strings.Contains(k, ".") {
+			pathfeilds := strings.Split(k, ".")
+			colName := pathfeilds[0]
+			t, ok := ddl[colName]
+			if t == "M" && ok {
+				var err error
+				newMap[colName], err = updateMapColumnObject(oldRes, colName, k, v)
+				if err != nil {
+					return nil, errors.New("Error updating the Map:", err)
+				}
+				delete(newMap, k)
 			}
-			// Update the map with the marshaled data
-			m[k] = ba
+		} else {
+			t, ok := ddl[k]
+			if t == "B" && ok {
+				ba, err := json.Marshal(v)
+				if err != nil {
+					return nil, errors.New("ValidationException", err)
+				}
+				newMap[k] = ba
+			}
+			if t == "M" && ok {
+				if v == nil {
+					continue
+				}
+				ba, err := json.MarshalIndent(v, "", "  ")
+				if err != nil {
+					return nil, errors.New("ValidationException", err)
+				}
+				newMap[k] = string(ba)
+			}
+			if t == "L" && ok {
+				list, ok := v.([]interface{})
+				if !ok {
+					return nil, errors.New("invalid list format")
+				}
+				jsonData, err := json.Marshal(list)
+				if err != nil {
+					return nil, fmt.Errorf("error marshaling list to JSON: %w", err)
+				}
+				newMap[k] = string(jsonData)
+			}
 		}
 	}
-
 	// Create a Spanner mutation for the InsertOrUpdateMap operation
-	mutation := spanner.InsertOrUpdateMap(table, m)
-
+	mutation := spanner.InsertOrUpdateMap(table, newMap)
 	return mutation, nil
 }
 

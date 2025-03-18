@@ -193,11 +193,11 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	_, err = services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
+	newResp, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
 	if err != nil {
 		return nil, err
 	}
-	return oldResp, nil
+	return newResp, nil
 }
 
 func queryResponse(query models.Query, c *gin.Context, svc services.Service) {
@@ -381,7 +381,6 @@ func (h *APIHandler) GetItemMeta(c *gin.Context) {
 			// Add annotation for processing the response
 			otelgo.AddAnnotation(ctx, "Changing Response Columns to Original Format")
 			changedColumns := ChangeResponseToOriginalColumns(getItemMeta.TableName, res)
-
 			// Convert changed columns to DynamoDB map
 			output, err := ChangeMaptoDynamoMap(changedColumns)
 			if err != nil {
@@ -1229,6 +1228,8 @@ func handleWriteOperation(c *gin.Context, details interface{}, txn *spanner.Read
 		resp, mut, err = TransactPut(c.Request.Context(), tableName, attrMap, nil, conditionExpression, expressionAttr, txn, svc)
 	case "Update":
 		updateDetails := details.(models.UpdateAttr)
+		updateDetails.PrimaryKeyMap = primaryKeyMap
+		updateDetails.ExpressionAttributeMap = expressionAttr
 		resp, mut, err = TransactWriteUpdateExpression(c.Request.Context(), updateDetails, txn, svc)
 	case "Delete":
 		oldRes, _, _ := svc.GetWithProjection(c.Request.Context(), tableName, primaryKeyMap, "", nil)
