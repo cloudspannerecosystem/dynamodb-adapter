@@ -47,7 +47,7 @@ func InitSpannerDriver() *spanner.Client {
 	str := "projects/" + models.GlobalConfig.Spanner.ProjectID + "/instances/" + models.GlobalConfig.Spanner.InstanceID + "/databases/" + models.GlobalConfig.Spanner.DatabaseName
 	Client, err := spanner.NewClientWithConfig(context.Background(), str, conf)
 	if err != nil {
-		logger.LogFatal(err)
+		logger.Fatal(err)
 	}
 	return Client
 }
@@ -135,7 +135,7 @@ func InitializeDriver(ctx context.Context) error {
 	}
 
 	storage.spannerClient[models.GlobalConfig.Spanner.InstanceID] = spannerClient
-	logger.LogInfo("Spanner client initialized successfully")
+	logger.Info("Spanner client initialized successfully")
 
 	if models.GlobalConfig.Otel.Traces.Enabled {
 		if models.GlobalConfig.Otel.Traces.SamplingRatio < 0 || models.GlobalConfig.Otel.Traces.SamplingRatio > 1 {
@@ -154,11 +154,11 @@ func (s Storage) Close() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	<-shutdown
-	logger.LogDebug("Connection Shutdown start")
+	logger.Debug("Connection Shutdown start")
 	for _, v := range s.spannerClient {
 		v.Close()
 	}
-	logger.LogDebug("Connection shutted down")
+	logger.Debug("Connection shutted down")
 }
 
 var once sync.Once

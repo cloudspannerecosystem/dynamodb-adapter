@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"cloud.google.com/go/spanner"
 	"github.com/antonmedv/expr"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/errors"
@@ -60,15 +59,34 @@ func GetStringInBetween(str string, start string, end string) (result string) {
 	return str[s:e]
 }
 
+// Helper to strip wrapping parentheses
+// Fixes e.g. NOT (attribute_exists (field)) from error interface {} is nil on !(TOKEN0) when TOKEN0 would be (attribute_exists(field))
+func stripWrappingParens(s string) string {
+	for {
+		s = strings.TrimSpace(s)
+		if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
+			// Remove one level of wrapping parentheses
+			s = s[1 : len(s)-1]
+		} else {
+			break
+		}
+	}
+	return s
+}
+
 // CreateConditionExpression - create evelute condition from condition
 func CreateConditionExpression(condtionExpression string, expressionAttr map[string]interface{}) (*models.Eval, error) {
 	if condtionExpression == "" {
 		e := new(models.Eval)
 		return e, nil
 	}
+	logger.Debug("Original condition expression:", condtionExpression)
 	condtionExpression = strings.TrimSpace(condtionExpression)
 	condtionExpression = strings.ReplaceAll(condtionExpression, "( ", "(")
 	condtionExpression = strings.ReplaceAll(condtionExpression, " )", ")")
+	condtionExpression = strings.ReplaceAll(condtionExpression, "NOT ", "!")
+	// Normalize function calls: remove spaces before '(' e.g., "attribute_exists (field)" to "attribute_exists(field)"
+	condtionExpression = regexp.MustCompile(`(\w+)\s+\(`).ReplaceAllString(condtionExpression, `$1(`)
 	tokens := strings.Split(condtionExpression, " ")
 	sb := strings.Builder{}
 	evalTokens := []string{}
@@ -76,18 +94,25 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	ts := []string{}
 	var err error
 	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
 		if i%2 == 0 {
-			if strings.Contains(tokens[i], ":") {
-				v, ok := expressionAttr[tokens[i]]
+			isNegated := false
+			if strings.HasPrefix(token, "!") {
+				isNegated = true
+				token = strings.TrimPrefix(token, "!")
+			}
+			token = stripWrappingParens(token)
+			if strings.Contains(token, ":") {
+				v, ok := expressionAttr[token]
 				if !ok {
-					return nil, errors.New("ResourceNotFoundException", expressionAttr, tokens[i])
+					return nil, errors.New("ResourceNotFoundException", expressionAttr, token)
 				}
 				str := fmt.Sprint(v)
 				_, ok = v.(string)
 				if ok {
 					str = "\"" + str + "\""
 				}
-				switch v.(type) {
+				switch v.(type) { // TODO: Support timestamp and big.rat
 				case float64:
 					str = fmt.Sprintf("%f", v)
 				case int64:
@@ -96,7 +121,7 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 					// Handle lists by converting them to JSON for easier evaluation
 					listBytes, err := json.Marshal(v)
 					if err != nil {
-						return nil, errors.New("InvalidListException", err.Error(), tokens[i])
+						return nil, errors.New("InvalidListException", err.Error(), token)
 					}
 					str = string(listBytes)
 				}
@@ -106,14 +131,17 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 			}
 
 			t := "TOKEN" + strconv.Itoa(i)
-			col := GetFieldNameFromConditionalExpression(tokens[i])
-			sb.WriteString(t)
-			sb.WriteString(" ")
-			evalTokens = append(evalTokens, tokens[i])
+			col := GetFieldNameFromConditionalExpression(token)
+			if isNegated {
+				sb.WriteString("!(" + t + ") ")
+			} else {
+				sb.WriteString(t + " ")
+			}
+			evalTokens = append(evalTokens, token)
 			cols = append(cols, col)
 			ts = append(ts, t)
 		} else {
-			sb.WriteString(tokens[i])
+			sb.WriteString(token)
 			sb.WriteString(" ")
 		}
 	}
@@ -125,6 +153,11 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	str = strings.ReplaceAll(str, " and ", " && ")
 	str = strings.ReplaceAll(str, " AND ", " && ")
 	str = strings.ReplaceAll(str, " <> ", " != ")
+
+	logger.Debug("Adjusted condition expression:", condtionExpression)
+	logger.Debug("Transformed (final) expression:", str)
+	logger.Debug("Tokens:", strings.Join(evalTokens, ", "))
+
 	e.Cond, err = expr.Compile(str)
 	if err != nil {
 		return nil, errors.New("ConditionalCheckFailedException", err.Error(), str)
@@ -192,12 +225,13 @@ func ChangeTableNameForSpanner(tableName string) string {
 }
 
 // Convert DynamoDB data types to equivalent Spanner types
+// Only used by initialization code to create tables
 func ConvertDynamoTypeToSpannerType(dynamoType string) string {
 	switch dynamoType {
 	case "S":
 		return "STRING(MAX)"
 	case "N":
-		return "FLOAT64"
+		return "INT64" // TODO: Change back to FLOAT64
 	case "B":
 		return "BYTES(MAX)"
 	case "BOOL":
@@ -286,77 +320,6 @@ func RemoveListElement(list []interface{}, idx int) []interface{} {
 	return append(list[:idx], list[idx+1:]...)
 }
 
-// IsValidJSONObject checks if a string is a valid JSON object
-func IsValidJSONObject(s string) error {
-	var js map[string]interface{}
-	err := json.Unmarshal([]byte(s), &js)
-	return err
-}
-
-func IsValidBase64(s string) bool {
-	if _, err := base64.StdEncoding.DecodeString(s); err != nil {
-		return false
-	}
-	return true
-}
-func ParseBytes(r *spanner.Row, i int, k string) (map[string]interface{}, error) {
-	var s []byte
-	singleRowImg := make(map[string]interface{})
-	err := r.Column(i, &s)
-	if err != nil {
-		if strings.Contains(err.Error(), "ambiguous column name") {
-			return nil, err
-		}
-		return nil, errors.New("ValidationException", err, k)
-	}
-	if len(s) > 0 {
-		var m interface{}
-		err := json.Unmarshal(s, &m)
-		if err != nil {
-			logger.LogError(err, string(s))
-			singleRowImg[k] = string(s)
-		}
-		val1, ok := m.(string)
-		if ok {
-			if base64Regexp.MatchString(val1) {
-				ba, err := base64.StdEncoding.DecodeString(val1)
-				if err == nil {
-					var sample interface{}
-					err = json.Unmarshal(ba, &sample)
-					if err == nil {
-						singleRowImg[k] = sample
-
-					} else {
-						singleRowImg[k] = string(s)
-
-					}
-				}
-			}
-		}
-
-		if mp, ok := m.(map[string]interface{}); ok {
-			for k, v := range mp {
-				if val, ok := v.(string); ok {
-					if base64Regexp.MatchString(val) {
-						ba, err := base64.StdEncoding.DecodeString(val)
-						if err == nil {
-							var sample interface{}
-							err = json.Unmarshal(ba, &sample)
-							if err == nil {
-								mp[k] = sample
-								m = mp
-							}
-						}
-					}
-				}
-			}
-		}
-		singleRowImg[k] = m
-
-	}
-	return singleRowImg, err
-}
-
 func ParseNestedJSON(value interface{}) interface{} {
 	switch v := value.(type) {
 	case map[string]interface{}:
@@ -375,11 +338,15 @@ func ParseNestedJSON(value interface{}) interface{} {
 		if base64Regexp.MatchString(v) {
 			ba, err := base64.StdEncoding.DecodeString(v)
 			if err == nil {
-				return ParseNestedJSON(string(ba)) // Convert bytes back to string
+				// Attempt to unmarshal the base64 decoded bytes as JSON
+				var m interface{}
+				if err := json.Unmarshal(ba, &m); err == nil {
+					return ParseNestedJSON(m)
+				}
+				return ba
 			}
 		}
-		return v // Keep string as is
-	case float64:
+		// Keep string as is if not base64 encoded
 		return v
 	default:
 		return v

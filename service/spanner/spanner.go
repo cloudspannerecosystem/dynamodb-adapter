@@ -27,13 +27,6 @@ import (
 // ParseDDL - this will parse DDL of spannerDB and set all the table configs in models
 // This fetches the spanner schema config from dynamodb_adapter_table_ddl table and stored it in
 // global map object which is used to read and write data into spanner tables
-
-// InitConfig loads ConfigurationMap and DbConfigMap in memory based on
-// ACTIVE_ENV. If ACTIVE_ENV is not set or and empty string the environment
-// is defaulted to staging.
-//
-// These config files are read from rice-box
-
 func ParseDDL(updateDB bool) error {
 	stmt := spanner.Statement{}
 
@@ -52,10 +45,11 @@ func ParseDDL(updateDB bool) error {
 			tableName := ms[i]["tableName"].(string)
 			column := ms[i]["column"].(string)
 			column = strings.Trim(column, "`")
-			dataType := ms[i]["dynamoDataType"].(string)
+			dynamoDataType := ms[i]["dynamoDataType"].(string)
 			originalColumn, ok := ms[i]["originalColumn"].(string)
 			partitionKey := ms[i]["partitionKey"].(string)
 			sortKey, _ := ms[i]["sortKey"].(string) // Optional, check if available
+			spannerDataType := ms[i]["spannerDataType"].(string)
 			spannerIndexName, _ := ms[i]["spannerIndexName"].(string)
 			models.DbConfigMap[tableName] = models.TableConfig{
 				PartitionKey:     partitionKey,
@@ -75,10 +69,12 @@ func ParseDDL(updateDB bool) error {
 			_, found := models.TableColumnMap[tableName]
 			if !found {
 				models.TableDDL[tableName] = make(map[string]string)
+				models.TableSpannerDDL[tableName] = make(map[string]string)
 				models.TableColumnMap[tableName] = []string{}
 			}
 			models.TableColumnMap[tableName] = append(models.TableColumnMap[tableName], column)
-			models.TableDDL[tableName][column] = dataType
+			models.TableDDL[tableName][column] = dynamoDataType
+			models.TableSpannerDDL[tableName][column] = spannerDataType
 		}
 	}
 	return nil

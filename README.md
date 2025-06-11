@@ -23,7 +23,7 @@ data types, refer to the [Compatibility Matrix](#compatibility_matrix)
 
 ## Examples and Quickstart
 
-The adapter project includes an example application and sample eCommerce
+**OUTDATED** - The adapter project includes an example application and sample eCommerce
 data model. The [instructions](./examples/README.md) for the sample
 application include migration using [Harbourbridge](https://github.com/cloudspannerecosystem/harbourbridge)
 and [setup](./examples/README.md#initialize_the_adapter_configuration) for
@@ -33,7 +33,7 @@ the adapter.
 
 ### Supported Actions
 
-DynamoDB Adapter currently supports the folowing operations:
+DynamoDB Adapter currently supports the following operations:
 
 | DynamoDB Action |
 |----------------|
@@ -54,7 +54,7 @@ DynamoDB Adapter currently supports the following DynamoDB data types
 
 | DynamoDB Data Type            | Spanner Data Types |
 | ------------------------------| ------------------ |
-| `N` (number type)             | `INT64`, `FLOAT64`, `NUMERIC` |
+| `N` (number type)             | `INT64`, `FLOAT64`, `NUMERIC`, `TIMESTAMP` (EPOCH seconds) |
 | `BOOL` (boolean)              | `BOOL` |
 | `B` (binary type)             | `BYTES(MAX)` |
 | `S` (string and data values)  | `STRING(MAX)` |
@@ -68,123 +68,196 @@ Note: Map and List datatypes does not support the Set datatypes.
 
 ## Configuration
 
+This DynamoDB Adapter requires some initial setup in order to work. There is an initialization section to help bootstrap and create required Spanner tables. Running the init code isn't required but keep in mind that you will have to manually create resources (noted below).
+
+### Auth
+
+#### Spanner Credentials
+The adapter and initialization both expect GOOGLE_APPLICATION_CREDENTIALS in order to run. On platforms like GCE, GKE, etc., this will be auto picked up at runtime. Locally, make sure to run the following:
+```sh
+gcloud auth application-default login
+```
+
+#### DynamoDB Credentials
+These can be set either in the `.env` file or by running the following:
+```sh
+export AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY
+export AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY
+export AWS_REGION=YOUR_REGION
+```
+
 ### config.yaml
 
-This file defines the necessary settings for the adapter.
-A sample configuration might look like this:
+This file defines the necessary settings for the adapter. You should avoid changing this file directly as all fields can be overwritten with env vars. Both the adapters `main.go` and the initilaization's `init.go` will pull in the `config.yaml` file and allow overriding of any value via env vars or a `.env` file.
 
+You can override `config.yaml` like the following:
+
+`config.yaml`
+```
 spanner:
-        project_id: "my-project-id"
-        instance_id: "my-instance-id"
-        database_name: "my-database-name"
-        query_limit: "query_limit"
-        dynamo_query_limit: "dynamo_query_limit"
+  project_id: SPANNER_PROJECT_ID
+```
 
-The fields are:
-project_id: The Google Cloud project ID.
-instance_id: The Spanner instance ID.
-database_name: The database name in Spanner.
-query_limit: Database query limit.
-dynamo_query_limit: DynamoDb query limit.
+`.env`
+```
+SPANNER_PROJECT_ID=<yourprojectid>
+```
 
-### dynamodb_adapter_table_ddl
+### .env
 
-`dynamodb_adapter_table_ddl` stores the metadata for all DynamoDB tables now
+The `.env` file is used to override `config.yaml`. It is not required and you can simply set env vars directly. For deployments on platforms like Docker or GKE, you likely will set env vars specifically for that platform.
+
+Copy the `.env.example` file to `.env` and set needed variables.
+```sh
+cp .env.example .env
+```
+
+### Required Spanner Tables
+
+* `dynamodb_adapter_table_ddl`
+  * Stores the metadata for all DynamoDB tables now
 stored in Cloud Spanner. It is used when the adapter starts up to create a map
 for all the columns names present in Spanner tables with the columns of tables
 present in DynamoDB. This mapping is required because DynamoDB supports the
 special characters in column names while Cloud Spanner only supports
 underscores(_). For more: [Spanner Naming Conventions](https://cloud.google.com/spanner/docs/data-definition-language#naming_conventions)
+  * This table also maps DynamoDB types to the underlying Spanner types. This is particularly important for mapping DynamoDB Number to Spanner since there isn't a 1to1 mapping. The adapter will read the Spanner column type and auto-convert reads/writes for that attribute to the closest type to match.
+* `dynamodb_adapter_config_manager`
 
-### Initialization Modes
+If you opt to not use the init code, you can create these tables manually by running:
+```SQL
+CREATE TABLE dynamodb_adapter_table_ddl (
+  column	     STRING(MAX),
+  tableName      STRING(MAX),
+  dataType       STRING(MAX),
+  originalColumn STRING(MAX),
+) PRIMARY KEY (tableName, column)
 
-DynamoDB Adapter supports two modes of initialization:
+CREATE TABLE dynamodb_adapter_config_manager (
+  tableName     STRING(MAX),
+  config 	    STRING(MAX),
+  cronTime      STRING(MAX),
+  enabledStream STRING(MAX),
+  uniqueValue   STRING(MAX),
+) PRIMARY KEY (tableName)
+```
 
-#### Dry Run Mode
+## Initialization
 
-This mode generates the Spanner queries required to:
+This repo provides init code to bootstrap the needed resources for the adapter to run. Running this is not required but note that you will have to manually setup required tables. Commands will only run if the resources don't already exist. The init will perform the following:
 
-Create the dynamodb_adapter_table_ddl table in Spanner.
-Insert metadata for all DynamoDB tables into dynamodb_adapter_table_ddl.
-These queries are printed to the console without executing them on Spanner,
-allowing you to review them before making changes.
+* Creates new database in Spanner
+* Creates adapter required tables
+  * `dynamodb_adapter_table_ddl`
+  * `dynamodb_adapter_config_manager`
+* Reads from source DynamoDB tables
+* Creates tables in Spanner converting names to match Spanner restrictions
+* Creates table columns converting DynamoDB types to Spanner types on a best effort basis.
+  * Note that by default, all number types are mapped to FLOAT64. You will have to manually adjust the schema for other types.
+* Creates Spanner indexes converting from DynamoDB GSIs and LSIs
+* Inserts rows into the `dynamodb_adapter_table_ddl` table to map DynamoDB -> Spanner attributes
 
+Before starting, make sure you followed the Configuration setup above. You can ignore any steps calling for manually creating resources.
+
+You can run the init in dry run mode which will only generate statements instead of creating resources. You can then remove the `--dry_run` flag to actually create needed resources:
 ```sh
 go run config-files/init.go --dry_run
 ```
 
-#### Execution Mode
-
-This mode executes the Spanner queries generated
-during the dry run on the Spanner instance. It will:
-
-Create the dynamodb_adapter_table_ddl table in Spanner if it does not exist.
-Insert metadata for all DynamoDB tables into the dynamodb_adapter_table_ddl table.
-
-```sh
-
-go run config-files/init.go
-
-```
-
-### Prerequisites for Initialization
-
-AWS CLI:
-Configure AWS credentials:
-
-```sh
-
-aws configure set aws_access_key_id YOUR_ACCESS_KEY
-aws configure set aws_secret_access_key YOUR_SECRET_KEY
-aws configure set default.region YOUR_REGION
-aws configure set aws_session_token YOUR_SESSION_TOKEN
-
-```
-
-Google Cloud CLI:
-Authenticate and set up your environment:
-
-```sh
-
-gcloud auth application-default login
-gcloud config set project [MY_PROJECT_NAME]
-
-```
-
 ## Starting DynamoDB Adapter
 
-Complete the steps described in
-[Set up](https://cloud.google.com/spanner/docs/getting-started/set-up), which
+To start from scratch, complete the steps described in https://cloud.google.com/spanner/docs/getting-started/set-up, which
 covers creating and setting a default Google Cloud project, enabling billing,
 enabling the Cloud Spanner API, and setting up OAuth 2.0 to get authentication
 credentials to use the Cloud Spanner API.
 
-In particular, ensure that you run
+Ensure you have already followed the Configuration section notes above.
 
-```sh
-
-gcloud auth application-default login
-
-```
-
-to set up your local development environment with authentication credentials.
-
-Set the GCLOUD_PROJECT environment variable to your Google Cloud project ID:
-
-```sh
-
-gcloud config set project [MY_PROJECT NAME]
-
-```
-
+### Locally or with Binary
+Run directly
 ```sh
 go run main.go
-
 ```
 
+Or
+
+Build
+```sh
+go build \
+  -ldflags "-X github.com/cloudspannerecosystem/dynamodb-adapter/config.proxyReleaseVersion=$(cat VERSION)" \
+  -o dynamodb-adapter
+```
+
+Run Binary
+```sh
+./dynamodb-adapter
+```
+
+### Docker
+
+Set needed env vars (for publishing)
+```
+export ARTIFACT_REGISTRY_NAME="<registry>"
+export ARTIFACT_REGISTRY_PROJECT_ID="<project>"
+export ARTIFACT_REGISTRY_REGION="<region>"
+```
+
+Build
+```sh
+docker build \
+  --platform linux/amd64 \
+  --build-arg "PROXY_RELEASE_VERSION=$(cat VERSION)" \
+  --tag $ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$ARTIFACT_REGISTRY_PROJECT_ID/$ARTIFACT_REGISTRY_NAME/dynamodb-adapter:$(cat VERSION) .
+```
+
+Running locally (passes in local GCP creds)
+```sh
+docker run \
+  --publish 9050:9050 \
+  --name dynamodb-adapter \
+  --detach \
+  --volume $HOME/.config/gcloud/application_default_credentials.json:/app/application_default_credentials.json:ro \
+  --env GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json \
+  --env-file .env \
+  $ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$ARTIFACT_REGISTRY_PROJECT_ID/$ARTIFACT_REGISTRY_NAME/dynamodb-adapter:$(cat VERSION)
+```
+
+Publish
+```sh
+gcloud auth configure-docker $ARTIFACT_REGISTRY_REGION-docker.pkg.dev
+docker push $ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$ARTIFACT_REGISTRY_PROJECT_ID/$ARTIFACT_REGISTRY_NAME/dynamodb-adapter:$(cat VERSION)
 ```
 
 ## API Documentation
 
 This is can be imported in Postman or can be used for Swagger UI.
 You can get open-api-spec file here [here](https://github.com/cldcvr/dynamodb-adapter/wiki/Open-API-Spec)
+
+## Development
+
+### Unit Tests
+
+Run with 
+```sh
+go test ./... -short 
+```
+
+### Integration Tests
+
+The integrations tests run against a live Spanner instance to perform validations. Integration tests rely on the same `config.yaml` but a local `.env` file if being used.
+
+If using `.env` files, copy the example to the integrationtest path:
+```sh
+cp .env.example integrationtest/.env
+```
+
+```sh
+cd integrationtest
+go test . -v
+```
+
+You can also manually setup/teardown the integration test DB
+```sh
+go run setup.go setup
+go run setup.go teardown
+```

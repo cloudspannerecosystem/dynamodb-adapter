@@ -609,7 +609,7 @@ func Test_parseSpannerCondition(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got1, got2 := parseSpannerCondition(tc.queryModel, tc.pKey, tc.sKey)
+		got1, got2, _ := parseSpannerCondition(tc.queryModel, tc.pKey, tc.sKey)
 		assert.Equal(t, got1, tc.want1)
 		assert.Equal(t, got2, tc.want2)
 	}

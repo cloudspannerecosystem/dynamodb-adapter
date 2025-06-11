@@ -25,35 +25,32 @@ import (
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
-	"gopkg.in/yaml.v2"
+	configpkg "github.com/cloudspannerecosystem/dynamodb-adapter/config"
 )
 
-var readFile = os.ReadFile
+func Setup() {
+	if err := runSetup(); err != nil {
+		log.Fatalf("Setup failed: %v", err)
+	}
+}
+
+func Teardown() {
+	if err := runTeardown(); err != nil {
+		log.Fatalf("Teardown failed: %v", err)
+	}
+}
 
 func main() {
-	config, err := loadConfig("config.yaml")
-	if err != nil {
-		log.Fatalf("Error loading configuration: %v", err)
+	if len(os.Args) < 2 {
+		log.Fatal("Missing command: use 'setup' or 'teardown'")
 	}
-
-	// Build the Spanner database name
-	databaseName := fmt.Sprintf(
-		"projects/%s/instances/%s/databases/%s",
-		config.Spanner.ProjectID, config.Spanner.InstanceID, config.Spanner.DatabaseName,
-	)
-	switch cmd := os.Args[1]; cmd {
+	switch os.Args[1] {
 	case "setup":
-		w := log.Writer()
-		if err := createDatabase(w, databaseName); err != nil {
-			log.Fatal(err)
-		}
-		if err := initData(w, databaseName); err != nil {
+		if err := runSetup(); err != nil {
 			log.Fatal(err)
 		}
 	case "teardown":
-		w := log.Writer()
-		if err := deleteDatabase(w, databaseName); err != nil {
+		if err := runTeardown(); err != nil {
 			log.Fatal(err)
 		}
 	default:
@@ -61,18 +58,39 @@ func main() {
 	}
 }
 
-func loadConfig(filename string) (*models.Config, error) {
-	data, err := readFile(filename)
+func runSetup() error {
+	config, err := configpkg.LoadConfig("../config.yaml")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		return err
 	}
-
-	var config models.Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	databaseName := fmt.Sprintf(
+		"projects/%s/instances/%s/databases/%s",
+		config.Spanner.ProjectID, config.Spanner.InstanceID, config.Spanner.DatabaseName,
+	)
+	w := log.Writer()
+	if err := createDatabase(w, databaseName); err != nil {
+		return err
 	}
+	if err := initData(w, databaseName); err != nil {
+		return err
+	}
+	return nil
+}
 
-	return &config, nil
+func runTeardown() error {
+	config, err := configpkg.LoadConfig("../config.yaml")
+	if err != nil {
+		return err
+	}
+	databaseName := fmt.Sprintf(
+		"projects/%s/instances/%s/databases/%s",
+		config.Spanner.ProjectID, config.Spanner.InstanceID, config.Spanner.DatabaseName,
+	)
+	w := log.Writer()
+	if err := deleteDatabase(w, databaseName); err != nil {
+		return err
+	}
+	return nil
 }
 
 func createDatabase(w io.Writer, db string) error {
@@ -103,6 +121,13 @@ func createDatabase(w io.Writer, db string) error {
 				actualTable STRING(MAX),
 				spannerDataType STRING(MAX)
 			) PRIMARY KEY (tableName, column)`,
+			`CREATE TABLE dynamodb_adapter_config_manager (
+				tableName     STRING(MAX),
+				config 	    STRING(MAX),
+				cronTime      STRING(MAX),
+				enabledStream STRING(MAX),
+				uniqueValue   STRING(MAX),
+			) PRIMARY KEY (tableName)`,
 			`CREATE TABLE employee (
 				emp_id          FLOAT64,
 				address         STRING(MAX),

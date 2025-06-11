@@ -19,12 +19,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -135,7 +137,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			p = tokens[0]
 			v1, ok := updateAtrr.ExpressionAttributeMap[tokens[1]]
 			if ok {
-				switch v2 := v1.(type) {
+				switch v2 := v1.(type) { // TODO: Support timestamp and big.rat
 				case float64:
 					addValue = v2
 					status = true
@@ -152,7 +154,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 			tokens[1] = strings.TrimSpace(tokens[1])
 			v1, ok := updateAtrr.ExpressionAttributeMap[tokens[1]]
 			if ok {
-				switch v2 := v1.(type) {
+				switch v2 := v1.(type) { // TODO: Support timestamp and big.rat
 				case float64:
 					addValue = -v2
 					status = true
@@ -277,7 +279,7 @@ func parseActionValue(actionValue string, updateAtrr models.UpdateAttr, assignme
 				switch newValue := tmp.(type) {
 				case []string: // String Set
 					resp[key] = handleStringSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
-				case []float64: // Number Set
+				case []float64: // Number Set // TODO: Support timestamp and big.rat
 					resp[key] = handleNumberSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
 				case [][]byte: // Binary Set
 					resp[key] = handleByteSet(oldRes, key, newValue, updateAtrr.UpdateExpression)
@@ -311,7 +313,7 @@ func handleStringSet(oldRes map[string]interface{}, key string, newValue []strin
 	}
 }
 
-// handleNumberSet handles set operations for number sets (float64).
+// handleNumberSet handles set operations for number sets (float64). // TODO: Support timestamp and big.rat
 func handleNumberSet(oldRes map[string]interface{}, key string, newValue []float64, updateExpression string) []float64 {
 	if floatSlice, ok := oldRes[key].([]float64); ok {
 		if strings.Contains(updateExpression, "ADD") {
@@ -460,12 +462,15 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc ser
 	updateAtrr.ExpressionAttributeNames = ChangeColumnToSpannerExpressionName(updateAtrr.TableName, updateAtrr.ExpressionAttributeNames)
 	var oldRes map[string]interface{}
 	var spannerRow map[string]interface{}
+	var err error
 	if updateAtrr.ReturnValues != "NONE" {
-		oldRes, spannerRow, _ = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+		oldRes, spannerRow, err = svc.GetWithProjection(ctx, updateAtrr.TableName, updateAtrr.PrimaryKeyMap, "", nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var resp map[string]interface{}
 	var actVal = make(map[string]interface{})
-	var er error
 	for k, v := range updateAtrr.ExpressionAttributeNames {
 		updateAtrr.UpdateExpression = strings.ReplaceAll(updateAtrr.UpdateExpression, k, v)
 		updateAtrr.ConditionExpression = strings.ReplaceAll(updateAtrr.ConditionExpression, k, v)
@@ -475,23 +480,25 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc ser
 	for k, v := range m {
 		res, acVal, err := performOperation(ctx, k, v, updateAtrr, oldRes, spannerRow)
 		resp = res
-		er = err
+		if err != nil {
+			return nil, err
+		}
 		for k, v := range acVal {
 			actVal[k] = v
 		}
 	}
-	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes)
+	logger.Debug(updateAtrr.ReturnValues, resp, oldRes)
 
 	var output map[string]interface{}
 	var errOutput error
 	switch updateAtrr.ReturnValues {
 	case "NONE":
-		return nil, er
+		return nil, nil
 	case "ALL_NEW":
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resp))
 	case "ALL_OLD":
 		if len(oldRes) == 0 {
-			return nil, er
+			return nil, err
 		}
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, oldRes))
 	case "UPDATED_NEW":
@@ -502,7 +509,7 @@ func UpdateExpression(ctx context.Context, updateAtrr models.UpdateAttr, svc ser
 		output, errOutput = ChangeMaptoDynamoMap(ChangeResponseToOriginalColumns(updateAtrr.TableName, resVal))
 	case "UPDATED_OLD":
 		if len(oldRes) == 0 {
-			return nil, er
+			return nil, err
 		}
 		var resVal = make(map[string]interface{})
 		for k := range actVal {
@@ -635,7 +642,7 @@ func ChangeResponseToOriginalColumns(tableName string, obj map[string]interface{
 		return obj
 	}
 	rs := make(map[string]interface{})
-	logger.LogInfo(models.ColumnToOriginalCol)
+	logger.Info(models.ColumnToOriginalCol)
 	for k, v := range obj {
 		if k1, ok := models.OriginalColResponse[k]; ok {
 			rs[k1] = v
@@ -677,28 +684,70 @@ func ChangeColumnToSpanner(obj map[string]interface{}) map[string]interface{} {
 	return rs
 }
 
-func convertFrom(a *dynamodb.AttributeValue, tableName string, level int16) interface{} {
+func convertFrom(colName string, a *dynamodb.AttributeValue, tableName string, level int16) interface{} {
 	if a.S != nil {
 		return *a.S
 	}
 
+	// DynamoDB Number does not translate to a single type in Spanner.
+	// We need to check the column type in Spanner to determine how to convert it.
+	// If the column type is INT64, FLOAT64, NUMERIC, or TIMESTAMP, we will convert accordingly.
 	if a.N != nil {
 		if strings.ToLower(*a.N) == "infinity" || strings.ToLower(*a.N) == "-infinity" || strings.ToLower(*a.N) == "nan" {
 			panic("N does not support " + *a.N + " type value")
 		}
-		// Number is tricky b/c we don't know which numeric type to use. Here we
-		// simply try the different types from most to least restrictive.
-		if n, err := strconv.ParseInt(*a.N, 10, 64); err == nil {
-			return float64(n)
+
+		// Get column type from models.TableSpannerDDL if available
+		tableName = utils.ChangeTableNameForSpanner(tableName)
+		spannerColType := ""
+		if tableSpannerDDL, ok := models.TableSpannerDDL[tableName]; ok {
+			if t, ok := tableSpannerDDL[colName]; ok {
+				spannerColType = t
+			}
 		}
-		if n, err := strconv.ParseUint(*a.N, 10, 64); err == nil {
-			return float64(n)
+
+		switch spannerColType {
+		case "INT64":
+			n, err := strconv.ParseInt(*a.N, 10, 64)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to parse INT64 for %s.%s: %v", tableName, colName, err))
+			}
+			return n
+		case "FLOAT64":
+			n, err := strconv.ParseFloat(*a.N, 64)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to parse FLOAT64 for %s.%s: %v", tableName, colName, err))
+			}
+			return n
+		case "NUMERIC":
+			if a.N == nil {
+				return spanner.NullNumeric{Valid: false}
+			}
+			r := new(big.Rat)
+			if _, ok := r.SetString(*a.N); !ok {
+				panic(fmt.Sprintf("Failed to parse NUMERIC for %s.%s: %s", tableName, colName, *a.N))
+			}
+			return spanner.NullNumeric{Numeric: *r, Valid: true}
+		case "TIMESTAMP":
+			n, err := strconv.ParseInt(*a.N, 10, 64)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to parse TIMESTAMP for %s.%s: %v", tableName, colName, err))
+			}
+			return spanner.NullTime{Time: time.Unix(n, 0).UTC(), Valid: true}
+		default:
+			// Keep preexisting default logic
+			if n, err := strconv.ParseInt(*a.N, 10, 64); err == nil {
+				return float64(n)
+			}
+			if n, err := strconv.ParseUint(*a.N, 10, 64); err == nil {
+				return float64(n)
+			}
+			n, err := strconv.ParseFloat(*a.N, 64)
+			if err != nil {
+				panic(err)
+			}
+			return n
 		}
-		n, err := strconv.ParseFloat(*a.N, 64)
-		if err != nil {
-			panic(err)
-		}
-		return n
 	}
 
 	if a.BOOL != nil {
@@ -717,7 +766,7 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string, level int16) inte
 			} else {
 				level++
 			}
-			m[k] = convertFrom(v, tableName, level)
+			m[k] = convertFrom(colName, v, tableName, level)
 		}
 		return m
 	}
@@ -725,7 +774,7 @@ func convertFrom(a *dynamodb.AttributeValue, tableName string, level int16) inte
 	if a.L != nil {
 		l := make([]interface{}, len(a.L))
 		for index, v := range a.L {
-			l[index] = convertFrom(v, tableName, 0)
+			l[index] = convertFrom(colName, v, tableName, 0)
 		}
 		return l
 	}
@@ -821,7 +870,7 @@ func ConvertFromMap(item map[string]*dynamodb.AttributeValue, v interface{}, tab
 
 	m := make(map[string]interface{})
 	for k, v := range item {
-		m[k] = convertFrom(v, tableName, defaultLevel)
+		m[k] = convertFrom(k, v, tableName, defaultLevel)
 	}
 
 	if isTyped(reflect.TypeOf(v)) {
@@ -940,7 +989,6 @@ func convertMap(output map[string]interface{}, v reflect.Value) error {
 
 		_ = convertMapToDynamoObject(elem, elemVal)
 		output[keyName] = elem
-
 	}
 	return nil
 }
@@ -993,7 +1041,8 @@ func convertSlice(output map[string]interface{}, v reflect.Value) error {
 
 		for i := 0; i < v.Len(); i++ {
 			elem := make(map[string]interface{})
-			err := convertMapToDynamoObject(elem, v.Index(i))
+			val := v.Index(i)
+			err := convertMapToDynamoObject(elem, val)
 			if err != nil {
 				return err
 			}
@@ -1014,7 +1063,9 @@ func convertSingle(output map[string]interface{}, v reflect.Value) error {
 		s := v.String()
 		output["S"] = s
 	case reflect.Struct:
-		output["NULL"] = true
+		if err := convertStruct(output, v); err != nil {
+			return err
+		}
 	default:
 		if err := convertNumber(output, v); err != nil {
 			return err
@@ -1024,7 +1075,7 @@ func convertSingle(output map[string]interface{}, v reflect.Value) error {
 	return nil
 }
 
-func convertNumber(output map[string]interface{}, v reflect.Value) error {
+func convertNumber(output map[string]interface{}, v reflect.Value) error { // TODO: Support timestamp and big.rat
 	var outVal string
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -1037,6 +1088,17 @@ func convertNumber(output map[string]interface{}, v reflect.Value) error {
 		outVal = strconv.FormatFloat(v.Float(), 'f', -1, 64)
 	}
 	output["N"] = outVal
+	return nil
+}
+
+func convertStruct(output map[string]interface{}, v reflect.Value) error {
+	if rat, ok := v.Interface().(*big.Rat); ok {
+		output["N"] = rat.String()
+	} else if t, ok := v.Interface().(time.Time); ok {
+		output["N"] = strconv.FormatInt(t.Unix(), 10)
+	} else {
+		output["NULL"] = true
+	}
 	return nil
 }
 
@@ -1071,7 +1133,7 @@ func TransactWriteUpdateExpression(ctx context.Context, updateAtrr models.Update
 		}
 	}
 	// log the result of the transaction
-	logger.LogDebug(updateAtrr.ReturnValues, resp, oldRes, mut)
+	logger.Debug(updateAtrr.ReturnValues, resp, oldRes, mut)
 	// return the result of the transaction
 	switch updateAtrr.ReturnValues {
 	case "NONE":

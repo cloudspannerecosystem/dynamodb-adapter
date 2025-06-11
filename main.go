@@ -17,12 +17,16 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/api"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/docs"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/initializer"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
 	"github.com/gin-contrib/pprof"
+	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
@@ -41,7 +45,10 @@ func main() {
 	if initErr != nil {
 		log.Fatalln(initErr)
 	}
-	r := gin.Default()
+	gin.SetMode(models.GlobalConfig.GinMode)
+	r := gin.New()
+	r.Use(ginzap.Ginzap(logger.Desugar(), time.RFC3339, true))
+	r.Use(ginzap.RecoveryWithZap(logger.Desugar(), true))
 	pprof.Register(r)
 	r.GET("/doc/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	docs.SwaggerInfo.Host = ""

@@ -50,9 +50,8 @@ func NewAPIHandler(svc services.Service) *APIHandler {
 
 // InitDBAPI - routes for apis
 func InitDBAPI(r *gin.Engine) {
+	r.Use(LogRequestResponse())
 	svc := services.GetServiceInstance()
-
-	// Create API handler with dependency injection
 	apiHandler := NewAPIHandler(svc)
 	r.POST("/v1", apiHandler.RouteRequest)
 }
@@ -67,6 +66,8 @@ func (h *APIHandler) RouteRequest(c *gin.Context) {
 		h.BatchWriteItem(c)
 	case "DeleteItem":
 		h.DeleteItem(c)
+	case "DescribeTable":
+		h.DescribeTable(c)
 	case "GetItem":
 		h.GetItemMeta(c)
 	case "PutItem":
@@ -144,7 +145,7 @@ func (h *APIHandler) UpdateMeta(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{})
 			return
 		}
-		logger.LogDebug(meta)
+		logger.Debug(meta)
 		meta.AttrMap, err = ConvertDynamoToMap(meta.TableName, meta.Item)
 		if err != nil {
 			otelgo.AddAnnotation(ctx, "Error while ConvertDynamoToMap")
@@ -193,7 +194,9 @@ func put(ctx context.Context, tableName string, putObj map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("oldResp: ", oldResp)
 	newResp, err := services.Put(ctx, tableName, putObj, nil, conditionExp, expressionAttr, oldResp, spannerRow)
+	logger.Debug("newResp: ", newResp)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +310,7 @@ func (h *APIHandler) QueryTable(c *gin.Context) {
 		c.JSON(errors.New("ValidationException", err).HTTPResponse(query))
 	} else {
 		otelgo.AddAnnotation(ctx, "Query API validation passed, processing query")
-		logger.LogInfo(query)
+		logger.Info(query)
 		queryResponse(query, c, h.svc)
 		otelgo.AddAnnotation(ctx, "Successfully processed Query API")
 	}
@@ -357,7 +360,7 @@ func (h *APIHandler) GetItemMeta(c *gin.Context) {
 				attribute.String("table", getItemMeta.TableName),
 			)
 		}
-		logger.LogDebug(getItemMeta)
+		logger.Debug(getItemMeta)
 		if allow := h.svc.MayIReadOrWrite(getItemMeta.TableName, false, ""); !allow {
 			c.JSON(http.StatusOK, gin.H{})
 			return
@@ -438,7 +441,7 @@ func (h *APIHandler) BatchGetItem(c *gin.Context) {
 		for k, v := range batchGetMeta.RequestItems {
 			batchGetWithProjectionMeta := v
 			batchGetWithProjectionMeta.TableName = k
-			logger.LogDebug(batchGetWithProjectionMeta)
+			logger.Debug(batchGetWithProjectionMeta)
 			if allow := h.svc.MayIReadOrWrite(batchGetWithProjectionMeta.TableName, false, ""); !allow {
 				c.JSON(http.StatusOK, []gin.H{})
 				return
@@ -461,7 +464,7 @@ func (h *APIHandler) BatchGetItem(c *gin.Context) {
 		c.JSON(http.StatusOK, map[string]interface{}{"Responses": output})
 
 		if time.Since(startTime) > time.Second*1 {
-			go fmt.Println("BatchGetCall", batchGetMeta)
+			go logger.Debug("BatchGetCall", batchGetMeta)
 		}
 	}
 }
@@ -527,7 +530,7 @@ func (h *APIHandler) DeleteItem(c *gin.Context) {
 	} else {
 
 		otelgo.AddAnnotation(ctx, "Validation succeeded for DeleteItem request")
-		logger.LogDebug(deleteItem)
+		logger.Debug(deleteItem)
 		if allow := h.svc.MayIReadOrWrite(deleteItem.TableName, true, "DeleteItem"); !allow {
 			otelgo.AddAnnotation(ctx, fmt.Sprintf("Permission denied for table: %s", deleteItem.TableName))
 			c.JSON(http.StatusOK, gin.H{})
@@ -625,7 +628,7 @@ func (h *APIHandler) Scan(c *gin.Context) {
 			meta.OnlyCount = true
 		}
 
-		logger.LogDebug(meta)
+		logger.Debug(meta)
 		otelgo.AddAnnotation(ctx, "Calling Scan Service")
 		res, err := services.Scan(ctx, meta)
 		if err == nil {
@@ -713,7 +716,9 @@ func (h *APIHandler) Update(c *gin.Context) {
 		}
 
 		// Call UpdateExpression and capture response or error
+		logger.Debug("UpdateExpression called with:", updateAttr)
 		resp, err := UpdateExpression(c.Request.Context(), updateAttr, h.svc)
+		logger.Debug("Error after UpdateExpression call:", err)
 		if err != nil {
 			otelgo.AddAnnotation(ctx, "Error during UpdateExpression")
 			c.JSON(errors.HTTPResponse(err, updateAttr))
@@ -757,11 +762,20 @@ func (h *APIHandler) BatchWriteItem(c *gin.Context) {
 	var batchWriteItem models.BatchWriteItem
 	var unprocessedBatchWriteItems models.BatchWriteItemResponse
 
+	// Clients expect UnprocessedItems to be present even if empty
+	unprocessedBatchWriteItems.UnprocessedItems = map[string][]models.BatchWriteSubItems{}
+
 	if err1 := c.ShouldBindJSON(&batchWriteItem); err1 != nil {
 		otelgo.AddAnnotation(ctx, "Validation failed for BatchWriteItem request")
 		c.JSON(errors.New("ValidationException", err1).HTTPResponse(batchWriteItem))
 	} else {
 		otelgo.AddAnnotation(ctx, "BatchWriteItem validation passed, processing batch write request")
+		for key, _ := range batchWriteItem.RequestItems {
+			if _, tableErr := config.GetTableConf(key); tableErr != nil {
+				c.JSON(errors.New("ResourceNotFoundException", "Requested resource not found: "+key).HTTPResponse(batchWriteItem))
+				return
+			}
+		}
 		for key, value := range batchWriteItem.RequestItems {
 			if allow := h.svc.MayIReadOrWrite(key, true, "BatchWriteItem"); !allow {
 				c.JSON(http.StatusOK, gin.H{})
@@ -788,10 +802,6 @@ func (h *APIHandler) BatchWriteItem(c *gin.Context) {
 				if err != nil {
 					for _, v := range value {
 						if v.PutReq.Item != nil {
-							if unprocessedBatchWriteItems.UnprocessedItems == nil {
-								unprocessedBatchWriteItems.UnprocessedItems = make(map[string][]models.BatchWriteSubItems) // Adjust type as needed
-							}
-
 							// Ensure that the specific key's slice is initialized
 							if _, exists := unprocessedBatchWriteItems.UnprocessedItems[key]; !exists {
 								unprocessedBatchWriteItems.UnprocessedItems[key] = []models.BatchWriteSubItems{} // Instantiate the slice
@@ -914,7 +924,7 @@ func (h *APIHandler) TransactGetItems(c *gin.Context) {
 
 	// Log slow transactions
 	if time.Since(start) > time.Second*1 {
-		go fmt.Println("TransactGetCall", transactGetMeta)
+		go logger.Debug("TransactGetCall", transactGetMeta)
 	}
 }
 
@@ -1010,7 +1020,7 @@ func (h *APIHandler) ExecuteStatement(c *gin.Context) {
 	} else {
 		execStmt.TableName = extractTableName(execStmt.Statement)
 		for _, val := range execStmt.Parameters {
-			execStmt.AttrParams = append(execStmt.AttrParams, convertFrom(val, execStmt.TableName, 1))
+			execStmt.AttrParams = append(execStmt.AttrParams, convertFrom("", val, execStmt.TableName, 1))
 		}
 		res, err := services.ExecuteStatement(c.Request.Context(), execStmt)
 		if err == nil {
@@ -1084,6 +1094,7 @@ func (h *APIHandler) TransactWriteItems(c *gin.Context) {
 	var resultItems []map[string]interface{}
 
 	_, _ = spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		resultItems = nil
 		var mutations []*spanner.Mutation
 
 		for _, transactItem := range transactWriteMeta.TransactItems {
@@ -1122,9 +1133,9 @@ func (h *APIHandler) TransactWriteItems(c *gin.Context) {
 			return e
 		}
 		resp.Item = resultItems
-		c.JSON(http.StatusOK, resultItems)
 		return nil
 	})
+	c.JSON(http.StatusOK, gin.H{"Responses": resultItems})
 }
 
 // handleConditionCheck takes a ConditionCheckRequest and a ReadWriteTransaction and returns a Mutation and an error.
@@ -1284,4 +1295,9 @@ func TransactPut(ctx context.Context, tableName string, putObj map[string]interf
 
 	// Return the result and the mutation
 	return res, mut, nil
+}
+
+// Test: DescribeTable provides a simple response to indicate the service is operational.
+func (h *APIHandler) DescribeTable(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

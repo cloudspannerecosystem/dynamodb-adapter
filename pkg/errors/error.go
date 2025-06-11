@@ -45,7 +45,7 @@ func New(errorCode string, logMessage ...interface{}) *Error {
 	err := new(Error)
 	err.ErrorCode = errorCode
 	err.ErrorMessage = fmt.Sprintln(logMessage...)
-	logger.ErrorLogging(err, logMessage)
+	logger.Error(err, logMessage)
 	return err
 }
 
@@ -55,14 +55,14 @@ func HTTPResponse(err error, body interface{}) (int, interface{}) {
 	if ok {
 		return http.StatusBadRequest, map[string]interface{}{"code": e.ErrorCode, "message": e.ErrorMessage}
 	}
-	logger.LogError(err)
-	logger.LogErrorF("body: %+v\n ", body)
+	logger.Error(err)
+	logger.Errorf("body: %+v\n ", body)
 	return http.StatusInternalServerError, map[string]interface{}{"code": "UncaughtException", "message": err.Error()}
 }
 
 // HTTPResponse - this is used to set http response
 func (e Error) HTTPResponse(body interface{}) (int, interface{}) {
-	logger.LogErrorF("body: %+v\n ", body)
+	logger.Errorf("body: %+v\n ", body)
 
 	return http.StatusBadRequest, map[string]interface{}{"code": e.ErrorCode, "message": e.ErrorMessage}
 }
@@ -78,10 +78,8 @@ func AssignError(err error) *Error {
 			e := new(Error)
 			e.ErrorCode = v
 			e.ErrorMessage = err.Error()
-			logger.ErrorLogging(err)
 			return e
 		}
 	}
-	logger.LogDebug(err)
 	return nil
 }

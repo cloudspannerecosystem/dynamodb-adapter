@@ -27,7 +27,7 @@ By default, OTEL is disabled in the configuration.
 *   **Kubernetes Cluster (GKE)**: Set up a Google Kubernetes Engine (GKE) cluster
     if deploying in a Kubernetes environment.
 
-## Steps to Set Up and Configure the OTEL Collector Service with Proxy Adaptor
+## Steps to Set Up and Configure the OTEL Collector Service with Proxy Adapter
 
 ### Step 1
 
@@ -83,7 +83,7 @@ service:
 
 ### Step 2
 
-Configure Proxy Adaptor
+Configure Proxy Adapter
 
 Follow these steps to enable and configure OTEL in your application:
 
@@ -111,10 +111,10 @@ Follow these steps to enable and configure OTEL in your application:
        samplingRatio: YOUR_SAMPLING_RATIO
 ```
 
-### Step 3: Set Up Proxy Adaptor & OTEL Collector Service as a Sidecar on GKE
+### Step 3: Set Up Proxy Adapter & OTEL Collector Service as a Sidecar on GKE
 
 *   Use the `proxy-adapter-application-as-sidecar.yaml` file from the `deployment/sidecar-k8`
-    to set up the OTEL collector service along with the proxy adaptor as a sidecar.
+    to set up the OTEL collector service along with the proxy adapter as a sidecar.
 *   You can find step-by-step instructions in the
     `/deployment/sidecar-k8/README.md` file.
 

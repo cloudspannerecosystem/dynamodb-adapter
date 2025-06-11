@@ -746,9 +746,7 @@ func TestTransactWriteUpdateExpression(t *testing.T) {
 
 	mockSvc.On("TransactWritePut", ctx, updateAttr.TableName, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mockTxn).
 		Return(map[string]interface{}{
-			"Name": map[string]interface{}{
-				"S": "John",
-			},
+			"Name": "John",
 		}, &spanner.Mutation{}, nil)
 
 	result, mut, err := TransactWriteUpdateExpression(ctx, updateAttr, mockTxn, mockSvc)
@@ -763,9 +761,7 @@ func TestTransactWriteUpdateExpression(t *testing.T) {
 	expected := map[string]interface{}{
 		"Attributes": map[string]interface{}{
 			"Name": map[string]interface{}{
-				"S": map[string]interface{}{
-					"S": "John",
-				},
+				"S": "John",
 			},
 		},
 	}

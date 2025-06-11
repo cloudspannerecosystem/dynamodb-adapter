@@ -39,7 +39,7 @@ func StartConfigManager() {
 	c = cron.New()
 	err := c.AddFunc("@every "+models.ConfigController.CornTime+"m", fetchConfigData)
 	if err != nil {
-		logger.LogError(err)
+		logger.Error(err)
 	}
 	c.Start()
 	fetchConfigData()
@@ -51,13 +51,13 @@ func MayIReadOrWrite(table string, IsMutation bool, operation string) bool {
 }
 
 func fetchConfigData() {
-	logger.LogDebug("Fetching starts")
+	logger.Debug("Fetching starts")
 	stmt := spanner.Statement{}
 	stmt.SQL = "SELECT * FROM dynamodb_adapter_config_manager"
 	data, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, "dynamodb_adapter_config_manager", []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream"}, false, stmt)
 	if err != nil {
 		models.ConfigController.StopConfigManager = true
-		logger.LogDebug(err)
+		logger.Debug(err)
 		return
 	}
 	if len(data) == 0 {
@@ -68,10 +68,10 @@ func fetchConfigData() {
 
 	uniqueValue, _ := m["uniqueValue"].(string)
 	if models.ConfigController.UniqueVal == uniqueValue {
-		logger.LogDebug("No Changes in config detected", models.ConfigController.UniqueVal, "--", uniqueValue)
+		logger.Debug("No Changes in config detected", models.ConfigController.UniqueVal, "--", uniqueValue)
 		return
 	}
-	logger.LogDebug("Changes in config detected", models.ConfigController.UniqueVal, "--", uniqueValue)
+	logger.Debug("Changes in config detected", models.ConfigController.UniqueVal, "--", uniqueValue)
 
 	cronTime, ok := m["cronTime"].(string)
 	if !ok {

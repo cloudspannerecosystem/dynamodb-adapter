@@ -26,50 +26,52 @@ import (
 )
 
 type SpannerConfig struct {
-	ProjectID        string  `yaml:"project_id"`
-	InstanceID       string  `yaml:"instance_id"`
-	DatabaseName     string  `yaml:"database_name"`
-	QueryLimit       int64   `yaml:"query_limit"`
-	DynamoQueryLimit int32   `yaml:"dynamo_query_limit"` //dynamo_query_limit
-	Session          Session `yaml:"Session"`
+	ProjectID        string  `mapstructure:"project_id"`
+	InstanceID       string  `mapstructure:"instance_id"`
+	DatabaseName     string  `mapstructure:"database_name"`
+	QueryLimit       int64   `mapstructure:"query_limit"`
+	DynamoQueryLimit int32   `mapstructure:"dynamo_query_limit"`
+	Session          Session `mapstructure:"Session"`
 }
 
 type Session struct {
-	Min          uint64 `yaml:"min"`
-	Max          uint64 `yaml:"max"`
-	GrpcChannels int    `yaml:"grpcChannels"`
+	Min          uint64 `mapstructure:"min"`
+	Max          uint64 `mapstructure:"max"`
+	GrpcChannels int    `mapstructure:"grpcChannels"`
 }
 
 // Spanner read/write operation settings.
 type Operation struct {
-	MaxCommitDelay   uint64 `yaml:"maxCommitDelay"`
-	ReplayProtection bool   `yaml:"replayProtection"`
+	MaxCommitDelay   uint64 `mapstructure:"maxCommitDelay"`
+	ReplayProtection bool   `mapstructure:"replayProtection"`
 }
 
-// OtelConfig defines the structure of the YAML configuration
+// OtelConfig defines the structure of the mapstructure configuration
 type OtelConfig struct {
-	Enabled                  bool   `yaml:"enabled"`
-	EnabledClientSideMetrics bool   `yaml:"enabledClientSideMetrics"`
-	ServiceName              string `yaml:"serviceName"`
+	Enabled                  bool   `mapstructure:"enabled"`
+	EnabledClientSideMetrics bool   `mapstructure:"enabledClientSideMetrics"`
+	ServiceName              string `mapstructure:"serviceName"`
 	HealthCheck              struct {
-		Enabled  bool   `yaml:"enabled"`
-		Endpoint string `yaml:"endpoint"`
-	} `yaml:"healthcheck"`
+		Enabled  bool   `mapstructure:"enabled"`
+		Endpoint string `mapstructure:"endpoint"`
+	} `mapstructure:"healthcheck"`
 	Metrics struct {
-		Enabled  bool   `yaml:"enabled"`
-		Endpoint string `yaml:"endpoint"`
-	} `yaml:"metrics"`
+		Enabled  bool   `mapstructure:"enabled"`
+		Endpoint string `mapstructure:"endpoint"`
+	} `mapstructure:"metrics"`
 	Traces struct {
-		Enabled       bool    `yaml:"enabled"`
-		Endpoint      string  `yaml:"endpoint"`
-		SamplingRatio float64 `yaml:"samplingRatio"`
-	} `yaml:"traces"`
+		Enabled       bool    `mapstructure:"enabled"`
+		Endpoint      string  `mapstructure:"endpoint"`
+		SamplingRatio float64 `mapstructure:"samplingRatio"`
+	} `mapstructure:"traces"`
 }
 
 type Config struct {
-	Spanner   SpannerConfig `yaml:"spanner"`
-	Otel      *OtelConfig   `yaml:"otel"`
+	Spanner   SpannerConfig `mapstructure:"spanner"`
+	Otel      *OtelConfig   `mapstructure:"otel"`
 	UserAgent string
+	GinMode   string `mapstructure:"gin_mode"`
+	LogLevel  string `mapstructure:"log_level"`
 }
 
 type Proxy struct {
@@ -176,6 +178,7 @@ type Query struct {
 	ExpressionAttributeNames  map[string]string                   `json:"ExpressionAttributeNames"`
 	FilterExp                 string                              `json:"FilterExpression"`
 	RangeExp                  string                              `json:"KeyConditionExpression"`
+	KeyConditions             map[string]KeyCondition             `json:"KeyConditions"`
 	RangeValMap               map[string]interface{}              `json:"RangeValMap"`
 	ExpressionAttributeValues map[string]*dynamodb.AttributeValue `json:"ExpressionAttributeValues"`
 	ExclusiveStartKey         map[string]*dynamodb.AttributeValue `json:"ExclusiveStartKey"`
@@ -256,6 +259,9 @@ var DbConfigMap map[string]TableConfig
 // TableDDL - this contains the DDL
 var TableDDL map[string]map[string]string
 
+// TableSpannerDDL - this contains the DDL with spanner data types
+var TableSpannerDDL map[string]map[string]string
+
 // TableColumnMap - this contains the list of columns for the tables
 var TableColumnMap map[string][]string
 
@@ -272,6 +278,9 @@ func init() {
 	TableDDL = make(map[string]map[string]string)
 	TableDDL["dynamodb_adapter_table_ddl"] = map[string]string{"tableName": "S", "column": "S", "dynamoDataType": "S", "originalColumn": "S", "partitionKey": "S", "sortKey": "S", "spannerIndexName": "S", "actualTable": "S", "spannerDataType": "S"}
 	TableDDL["dynamodb_adapter_config_manager"] = map[string]string{"tableName": "STRING(MAX)", "config": "STRING(MAX)", "cronTime": "STRING(MAX)", "uniqueValue": "STRING(MAX)", "enabledStream": "STRING(MAX)"}
+	TableSpannerDDL = make(map[string]map[string]string)
+	TableSpannerDDL["dynamodb_adapter_table_ddl"] = map[string]string{"tableName": "STRING(MAX)", "column": "STRING(MAX)", "dynamoDataType": "STRING(MAX)", "originalColumn": "STRING(MAX)", "partitionKey": "STRING(MAX)", "sortKey": "STRING(MAX)", "spannerIndexName": "STRING(MAX)", "actualTable": "STRING(MAX)", "spannerDataType": "STRING(MAX)"}
+	TableSpannerDDL["dynamodb_adapter_config_manager"] = map[string]string{"tableName": "STRING(MAX)", "config": "STRING(MAX)", "cronTime": "STRING(MAX)", "uniqueValue": "STRING(MAX)", "enabledStream": "STRING(MAX)"}
 	TableColumnMap = make(map[string][]string)
 	TableColumnMap["dynamodb_adapter_table_ddl"] = []string{"tableName", "column", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"}
 	TableColumnMap["dynamodb_adapter_config_manager"] = []string{"tableName", "config", "cronTime", "uniqueValue", "enabledStream"}
@@ -487,4 +496,9 @@ type ExecuteStatementQuery struct {
 	PartiQl      string
 	Params       map[string]interface{}
 	SQLStatement spanner.Statement
+}
+
+type KeyCondition struct {
+	AttributeValueList []*dynamodb.AttributeValue `json:"AttributeValueList"`
+	ComparisonOperator string                     `json:"ComparisonOperator"`
 }

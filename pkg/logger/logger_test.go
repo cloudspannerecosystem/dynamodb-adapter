@@ -18,40 +18,40 @@ import (
 	"testing"
 )
 
-func TestLogError(t *testing.T) {
+func TestError(t *testing.T) {
 	err := struct {
 		Error string
 	}{
 		"Test",
 	}
-	LogError(err)
+	Error(err)
 }
 
-func TestLogInfo(t *testing.T) {
+func TestInfo(t *testing.T) {
 	info := struct {
 		Info string
 	}{
 		"Test info",
 	}
-	LogInfo(info)
+	Info(info)
 }
 
-func TestLogDebug(t *testing.T) {
+func TestDebug(t *testing.T) {
 	info := struct {
 		Info string
 	}{
 		"Test info",
 	}
-	LogDebug(info)
+	Debug(info)
 }
 
-func BenchmarkLogError(b *testing.B) {
+func BenchmarkError(b *testing.B) {
 	err := struct {
 		Error string
 	}{
 		"Test",
 	}
 	for index := 0; index < b.N; index++ {
-		LogError(err)
+		Error(err)
 	}
 }

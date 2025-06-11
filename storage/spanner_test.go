@@ -14,23 +14,29 @@
 package storage
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
 	translator "github.com/cloudspannerecosystem/dynamodb-adapter/translator/utils"
 )
 
 func Test_parseRow(t *testing.T) {
 	tests := []struct {
-		name      string
-		row       *spanner.Row
-		colDDL    map[string]string
-		want      map[string]interface{}
-		wantError bool
+		name             string
+		spannerTableName string
+		row              *spanner.Row
+		tableDDL         map[string]string
+		tableSpannerDDL  map[string]string
+		want             map[string]interface{}
+		wantError        bool
 	}{
 		{
-			name: "ParseStringValue",
+			name:             "ParseStringValue",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"strCol"}, []interface{}{
 					spanner.NullString{StringVal: "my-text", Valid: true},
@@ -40,25 +46,29 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"strCol": "S"},
-			want:   map[string]interface{}{"strCol": "my-text"},
+			tableDDL:        map[string]string{"strCol": "S"},
+			tableSpannerDDL: map[string]string{"strCol": "STRING(MAX)"},
+			want:            map[string]interface{}{"strCol": "my-text"},
 		},
 		{
-			name: "ParseIntValue",
+			name:             "ParseIntValue",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"intCol"}, []interface{}{
-					spanner.NullFloat64{Float64: 314, Valid: true},
+					spanner.NullInt64{Int64: 314, Valid: true},
 				})
 				if err != nil {
 					t.Fatalf("failed to create row: %v", err)
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"intCol": "N"},
-			want:   map[string]interface{}{"intCol": 314.0},
+			tableDDL:        map[string]string{"intCol": "N"},
+			tableSpannerDDL: map[string]string{"intCol": "INT64"},
+			want:            map[string]interface{}{"intCol": int64(314)},
 		},
 		{
-			name: "ParseFloatValue",
+			name:             "ParseFloatValue",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"floatCol"}, []interface{}{
 					spanner.NullFloat64{Float64: 3.14, Valid: true},
@@ -68,11 +78,50 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"floatCol": "N"},
-			want:   map[string]interface{}{"floatCol": 3.14},
+			tableDDL:        map[string]string{"floatCol": "N"},
+			tableSpannerDDL: map[string]string{"floatCol": "FLOAT64"},
+			want:            map[string]interface{}{"floatCol": 3.14},
 		},
 		{
-			name: "ParseBoolValue",
+			name:             "ParseNumericValue",
+			spannerTableName: "TestTable",
+			row: func() *spanner.Row {
+				row, err := spanner.NewRow([]string{"numericCol"}, []interface{}{
+					spanner.NullNumeric{
+						Numeric: func() big.Rat { r, _ := new(big.Rat).SetString("3.14"); return *r }(),
+						Valid:   true,
+					},
+				})
+				if err != nil {
+					t.Fatalf("failed to create row: %v", err)
+				}
+				return row
+			}(),
+			tableDDL:        map[string]string{"numericCol": "N"},
+			tableSpannerDDL: map[string]string{"numericCol": "NUMERIC"},
+			want:            map[string]interface{}{"numericCol": func() big.Rat { r, _ := new(big.Rat).SetString("3.14"); return *r }()},
+		},
+		{
+			name:             "ParseTimestampValue",
+			spannerTableName: "TestTable",
+			row: func() *spanner.Row {
+				row, err := spanner.NewRow([]string{"timestampCol"}, []interface{}{
+					spanner.NullTime{
+						Time:  time.Date(2024, 6, 18, 12, 0, 0, 0, time.UTC),
+						Valid: true,
+					},
+				})
+				if err != nil {
+					t.Fatalf("failed to create row: %v", err)
+				}
+				return row
+			}(),
+			tableDDL:        map[string]string{"timestampCol": "N"},
+			tableSpannerDDL: map[string]string{"timestampCol": "TIMESTAMP"},
+			want:            map[string]interface{}{"timestampCol": time.Date(2024, 6, 18, 12, 0, 0, 0, time.UTC)}},
+		{
+			name:             "ParseBoolValue",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"boolCol"}, []interface{}{
 					spanner.NullBool{Bool: true, Valid: true},
@@ -82,11 +131,13 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"boolCol": "BOOL"},
-			want:   map[string]interface{}{"boolCol": true},
+			tableDDL:        map[string]string{"boolCol": "BOOL"},
+			tableSpannerDDL: map[string]string{"boolCol": "BOOL"},
+			want:            map[string]interface{}{"boolCol": true},
 		},
 		{
-			name: "RemoveNulls",
+			name:             "RemoveNulls",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"strCol"}, []interface{}{
 					spanner.NullString{StringVal: "", Valid: false},
@@ -96,25 +147,29 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"strCol": "S"},
-			want:   map[string]interface{}{"strCol": nil}, // Null value should be removed
+			tableDDL:        map[string]string{"strCol": "S"},
+			tableSpannerDDL: map[string]string{"strCol": "STRING(MAX)"},
+			want:            map[string]interface{}{"strCol": nil},
 		},
 		{
-			name: "SkipCommitTimestamp",
+			name:             "SkipCommitTimestamp",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"commit_timestamp"}, []interface{}{
-					nil, // Commit timestamp should be skipped
+					nil,
 				})
 				if err != nil {
 					t.Fatalf("failed to create row: %v", err)
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"commit_timestamp": "S"},
-			want:   map[string]interface{}{}, // Commit timestamp should not appear in the result
+			tableDDL:        map[string]string{"commit_timestamp": "S"},
+			tableSpannerDDL: map[string]string{"commit_timestamp": "STRING(MAX)"},
+			want:            map[string]interface{}{},
 		},
 		{
-			name: "MultiValueRow",
+			name:             "MultiValueRow",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"boolCol", "intCol", "strCol"}, []interface{}{
 					spanner.NullBool{Bool: true, Valid: true},
@@ -126,11 +181,13 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"boolCol": "BOOL", "intCol": "N", "strCol": "S"},
-			want:   map[string]interface{}{"boolCol": true, "intCol": 32.0, "strCol": "my-text"},
+			tableDDL:        map[string]string{"boolCol": "BOOL", "intCol": "N", "strCol": "S"},
+			tableSpannerDDL: map[string]string{"boolCol": "BOOL", "intCol": "FLOAT64", "strCol": "STRING(MAX)"},
+			want:            map[string]interface{}{"boolCol": true, "intCol": 32.0, "strCol": "my-text"},
 		},
 		{
-			name: "ParseStringArray",
+			name:             "ParseStringArray",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"arrayCol"}, []interface{}{
 					[]spanner.NullString{
@@ -144,12 +201,14 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"arrayCol": "SS"},
-			want:      map[string]interface{}{"arrayCol": []string{"element1", "element2", "element3"}},
-			wantError: false,
+			tableDDL:        map[string]string{"arrayCol": "SS"},
+			tableSpannerDDL: map[string]string{"arrayCol": "ARRAY<STRING(MAX)>"},
+			want:            map[string]interface{}{"arrayCol": []string{"element1", "element2", "element3"}},
+			wantError:       false,
 		},
 		{
-			name: "MissingColumnTypeInDDL",
+			name:             "MissingColumnTypeInDDL",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"strCol"}, []interface{}{
 					spanner.NullString{StringVal: "test", Valid: true},
@@ -159,27 +218,31 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"strCol": ""}, // Missing type in DDL
-			want:      nil,
-			wantError: true,
+			tableDDL:        map[string]string{"strCol": ""},
+			tableSpannerDDL: map[string]string{"strCol": "STRING(MAX)"},
+			want:            nil,
+			wantError:       true,
 		},
 		{
-			name: "InvalidTypeConversion",
+			name:             "InvalidTypeConversion",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"strCol"}, []interface{}{
-					spanner.NullFloat64{Float64: 123.45, Valid: true}, // Trying to parse float as a string
+					spanner.NullFloat64{Float64: 123.45, Valid: true},
 				})
 				if err != nil {
 					t.Fatalf("failed to create row: %v", err)
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"strCol": "S"},
-			want:      nil,
-			wantError: true,
+			tableDDL:        map[string]string{"strCol": "S"},
+			tableSpannerDDL: map[string]string{"strCol": "STRING(MAX)"},
+			want:            nil,
+			wantError:       true,
 		},
 		{
-			name: "ColumnNotInDDL",
+			name:             "ColumnNotInDDL",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"someOtherCol"}, []interface{}{
 					spanner.NullString{StringVal: "missing-column", Valid: true},
@@ -189,12 +252,14 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"strCol": "S"}, // Column "someOtherCol" not in DDL
-			want:      nil,
-			wantError: true,
+			tableDDL:        map[string]string{"strCol": "S"},
+			tableSpannerDDL: map[string]string{"strCol": "STRING(MAX)"},
+			want:            nil,
+			wantError:       true,
 		},
 		{
-			name: "ParseNumberArray",
+			name:             "ParseNumberArray",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"numberArrayCol"}, []interface{}{
 					[]spanner.NullFloat64{
@@ -208,12 +273,14 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"numberArrayCol": "NS"},
-			want:      map[string]interface{}{"numberArrayCol": []float64{1.1, 2.2, 3.3}},
-			wantError: false,
+			tableDDL:        map[string]string{"numberArrayCol": "NS"},
+			tableSpannerDDL: map[string]string{"numberArrayCol": "ARRAY<FLOAT64>"},
+			want:            map[string]interface{}{"numberArrayCol": []float64{1.1, 2.2, 3.3}},
+			wantError:       false,
 		},
 		{
-			name: "ParseBinaryArray",
+			name:             "ParseBinaryArray",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"binaryArrayCol"}, []interface{}{
 					[][]byte{
@@ -226,12 +293,14 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"binaryArrayCol": "BS"},
-			want:      map[string]interface{}{"binaryArrayCol": [][]byte{[]byte("binaryData1"), []byte("binaryData2")}},
-			wantError: false,
+			tableDDL:        map[string]string{"binaryArrayCol": "BS"},
+			tableSpannerDDL: map[string]string{"binaryArrayCol": "ARRAY<BYTES(MAX)>"},
+			want:            map[string]interface{}{"binaryArrayCol": [][]byte{[]byte("binaryData1"), []byte("binaryData2")}},
+			wantError:       false,
 		},
 		{
-			name: "EmptyNumberArray",
+			name:             "EmptyNumberArray",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"numberArrayCol"}, []interface{}{
 					[]spanner.NullFloat64{},
@@ -241,12 +310,14 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"numberArrayCol": "NS"},
-			want:      map[string]interface{}{},
-			wantError: false,
+			tableDDL:        map[string]string{"numberArrayCol": "NS"},
+			tableSpannerDDL: map[string]string{"numberArrayCol": "ARRAY<FLOAT64>"},
+			want:            map[string]interface{}{},
+			wantError:       false,
 		},
 		{
-			name: "EmptyBinaryArray",
+			name:             "EmptyBinaryArray",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"binaryArrayCol"}, []interface{}{
 					[][]byte{},
@@ -256,16 +327,18 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"binaryArrayCol": "BS"},
-			want:      map[string]interface{}{},
-			wantError: false,
+			tableDDL:        map[string]string{"binaryArrayCol": "BS"},
+			tableSpannerDDL: map[string]string{"binaryArrayCol": "ARRAY<BYTES(MAX)>"},
+			want:            map[string]interface{}{},
+			wantError:       false,
 		},
 		{
-			name: "InvalidNumberArrayConversion",
+			name:             "InvalidNumberArrayConversion",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"numberArrayCol"}, []interface{}{
 					[]spanner.NullString{
-						{StringVal: "not-a-number", Valid: true}, // Invalid conversion
+						{StringVal: "not-a-number", Valid: true},
 					},
 				})
 				if err != nil {
@@ -273,16 +346,18 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"numberArrayCol": "NS"},
-			want:      nil,
-			wantError: true,
+			tableDDL:        map[string]string{"numberArrayCol": "NS"},
+			tableSpannerDDL: map[string]string{"numberArrayCol": "ARRAY<FLOAT64>"},
+			want:            nil,
+			wantError:       true,
 		},
 		{
-			name: "InvalidBinaryArrayConversion",
+			name:             "InvalidBinaryArrayConversion",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"binaryArrayCol"}, []interface{}{
 					[]spanner.NullString{
-						{StringVal: "not-binary-data", Valid: true}, // Invalid conversion
+						{StringVal: "not-binary-data", Valid: true},
 					},
 				})
 				if err != nil {
@@ -290,29 +365,36 @@ func Test_parseRow(t *testing.T) {
 				}
 				return row
 			}(),
-			colDDL:    map[string]string{"binaryArrayCol": "BS"},
-			want:      nil,
-			wantError: true,
+			tableDDL:        map[string]string{"binaryArrayCol": "BS"},
+			tableSpannerDDL: map[string]string{"binaryArrayCol": "ARRAY<BYTES(MAX)>"},
+			want:            nil,
+			wantError:       true,
 		},
 		{
-			name: "ParseNullValue",
+			name:             "ParseNullValue",
+			spannerTableName: "TestTable",
 			row: func() *spanner.Row {
 				row, err := spanner.NewRow([]string{"nullCol"}, []interface{}{
-					spanner.NullString{Valid: false}, // Represents a NULL value
+					spanner.NullString{Valid: false},
 				})
 				if err != nil {
 					t.Fatalf("failed to create row: %v", err)
 				}
 				return row
 			}(),
-			colDDL: map[string]string{"nullCol": "NULL"},   // Define the column type as NULL
-			want:   map[string]interface{}{"nullCol": nil}, // Expect a nil value in the output
+			tableDDL:        map[string]string{"nullCol": "NULL"},
+			tableSpannerDDL: map[string]string{"nullCol": "STRING(MAX)"},
+			want:            map[string]interface{}{"nullCol": nil},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := parseRow(tt.row, tt.colDDL)
+			// Set up the DDLs for this test case
+			models.TableDDL[tt.spannerTableName] = tt.tableDDL
+			models.TableSpannerDDL[tt.spannerTableName] = tt.tableSpannerDDL
+
+			got, _, err := parseRow(tt.row, tt.spannerTableName)
 			if (err != nil) != tt.wantError {
 				t.Errorf("parseRow() error = %v, wantError %v", err, tt.wantError)
 				return

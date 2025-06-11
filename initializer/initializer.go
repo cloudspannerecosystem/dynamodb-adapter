@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudspannerecosystem/dynamodb-adapter/config"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/services"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/service/spanner"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/storage"
@@ -29,6 +30,7 @@ import (
 // Config, storage and all other global objects are initialize
 func InitAll(filepath string) error {
 	config.InitConfig(filepath)
+	logger.Init()
 	err := storage.InitializeDriver(context.Background())
 	if err != nil {
 		return err

@@ -76,7 +76,7 @@ func GetServiceInstance() Service {
 		storageInstance := storage.GetStorageInstance()
 		spannerClient, err := storageInstance.GetSpannerClient()
 		if err != nil {
-			logger.LogError("Failed to initialize Spanner client: %v", err)
+			logger.Error("Failed to initialize Spanner client: %v", err)
 			panic(err)
 		}
 
@@ -194,7 +194,7 @@ func Add(ctx context.Context, tableName string, attrMap map[string]interface{}, 
 
 // Del checks the expression for saving the data
 func Del(ctx context.Context, tableName string, attrMap map[string]interface{}, condExpression string, expressionAttr map[string]interface{}, expr *models.UpdateExpressionCondition) (map[string]interface{}, error) {
-	logger.LogDebug(expressionAttr)
+	logger.Debug(expressionAttr)
 	tableConf, err := config.GetTableConf(tableName)
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func QueryAttributes(ctx context.Context, query models.Query) (map[string]interf
 	if err != nil {
 		return nil, hash, err
 	}
-	logger.LogDebug(stmt)
+	logger.Debug(stmt)
 	resp, err := storage.GetStorageInstance().ExecuteSpannerQuery(ctx, query.TableName, cols, isCountQuery, stmt)
 	if err != nil {
 		return nil, hash, err
@@ -364,7 +364,11 @@ func createSpannerQuery(query *models.Query, tPkey, pKey, sKey string) (spanner.
 		return stmt, cols, isCountQuery, 0, "", err
 	}
 	tableName := parseSpannerTableName(query)
-	whereCondition, m := parseSpannerCondition(query, pKey, sKey)
+	whereCondition, m, err := parseSpannerCondition(query, pKey, sKey)
+	if err != nil {
+		return stmt, cols, isCountQuery, 0, "", err
+	}
+	logger.Debug("whereCondition: ", whereCondition)
 	offsetString, offset := parseOffset(query)
 	orderBy := parseSpannerSorting(query, isCountQuery, pKey, sKey)
 	limitClause := parseLimit(query, isCountQuery)
@@ -446,7 +450,21 @@ func parseSpannerTableName(query *models.Query) string {
 	return tableName
 }
 
-func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[string]interface{}) {
+// parseSpannerCondition builds the WHERE clause and parameter map for a Spanner SQL query from a DynamoDB Query object.
+//
+// It processes the RangeExp, FilterExp, and KeyConditions fields of the query, applying each to the WHERE clause and
+// collecting parameters as needed. If no conditions are present, returns an empty WHERE clause.
+//
+// Parameters:
+//   - query: The DynamoDB Query object containing expressions and key conditions.
+//   - pKey: The partition key name for the table or index.
+//   - sKey: The sort key name for the table or index.
+//
+// Returns:
+//   - The constructed WHERE clause string (or a single space if no conditions).
+//   - A map of parameter names to values for use in parameterized queries.
+//   - An error if any condition is invalid or unsupported.
+func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[string]interface{}, error) {
 	params := make(map[string]interface{})
 	whereClause := "WHERE "
 
@@ -454,23 +472,35 @@ func parseSpannerCondition(query *models.Query, pKey, sKey string) (string, map[
 		whereClause += sKey + " is not null "
 	}
 
+	// Parse KeyConditionExpression
 	if query.RangeExp != "" {
 		whereClause, query.RangeExp = createWhereClause(whereClause, query.RangeExp, "rangeExp", query.RangeValMap, params)
 	}
 
+	// Parse FilterExpression
 	if query.FilterExp != "" {
 		whereClause, query.FilterExp = createWhereClause(whereClause, query.FilterExp, "filterExp", query.RangeValMap, params)
+	}
+
+	// Parse KeyConditions
+	if len(query.KeyConditions) > 0 {
+		var err error
+		whereClause, err = applyKeyConditionsToWhereClause(whereClause, query.KeyConditions, params)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	if whereClause == "WHERE " {
 		whereClause = " "
 	}
-	return whereClause, params
+	return whereClause, params, nil
 }
 
 func createWhereClause(whereClause string, expression string, queryVar string, RangeValueMap map[string]interface{}, params map[string]interface{}) (string, string) {
 	_, _, expression = utils.ParseBeginsWith(expression)
 	expression = strings.ReplaceAll(expression, "begins_with", "STARTS_WITH")
+	expression = strings.ReplaceAll(expression, "contains", "ARRAY_INCLUDES")
 	trimmedString := strings.TrimSpace(whereClause)
 	if whereClause != "WHERE " && !strings.HasSuffix(trimmedString, "AND") {
 		whereClause += " AND "
@@ -500,8 +530,172 @@ func createWhereClause(whereClause string, expression string, queryVar string, R
 	return whereClause, expression
 }
 
-func parseOffset(query *models.Query) (string, int64) {
-	logger.LogDebug(query)
+// applyKeyConditionsToWhereClause appends a SQL WHERE clause for DynamoDB-style key conditions to an existing WHERE clause.
+//
+// It uses buildKeyConditionsClause to generate the SQL fragment and parameters for the provided key conditions,
+// appends the resulting clause (with "AND" if needed) to the existing WHERE clause, and merges the parameters.
+//
+// Parameters:
+//   - whereClause: The current SQL WHERE clause string.
+//   - keyConds: A map of attribute names to KeyCondition objects specifying comparison operators and values.
+//   - params: The parameter map to which new parameters will be added.
+//
+// Returns:
+//   - The updated WHERE clause string with key conditions applied.
+//   - An error if the key conditions are invalid or unsupported.
+func applyKeyConditionsToWhereClause(
+	whereClause string,
+	keyConds map[string]models.KeyCondition,
+	params map[string]interface{},
+) (string, error) {
+	keyClause, keyParams, err := buildKeyConditionsClause(keyConds)
+	if err != nil {
+		return "", err
+	}
+	if keyClause != "" {
+		whereClause = addAndIfNeeded(whereClause) + keyClause
+		for k, v := range keyParams {
+			params[k] = v
+		}
+	}
+	return whereClause, nil
+}
+
+// buildKeyConditionsClause constructs a SQL WHERE clause and parameter map from DynamoDB-style key conditions.
+//
+// Note: While the DynamoDB API restricts key conditions to partition keys, sort keys, and indexes,
+// this function allows any attribute. The adapter table schema does not account for indexes,
+// and Spanner does not enforce such restrictions (though this may impact performance).
+//
+// Parameters:
+//   - conds: A map where each key is an attribute name and the value is a KeyCondition specifying the comparison operator and values.
+//
+// Returns:
+//   - A string representing the SQL clause (e.g., "attr1 = @attr1_cond AND attr2 BETWEEN @attr2_cond1 AND @attr2_cond2").
+//   - A map of parameter names to values for use in parameterized queries.
+//   - An error if the conditions are invalid or unsupported.
+//
+// Supported operators: EQ, LT, LE, GT, GE, BEGINS_WITH, and BETWEEN. These are translated to Spanner-compatible SQL.
+func buildKeyConditionsClause(
+	conds map[string]models.KeyCondition,
+) (string, map[string]interface{}, error) {
+	params := make(map[string]interface{})
+	clauses := []string{}
+
+	for attr, cond := range conds {
+		paramBase := attr + "_cond"
+		vals := cond.AttributeValueList
+		op := cond.ComparisonOperator
+
+		switch op {
+		case "EQ":
+			if len(vals) != 1 {
+				return "", nil, errors.New("ValidationException", "Operator requires exactly one value")
+			}
+			val, err := extractKeyConditionDynamoValue(vals[0])
+			if err != nil {
+				return "", nil, err
+			}
+			clauses = append(clauses, fmt.Sprintf("%s = @%s", attr, paramBase))
+			params[paramBase] = val
+
+		case "LT", "LE", "GT", "GE":
+			if len(vals) != 1 {
+				return "", nil, errors.New("ValidationException", "Operator requires exactly one value")
+			}
+			sqlOp := map[string]string{
+				"LT": "<", "LE": "<=", "GT": ">", "GE": ">=",
+			}[op]
+			val, err := extractKeyConditionDynamoValue(vals[0])
+			if err != nil {
+				return "", nil, err
+			}
+			clauses = append(clauses, fmt.Sprintf("%s %s @%s", attr, sqlOp, paramBase))
+			params[paramBase] = val
+
+		case "BEGINS_WITH":
+			val, err := extractKeyConditionDynamoValue(vals[0])
+			if err != nil {
+				return "", nil, err
+			}
+			clauses = append(clauses, fmt.Sprintf("STARTS_WITH(%s, @%s)", attr, paramBase))
+			params[paramBase] = val
+
+		case "BETWEEN":
+			if len(vals) != 2 {
+				return "", nil, errors.New("ValidationException", "BETWEEN operator requires exactly two values")
+			}
+			val1, err1 := extractKeyConditionDynamoValue(vals[0])
+			if err1 != nil {
+				return "", nil, err1
+			}
+			val2, err2 := extractKeyConditionDynamoValue(vals[1])
+			if err2 != nil {
+				return "", nil, err2
+			}
+			clauses = append(clauses, fmt.Sprintf("%s BETWEEN @%s1 AND @%s2", attr, paramBase, paramBase))
+			params[paramBase+"1"] = val1
+			params[paramBase+"2"] = val2
+		default:
+			return "", nil, errors.New("ValidationException", "Unsupported ComparisonOperator")
+		}
+	}
+
+	return strings.Join(clauses, " AND "), params, nil
+}
+
+// extractKeyConditionDynamoValue extracts a Go value from a DynamoDB AttributeValue for use in key condition expressions.
+//
+// Supports string, number (as int64 or float64), and boolean types. Returns an error if the attribute is nil or of an unsupported type.
+//
+// Parameters:
+//   - attr: Pointer to a DynamoDB AttributeValue.
+//
+// Returns:
+//   - The extracted Go value (string, int64, float64, or bool).
+//   - An error if the attribute is nil or of an unsupported type.
+func extractKeyConditionDynamoValue(attr *dynamodb.AttributeValue) (interface{}, error) {
+	if attr == nil {
+		return nil, errors.New("ValidationException")
+	}
+	if attr.S != nil {
+		return *attr.S, nil
+	}
+	if attr.N != nil { // TODO: Support decimal and timestamp
+		if i, err := strconv.ParseInt(*attr.N, 10, 64); err == nil {
+			return i, nil
+		}
+		if f, err := strconv.ParseFloat(*attr.N, 64); err == nil {
+			return f, nil
+		}
+		return *attr.N, nil
+	}
+	if attr.BOOL != nil {
+		return *attr.BOOL, nil
+	}
+	return nil, errors.New("ValidationException")
+}
+
+func addAndIfNeeded(where string) string {
+	trim := strings.TrimSpace(where)
+	if trim != "WHERE" && !strings.HasSuffix(trim, "AND") && !strings.HasSuffix(trim, "WHERE") {
+		return where + " AND "
+	}
+	return where
+}
+
+// addAndIfNeeded appends "AND" to the given WHERE clause string if needed.
+//
+// If the input string is not just "WHERE" and does not already end with "AND" or "WHERE",
+// this function appends " AND " to the end. Otherwise, it returns the string unchanged.
+//
+// Parameters:
+//   - where: The current WHERE clause string.
+//
+// Returns:
+//   - The WHERE clause string, with " AND " appended if appropriate.
+func parseOffset(query *models.Query) (string, int64) { // TODO: Support timestamp and big.rat
+	logger.Debug(query)
 	if query.StartFrom != nil {
 		offset, ok := query.StartFrom["offset"].(float64)
 		if ok {
@@ -959,7 +1153,7 @@ func convertType(columnName string, val interface{}, columntype string) (interfa
 		// Ensure the value is a string
 		return utils.TrimSingleQuotes(fmt.Sprintf("%v", val)), nil
 
-	case "N":
+	case "N": // TODO: Support timestamp and big.rat
 		// Convert to float64
 		floatValue, err := strconv.ParseFloat(fmt.Sprintf("%v", val), 64)
 		if err != nil {

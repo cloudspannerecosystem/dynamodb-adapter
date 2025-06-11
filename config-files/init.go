@@ -30,9 +30,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	configpkg "github.com/cloudspannerecosystem/dynamodb-adapter/config"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/models"
+	"github.com/cloudspannerecosystem/dynamodb-adapter/pkg/logger"
 	"github.com/cloudspannerecosystem/dynamodb-adapter/utils"
-	"gopkg.in/yaml.v3"
 )
 
 // Define a global variable for reading files (mockable for tests)
@@ -52,6 +53,15 @@ var (
 		actualTable STRING(MAX),
 		spannerDataType STRING(MAX)
 	) PRIMARY KEY (tableName, column)`
+
+	adapterConfigManagerDDL = `
+    CREATE TABLE dynamodb_adapter_config_manager (
+        tableName     STRING(MAX) NOT NULL,
+        config        STRING(MAX),
+        cronTime      STRING(MAX),
+        enabledStream STRING(MAX),
+        uniqueValue   STRING(MAX),
+    ) PRIMARY KEY (tableName)`
 )
 
 // Entry point for the application
@@ -61,7 +71,7 @@ func main() {
 	flag.Parse()
 
 	// Load configuration from a YAML file
-	config, err := loadConfig("config.yaml")
+	config, err := configpkg.LoadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Error loading configuration: %v", err)
 	}
@@ -79,33 +89,18 @@ func main() {
 	defer adminClient.Close()
 	// Decide execution mode based on the dry-run flag
 	if *dryRun {
-		fmt.Println("-- Dry Run Mode: Generating Spanner DDL and Insert Queries Only --")
+		logger.Info("-- Dry Run Mode: Generating Spanner DDL and Insert Queries Only --")
 		runDryRun(config)
 	} else {
-		fmt.Println("-- Executing Setup on Spanner --")
+		logger.Info("-- Executing Setup on Spanner --")
 		executeSetup(ctx, adminClient, databaseName, config)
 	}
 }
 
-// Load configuration from a YAML file
-func loadConfig(filename string) (*models.Config, error) {
-	data, err := readFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var config models.Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	return &config, nil
-}
-
 // Run in dry-run mode to output DDL and insert queries without making changes
 func runDryRun(config *models.Config) {
-	fmt.Println("-- Spanner DDL to create the adapter table --")
-	fmt.Println(adapterTableDDL + ";")
+	logger.Info("-- Spanner DDL to create the adapter table --")
+	logger.Info(adapterTableDDL + ";")
 
 	client := createDynamoClient()
 	tables, err := listDynamoTables(client)
@@ -115,19 +110,22 @@ func runDryRun(config *models.Config) {
 
 	// Process each DynamoDB table
 	for _, tableName := range tables {
-		fmt.Printf("-- Processing table: %s\n", tableName)
+		fmt.Printf("-- Processing DynamoDB table: %s\n", tableName)
+
+		spannerTableName := utils.ChangeTableNameForSpanner(tableName)
+		fmt.Printf("-- Spanner generated table name: %s\n", spannerTableName)
 
 		// Generate and print table-specific DDL
-		ddl := generateTableDDL(tableName, client, config.Spanner.DynamoQueryLimit)
+		ddl := generateTableDDL(tableName, spannerTableName, client, config.Spanner.DynamoQueryLimit)
 		fmt.Printf("-- DDL for table: %s --\n%s\n", tableName, ddl+";")
 
 		// Generate and print insert queries
-		generateInsertQueries(tableName, client, config.Spanner.DynamoQueryLimit)
+		generateInsertQueries(tableName, spannerTableName, client, config.Spanner.DynamoQueryLimit)
 	}
 }
 
 // Generate DDL statement for a specific DynamoDB table
-func generateTableDDL(tableName string, client *dynamodb.Client, limit int32) string {
+func generateTableDDL(tableName string, spannerTableName string, client *dynamodb.Client, limit int32) string {
 	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, limit)
 	if err != nil {
 		log.Printf("Failed to fetch attributes for table %s: %v", tableName, err)
@@ -136,7 +134,11 @@ func generateTableDDL(tableName string, client *dynamodb.Client, limit int32) st
 
 	var columns []string
 	for column, dataType := range attributes {
-		columns = append(columns, fmt.Sprintf("%s %s", column, utils.ConvertDynamoTypeToSpannerType(dataType)))
+		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
+		if column == "expiresAt" { // TODO: Remove this opinionated column
+			spannerDataType = "TIMESTAMP"
+		}
+		columns = append(columns, fmt.Sprintf("%s %s", column, spannerDataType))
 	}
 	primaryKey := fmt.Sprintf("PRIMARY KEY (%s%s)", partitionKey, func() string {
 		if sortKey != "" {
@@ -147,12 +149,12 @@ func generateTableDDL(tableName string, client *dynamodb.Client, limit int32) st
 
 	return fmt.Sprintf(
 		"CREATE TABLE %s (\n\t%s\n) %s",
-		tableName, strings.Join(columns, ",\n\t"), primaryKey,
+		spannerTableName, strings.Join(columns, ",\n\t"), primaryKey,
 	)
 }
 
 // Generate insert queries for a given DynamoDB table
-func generateInsertQueries(tableName string, client *dynamodb.Client, limit int32) {
+func generateInsertQueries(tableName string, spannerTableName string, client *dynamodb.Client, limit int32) {
 	attributes, partitionKey, sortKey, err := fetchTableAttributes(client, tableName, limit)
 	if err != nil {
 		log.Printf("Failed to fetch attributes for table %s: %v", tableName, err)
@@ -161,13 +163,16 @@ func generateInsertQueries(tableName string, client *dynamodb.Client, limit int3
 
 	for column, dataType := range attributes {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
+		if column == "expiresAt" { // TODO: Remove this opinionated column
+			spannerDataType = "TIMESTAMP"
+		}
 		query := fmt.Sprintf(
 			`INSERT INTO dynamodb_adapter_table_ddl
 			(column, tableName, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType)
 			VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');`,
-			column, tableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType,
+			column, spannerTableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType,
 		)
-		fmt.Println(query)
+		logger.Info(query)
 	}
 }
 
@@ -179,9 +184,12 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 		log.Fatalf("Failed to create database: %v", err)
 	}
 
-	// Create the adapter table
+	// Create the adapter tables
 	if err := createTable(ctx, adminClient, databaseName, adapterTableDDL); err != nil {
 		log.Fatalf("Failed to create adapter table: %v", err)
+	}
+	if err := createTable(ctx, adminClient, databaseName, adapterConfigManagerDDL); err != nil {
+		log.Fatalf("Failed to create config manager table: %v", err)
 	}
 
 	// Process each DynamoDB table
@@ -192,25 +200,28 @@ func executeSetup(ctx context.Context, adminClient *Admindatabase.DatabaseAdminC
 	}
 
 	for _, tableName := range tables {
+		spannerTableName := utils.ChangeTableNameForSpanner(tableName)
+		fmt.Printf("-- Spanner generated table name: %s\n", spannerTableName)
+
 		// Generate and apply table-specific DDL
-		ddl := generateTableDDL(tableName, client, config.Spanner.DynamoQueryLimit)
+		ddl := generateTableDDL(tableName, spannerTableName, client, config.Spanner.DynamoQueryLimit)
 		if err := createTable(ctx, adminClient, databaseName, ddl); err != nil {
 			log.Printf("Failed to create table %s: %v", tableName, err)
 			continue
 		}
 
 		// Migrate table metadata to Spanner
-		err := migrateDynamoTableToSpanner(ctx, databaseName, tableName, client, config)
+		err := migrateDynamoTableToSpanner(ctx, databaseName, tableName, spannerTableName, client, config)
 		if err != nil {
 			log.Printf("Error migrating table %s: %v", tableName, err)
 		}
 	}
 
-	fmt.Println("Initial setup complete.")
+	logger.Info("Initial setup complete.")
 }
 
 // migrateDynamoTableToSpanner migrates a DynamoDB table schema and metadata to Spanner.
-func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, client *dynamodb.Client, config *models.Config) error {
+func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, spannerTableName string, client *dynamodb.Client, config *models.Config) error {
 	models.SpannerTableMap[tableName] = config.Spanner.InstanceID
 
 	// Fetch table attributes and keys from DynamoDB
@@ -220,50 +231,96 @@ func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, clie
 	}
 
 	// Fetch the current Spanner schema for the table
-	spannerSchema, err := fetchSpannerSchema(ctx, db, tableName)
+	spannerSchema, err := fetchSpannerSchema(ctx, db, spannerTableName)
 	if err != nil {
-		return fmt.Errorf("failed to fetch Spanner schema for table %s: %v", tableName, err)
+		return fmt.Errorf("failed to fetch Spanner schema for table %s: %v", spannerTableName, err)
 	}
 
-	// Generate and apply DDL statements for missing columns
+	// Generate and apply DDL statements for missing columns and indexes
 	var ddlStatements []string
 	for column, dynamoType := range attributes {
 		if _, exists := spannerSchema[column]; !exists {
 			spannerType := utils.ConvertDynamoTypeToSpannerType(dynamoType)
-			ddlStatements = append(ddlStatements, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", tableName, column, spannerType))
+			if column == "expiresAt" { // TODO: Remove this opinionated column
+				spannerType = "TIMESTAMP"
+			}
+			fmt.Println("Adding column:", column, "with type:", spannerType)
+			ddlStatements = append(ddlStatements, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", spannerTableName, column, spannerType))
 		}
 	}
+	indexes, err := getIndexesFromDynamo(client, tableName)
+	if err != nil {
+		log.Printf("Failed to fetch indexes for table %s: %v", tableName, err)
+	}
+	// Fetch existing indexes from Spanner
+	existingIndexes := make(map[string]bool)
+	{
+		client, err := spanner.NewClient(ctx, db)
+		if err == nil {
+			defer client.Close()
+			stmt := spanner.Statement{
+				SQL: `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME = @tableName`,
+				Params: map[string]interface{}{
+					"tableName": spannerTableName,
+				},
+			}
+			iter := client.Single().Query(ctx, stmt)
+			defer iter.Stop()
+			_ = iter.Do(func(row *spanner.Row) error {
+				var idxName string
+				if err := row.Columns(&idxName); err == nil {
+					existingIndexes[idxName] = true
+				}
+				return nil
+			})
+		}
+	}
+	for _, idx := range indexes {
+		indexName := utils.ChangeTableNameForSpanner(idx.Name)
+		if !existingIndexes[indexName] {
+			ddlStatements = append(ddlStatements, fmt.Sprintf(
+				"CREATE INDEX %s ON %s (%s)",
+				indexName,
+				spannerTableName,
+				strings.Join(idx.Columns, ", "),
+			))
+		}
+	}
+
 	if len(ddlStatements) > 0 {
 		if err := applySpannerDDL(ctx, db, ddlStatements); err != nil {
-			return fmt.Errorf("failed to apply DDL to table %s: %v", tableName, err)
+			return fmt.Errorf("failed to apply DDL to table %s: %v", spannerTableName, err)
 		}
-		log.Printf("Schema updated for table %s in Spanner.", tableName)
+		log.Printf("Schema updated for table %s in Spanner.", spannerTableName)
 	}
 
 	// Check for columns that are in Spanner but not in DynamoDB (columns that should be dropped)
 	var dropColumnStatements []string
 	for column := range spannerSchema {
 		if _, exists := attributes[column]; !exists {
-			dropColumnStatements = append(dropColumnStatements, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", tableName, column))
+			dropColumnStatements = append(dropColumnStatements, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", spannerTableName, column))
 		}
 	}
 
 	// Apply DDL to drop removed columns
 	if len(dropColumnStatements) > 0 {
 		if err := applySpannerDDL(ctx, db, dropColumnStatements); err != nil {
-			return fmt.Errorf("failed to apply DROP COLUMN DDL to table %s: %v", tableName, err)
+			return fmt.Errorf("failed to apply DROP COLUMN DDL to table %s: %v", spannerTableName, err)
 		}
-		log.Printf("Removed columns from table %s in Spanner.", tableName)
+		log.Printf("Removed columns from table %s in Spanner.", spannerTableName)
 	}
 
 	// Prepare mutations to insert metadata into the adapter table
 	var mutations []*spanner.Mutation
 	for column, dataType := range attributes {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
+		if column == "expiresAt" { // TODO: Remove this opinionated column
+			spannerDataType = "TIMESTAMP"
+		}
 		mutations = append(mutations, spanner.InsertOrUpdate(
 			"dynamodb_adapter_table_ddl",
 			[]string{"column", "tableName", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"},
-			[]interface{}{column, tableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType},
+			[]interface{}{column, spannerTableName, dataType, column, partitionKey, sortKey, column, tableName, spannerDataType},
 		))
 	}
 
@@ -408,6 +465,44 @@ func fetchTableAttributes(client *dynamodb.Client, tableName string, limit int32
 	return attributes, partitionKey, sortKey, nil
 }
 
+type IndexInfo struct {
+	Name    string
+	Columns []string
+}
+
+// getIndexesFromDynamo extracts GSIs and LSIs from a DynamoDB table definition.
+func getIndexesFromDynamo(client *dynamodb.Client, tableName string) ([]IndexInfo, error) {
+	output, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe table %s: %w", tableName, err)
+	}
+
+	var indexes []IndexInfo
+	for _, gsi := range output.Table.GlobalSecondaryIndexes {
+		var cols []string
+		for _, k := range gsi.KeySchema {
+			cols = append(cols, aws.ToString(k.AttributeName))
+		}
+		indexes = append(indexes, IndexInfo{
+			Name:    aws.ToString(gsi.IndexName),
+			Columns: cols,
+		})
+	}
+	for _, lsi := range output.Table.LocalSecondaryIndexes {
+		var cols []string
+		for _, k := range lsi.KeySchema {
+			cols = append(cols, aws.ToString(k.AttributeName))
+		}
+		indexes = append(indexes, IndexInfo{
+			Name:    aws.ToString(lsi.IndexName),
+			Columns: cols,
+		})
+	}
+	return indexes, nil
+}
+
 // inferDynamoDBType determines the type of a DynamoDB attribute based on its value.
 func inferDynamoDBType(attr dynamodbtypes.AttributeValue) string {
 	// Check the attribute type and return the corresponding DynamoDB type.
@@ -454,16 +549,21 @@ func spannerBatchInsert(ctx context.Context, databaseName string, mutations []*s
 
 // createDynamoClient initializes a DynamoDB client using default AWS configuration.
 func createDynamoClient() *dynamodb.Client {
-	// Load the default AWS configuration.
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
-	return dynamodb.NewFromConfig(cfg) // Return the configured client.
+	endpoint := os.Getenv("DYNAMODB_ENDPOINT")
+	if endpoint != "" {
+		return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+			o.EndpointResolver = dynamodb.EndpointResolverFromURL(endpoint)
+		})
+	}
+	return dynamodb.NewFromConfig(cfg)
 }
 
 // fetchSpannerSchema retrieves the schema of a Spanner table by querying the INFORMATION_SCHEMA.
-func fetchSpannerSchema(ctx context.Context, db, tableName string) (map[string]string, error) {
+func fetchSpannerSchema(ctx context.Context, db, spannerTableName string) (map[string]string, error) {
 	// Create a Spanner client.
 	client, err := spanner.NewClient(ctx, db)
 	if err != nil {
@@ -475,7 +575,7 @@ func fetchSpannerSchema(ctx context.Context, db, tableName string) (map[string]s
 	stmt := spanner.Statement{
 		SQL: `SELECT COLUMN_NAME, SPANNER_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tableName`,
 		Params: map[string]interface{}{
-			"tableName": tableName,
+			"tableName": spannerTableName,
 		},
 	}
 	iter := client.Single().Query(ctx, stmt)

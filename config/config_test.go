@@ -21,6 +21,9 @@ import (
 	"gopkg.in/go-playground/assert.v1"
 )
 
+// Actual table name comes from the DynamoDB table name
+// Key in table config is the Spanner table name
+// We fetch from GetTableConf using the DynamoDB table name which get's converted
 func TestGetTableConf(t *testing.T) {
 	models.DbConfigMap = map[string]models.TableConfig{
 		"employee_data": {
@@ -28,14 +31,14 @@ func TestGetTableConf(t *testing.T) {
 			SortKey:          "emp_name",
 			Indices:          nil,
 			SpannerIndexName: "emp_id",
-			ActualTable:      "employee%data",
+			ActualTable:      "employee_data",
 		},
-		"employee%data": {
+		"employee_data_2": {
 			PartitionKey:     "e_id",
 			SortKey:          "e_name",
 			Indices:          nil,
 			SpannerIndexName: "emp_id",
-			ActualTable:      "employee%data",
+			ActualTable:      "employee-data-2",
 		},
 		"department": {
 			PartitionKey:     "d_id",
@@ -52,17 +55,17 @@ func TestGetTableConf(t *testing.T) {
 		want      models.TableConfig
 	}{
 		{
-			"empty table Name",
+			"Empty table name",
 			"",
 			models.TableConfig{},
 		},
 		{
-			"table which is not present",
+			"Missing table",
 			"xyz",
 			models.TableConfig{},
 		},
 		{
-			"table which does not have actual table name",
+			"Table missing ActualTable name, defaults to Spanner table name",
 			"department",
 			models.TableConfig{
 				PartitionKey:     "d_id",
@@ -73,14 +76,25 @@ func TestGetTableConf(t *testing.T) {
 			},
 		},
 		{
-			"table which is present",
+			"Table where DynamoDB table name is same as Spanner table name",
 			"employee_data",
+			models.TableConfig{
+				PartitionKey:     "emp_id",
+				SortKey:          "emp_name",
+				Indices:          nil,
+				SpannerIndexName: "emp_id",
+				ActualTable:      "employee_data",
+			},
+		},
+		{
+			"Table where DynamoDB table name is different from Spanner table name",
+			"employee-data-2",
 			models.TableConfig{
 				PartitionKey:     "e_id",
 				SortKey:          "e_name",
 				Indices:          nil,
 				SpannerIndexName: "emp_id",
-				ActualTable:      "employee%data",
+				ActualTable:      "employee-data-2",
 			},
 		},
 	}

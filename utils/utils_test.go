@@ -391,22 +391,6 @@ func TestRemoveListElement(t *testing.T) {
 	}
 }
 
-func TestIsValidJSONObject(t *testing.T) {
-	validJSON := `{"name":"John", "age":30}`
-	invalidJSON := `{"name":"John", "age":30,}` // Trailing comma
-
-	assert.NoError(t, IsValidJSONObject(validJSON))
-	assert.Error(t, IsValidJSONObject(invalidJSON))
-}
-
-func TestIsValidBase64(t *testing.T) {
-	validBase64 := "SGVsbG8sIFdvcmxkIQ=="
-	invalidBase64 := "SGVsbG8sIFdvcmxkI!" // Invalid character
-
-	assert.True(t, IsValidBase64(validBase64))
-	assert.False(t, IsValidBase64(invalidBase64))
-}
-
 func TestUpdateFieldByPath(t *testing.T) {
 	data := map[string]interface{}{
 		"first": map[string]interface{}{

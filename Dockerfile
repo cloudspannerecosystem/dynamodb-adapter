@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.22
-
-
-# Set the Current Working Directory inside the container
-WORKDIR /go/src/db-driver
+# Multi-stage build to create the binary
+FROM golang:1.24 AS builder
+WORKDIR /go/src/dynamodb-adapter
 
 # Force the go compiler to use modules
 ENV GO111MODULE=on
 
-# We want to populate the module cache based on the go.{mod,sum} files.
-COPY go.mod .
-COPY go.sum .
+COPY . .
 
 #This is the 'magic' step that will download all the dependencies that are specified in
 # the go.mod and go.sum file.
@@ -32,19 +28,17 @@ COPY go.sum .
 # (or when we add another docker instruction this line)
 RUN go mod download
 
-# Copy everything from the current directory to the PWD(Present Working Directory) inside the container
-COPY . .
+# Build the package
+ARG PROXY_RELEASE_VERSION
+RUN go build \
+  -ldflags "-X github.com/cloudspannerecosystem/dynamodb-adapter/config.proxyReleaseVersion=${PROXY_RELEASE_VERSION}" \
+  -o dynamodb-adapter
 
-# Set active environment
-ARG ACTIVE_ENV
-ENV ACTIVE_ENV ${ACTIVE_ENV}
-
-# Download all the dependencies
-# https://stackoverflow.com/questions/28031603/what-do-three-dots-mean-in-go-command-line-invocations
-#RUN go get -d -v ./...
-
-# Install the package
-RUN go install -v ./...
-
+# Multi-stage build to create a minimal runtime image
 # Run the executable
-CMD ["db-driver"]
+FROM debian:bookworm-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /go/src/dynamodb-adapter/dynamodb-adapter .
+COPY config.yaml .
+CMD ["./dynamodb-adapter"]
