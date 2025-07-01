@@ -1162,7 +1162,7 @@ func handleConditionCheck(c *gin.Context, details models.ConditionCheckRequest, 
 	for k, v := range details.PrimaryKeyMap {
 		tmpMap[k] = v
 	}
-	if len(eval.Attributes) > 0 || expr != nil {
+	if len(eval.Attributes) > 0 || (expr != nil && len(expr.Field) > 0) {
 		status, err := storage.EvaluateConditionalExpression(ctx, txn, details.TableName, tmpMap, eval, expr)
 		if err != nil {
 			return nil, err
