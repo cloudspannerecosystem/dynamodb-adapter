@@ -59,19 +59,112 @@ func GetStringInBetween(str string, start string, end string) (result string) {
 	return str[s:e]
 }
 
-// Helper to strip wrapping parentheses
-// Fixes e.g. NOT (attribute_exists (field)) from error interface {} is nil on !(TOKEN0) when TOKEN0 would be (attribute_exists(field))
+// stripWrappingParens removes unnecessary wrapping or unmatched parentheses from a string.
+//
+// - If the string is wrapped in balanced parentheses, it removes the outermost pair(s).
+// - If there are unmatched leading or trailing parentheses, it removes them until balanced.
+// - It preserves valid, balanced parentheses inside the string.
+//
+// Examples:
+//
+//	stripWrappingParens("(foo)")            // "foo"
+//	stripWrappingParens("((foo))")          // "foo"
+//	stripWrappingParens("(foo")             // "foo"
+//	stripWrappingParens("foo)")             // "foo"
+//	stripWrappingParens("((foo)")           // "foo"
+//	stripWrappingParens("(size(bar))")      // "size(bar)"
+//	stripWrappingParens("(size(bar)")       // "size(bar)"
+//	stripWrappingParens("size(bar))")       // "size(bar)"
+//	stripWrappingParens("size(bar)")        // "size(bar)"
+//	stripWrappingParens("foo(bar(baz))")    // "foo(bar(baz))"
+//	stripWrappingParens("((foo(bar)))")     // "foo(bar)"
 func stripWrappingParens(s string) string {
+	s = strings.TrimSpace(s)
+	// Remove balanced wrapping parentheses
 	for {
-		s = strings.TrimSpace(s)
-		if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
-			// Remove one level of wrapping parentheses
-			s = s[1 : len(s)-1]
-		} else {
+		changed := false
+		// Remove balanced outermost parens
+		for strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") && len(s) > 1 {
+			inner := s[1 : len(s)-1]
+			if countParens(inner) == 0 {
+				s = strings.TrimSpace(inner)
+				changed = true
+			} else {
+				break
+			}
+		}
+		// Remove unmatched leading paren
+		if strings.HasPrefix(s, "(") && countParens(s) > 0 {
+			s = strings.TrimSpace(s[1:])
+			changed = true
+		}
+		// Remove unmatched trailing paren
+		if strings.HasSuffix(s, ")") && countParens(s) < 0 {
+			s = strings.TrimSpace(s[:len(s)-1])
+			changed = true
+		}
+		if !changed {
 			break
 		}
 	}
 	return s
+}
+
+// Helper: returns open parens minus close parens
+func countParens(s string) int {
+	open := 0
+	close := 0
+	for _, c := range s {
+		if c == '(' {
+			open++
+		} else if c == ')' {
+			close++
+		}
+	}
+	return open - close
+}
+
+// cleanExpressionSpacing removes unnecessary spaces between function names and their opening parenthesis
+// in a DynamoDB expression, while preserving spaces for logical operators like AND, OR, etc. This is needed
+// since logic below splits tokens by spaces.
+//
+// For example, it converts:
+//
+//	"attribute_exists (foo) AND begins_with (bar, :val)"
+//
+// to:
+//
+//	"attribute_exists(foo) AND begins_with(bar, :val)"
+//
+// Logical operators (AND, OR, etc.) are not affected, so their spacing remains
+func cleanExpressionSpacing(expression string) string {
+	// Regex to find words followed by any whitespace (space, tab, etc.) and (
+	re := regexp.MustCompile(`\b(\w+)\s+\(`)
+
+	// List of logical operators to exclude
+	logicalOps := map[string]bool{
+		"AND": true,
+		"and": true,
+		"OR":  true,
+		"or":  true,
+	}
+
+	// Use ReplaceAllStringFunc to process each match
+	return re.ReplaceAllStringFunc(expression, func(m string) string {
+		// Extract the word before whitespace+(
+		// m is like "attribute_exists (" or "attribute_exists\t("
+		parts := regexp.MustCompile(`\s+`).Split(m, 2)
+		if len(parts) != 2 {
+			return m
+		}
+		word := parts[0]
+		if logicalOps[word] {
+			// If logical operator, don't change spacing
+			return m
+		}
+		// Otherwise remove all whitespace before '('
+		return word + "("
+	})
 }
 
 // CreateConditionExpression - create evelute condition from condition
@@ -85,8 +178,7 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	condtionExpression = strings.ReplaceAll(condtionExpression, "( ", "(")
 	condtionExpression = strings.ReplaceAll(condtionExpression, " )", ")")
 	condtionExpression = strings.ReplaceAll(condtionExpression, "NOT ", "!")
-	// Normalize function calls: remove spaces before '(' e.g., "attribute_exists (field)" to "attribute_exists(field)"
-	condtionExpression = regexp.MustCompile(`(\w+)\s+\(`).ReplaceAllString(condtionExpression, `$1(`)
+	condtionExpression = cleanExpressionSpacing(condtionExpression)
 	tokens := strings.Split(condtionExpression, " ")
 	sb := strings.Builder{}
 	evalTokens := []string{}

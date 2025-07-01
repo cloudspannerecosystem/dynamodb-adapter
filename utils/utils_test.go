@@ -454,3 +454,175 @@ func TestTrimSingleQuotes(t *testing.T) {
 		})
 	}
 }
+func TestCleanExpressionSpacing(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Removes space after function name",
+			input:    "attribute_exists (foo)",
+			expected: "attribute_exists(foo)",
+		},
+		{
+			name:     "Multiple functions and logical operators",
+			input:    "attribute_exists (foo) AND begins_with (bar, :val)",
+			expected: "attribute_exists(foo) AND begins_with(bar, :val)",
+		},
+		{
+			name:     "Logical operators not affected",
+			input:    "foo AND bar OR baz",
+			expected: "foo AND bar OR baz",
+		},
+		{
+			name:     "Lowercase logical operators not affected",
+			input:    "foo and bar or baz",
+			expected: "foo and bar or baz",
+		},
+		{
+			name:     "Mixed case logical operators not affected",
+			input:    "foo Or bar aNd baz",
+			expected: "foo Or bar aNd baz",
+		},
+		{
+			name:     "No space after function name",
+			input:    "attribute_exists(foo)",
+			expected: "attribute_exists(foo)",
+		},
+		{
+			name:     "Space after logical operator and function",
+			input:    "AND begins_with (bar, :val)",
+			expected: "AND begins_with(bar, :val)",
+		},
+		{
+			name:     "Function with multiple spaces before paren",
+			input:    "begins_with    (bar, :val)",
+			expected: "begins_with(bar, :val)",
+		},
+		{
+			name:     "Function with tab before paren",
+			input:    "begins_with\t(bar, :val)",
+			expected: "begins_with(bar, :val)",
+		},
+		{
+			name:     "Function with space and tab before paren",
+			input:    "begins_with \t(bar, :val)",
+			expected: "begins_with(bar, :val)",
+		},
+		{
+			name:     "No function, just text",
+			input:    "foo bar baz",
+			expected: "foo bar baz",
+		},
+		{
+			name:     "Function name is logical operator (should not remove space)",
+			input:    "AND (foo)",
+			expected: "AND (foo)",
+		},
+		{
+			name:     "Lowercase logical operator as function name (should not remove space)",
+			input:    "or (foo)",
+			expected: "or (foo)",
+		},
+		{
+			name:     "Function with underscore",
+			input:    "my_func (x)",
+			expected: "my_func(x)",
+		},
+		{
+			name:     "Function with digits",
+			input:    "func123 (x)",
+			expected: "func123(x)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := cleanExpressionSpacing(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+func TestStripWrappingParens(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"(foo)", "foo"},
+		{"((foo))", "foo"},
+		{"(foo", "foo"},
+		{"foo)", "foo"},
+		{"((foo)", "foo"},
+		{"(size(bar))", "size(bar)"},
+		{"(size(bar)", "size(bar)"},
+		{"size(bar))", "size(bar)"},
+		{"size(bar)", "size(bar)"},
+		{"foo(bar(baz))", "foo(bar(baz))"},
+		{"((foo(bar)))", "foo(bar)"},
+		{"(((foo)))", "foo"},
+		{"(foo(bar))", "foo(bar)"},
+		{"", ""},
+		{"()", ""},
+		{"((()))", ""},
+		{"(foo)   ", "foo"},
+		{"   (foo)", "foo"},
+		{"   (foo)   ", "foo"},
+		{"(((foo(bar(baz)))))", "foo(bar(baz))"},
+		{"(foo(bar(baz))", "foo(bar(baz))"},
+		{"foo(bar(baz)))", "foo(bar(baz))"},
+		{"((foo(bar(baz))))", "foo(bar(baz))"},
+		{"(foo(bar(baz)))))", "foo(bar(baz))"},
+		{"(((foo(bar(baz)))", "foo(bar(baz))"},
+		{"(foo(bar(baz)) extra)", "foo(bar(baz)) extra"},
+		{"(foo)bar", "(foo)bar"},
+		{"foo(bar)", "foo(bar)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := stripWrappingParens(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripWrappingParens(%q) = %q; want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+func TestCountParens(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+	}{
+		{"", 0},
+		{"()", 0},
+		{"((", 2},
+		{"))", -2},
+		{"(()", 1},
+		{"())", -1},
+		{"(foo)", 0},
+		{"((foo)", 1},
+		{"(foo))", -1},
+		{"foo(bar(baz))", 0},
+		{"foo(bar(baz)", 1},
+		{"foo)bar(baz(", 1},
+		{"((foo(bar)))", 0},
+		{"(((foo)))", 0},
+		{"(foo(bar(baz)) extra)", 0},
+		{"(foo)bar", 0},
+		{"foo(bar)", 0},
+		{"(((((", 5},
+		{")))))", -5},
+		{"(()())", 0},
+		{"(()", 1},
+		{"())", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := countParens(tt.input)
+			if result != tt.expected {
+				t.Errorf("countParens(%q) = %d; want %d", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
