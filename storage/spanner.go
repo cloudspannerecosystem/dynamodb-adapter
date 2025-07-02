@@ -716,6 +716,10 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 			}
 		} else {
 			t, ok := ddl[k]
+			if v == nil {
+				newMap[k] = nil
+				continue
+			}
 			if t == "B" && ok {
 				ba, err := json.Marshal(v)
 				if err != nil {
@@ -724,9 +728,6 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 				newMap[k] = ba
 			}
 			if t == "M" && ok {
-				if v == nil {
-					continue
-				}
 				ba, err := json.MarshalIndent(v, "", "  ")
 				if err != nil {
 					return errors.New("ValidationException", err)
@@ -743,6 +744,24 @@ func (s Storage) performPutOperation(ctx context.Context, t *spanner.ReadWriteTr
 					return errors.New("ValidationException", err)
 				}
 				newMap[k] = string(jsonData)
+			}
+			if t == "SS" && ok {
+				switch val := v.(type) {
+				case []string:
+					newMap[k] = val
+				case []interface{}:
+					strList := make([]string, len(val))
+					for i, v := range val {
+						s, ok := v.(string)
+						if !ok {
+							return errors.New("ValidationException")
+						}
+						strList[i] = s
+					}
+					newMap[k] = strList
+				default:
+					return errors.New("ValidationException")
+				}
 			}
 		}
 	}
@@ -947,12 +966,11 @@ func evaluateStatementFromRowMap(conditionalExpression, colName string, rowMap m
 			}
 
 			// Ensure the attribute is a list and calculate its size
-			switch v := val.(type) {
-			case []interface{}:
-				return len(v) // Return the size of the list
-			default:
-				return errors.New("size() function is only valid for list attributes")
+			valValue := reflect.ValueOf(val)
+			if valValue.Kind() == reflect.Slice {
+				return valValue.Len()
 			}
+			return errors.New("size() function is only valid for list attributes")
 		} else {
 			return errors.New("Invalid size() function syntax")
 		}
