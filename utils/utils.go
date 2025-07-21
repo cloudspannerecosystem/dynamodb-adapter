@@ -246,10 +246,6 @@ func CreateConditionExpression(condtionExpression string, expressionAttr map[str
 	str = strings.ReplaceAll(str, " AND ", " && ")
 	str = strings.ReplaceAll(str, " <> ", " != ")
 
-	logger.Debug("Adjusted condition expression:", condtionExpression)
-	logger.Debug("Transformed (final) expression:", str)
-	logger.Debug("Tokens:", strings.Join(evalTokens, ", "))
-
 	e.Cond, err = expr.Compile(str)
 	if err != nil {
 		return nil, errors.New("ConditionalCheckFailedException", err.Error(), str)
@@ -323,7 +319,7 @@ func ConvertDynamoTypeToSpannerType(dynamoType string) string {
 	case "S":
 		return "STRING(MAX)"
 	case "N":
-		return "INT64" // TODO: Change back to FLOAT64
+		return "FLOAT64"
 	case "B":
 		return "BYTES(MAX)"
 	case "BOOL":

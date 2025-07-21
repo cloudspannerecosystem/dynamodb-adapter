@@ -588,23 +588,12 @@ func buildKeyConditionsClause(
 		op := cond.ComparisonOperator
 
 		switch op {
-		case "EQ":
-			if len(vals) != 1 {
-				return "", nil, errors.New("ValidationException", "Operator requires exactly one value")
-			}
-			val, err := extractKeyConditionDynamoValue(vals[0])
-			if err != nil {
-				return "", nil, err
-			}
-			clauses = append(clauses, fmt.Sprintf("%s = @%s", attr, paramBase))
-			params[paramBase] = val
-
-		case "LT", "LE", "GT", "GE":
+		case "EQ", "LT", "LE", "GT", "GE":
 			if len(vals) != 1 {
 				return "", nil, errors.New("ValidationException", "Operator requires exactly one value")
 			}
 			sqlOp := map[string]string{
-				"LT": "<", "LE": "<=", "GT": ">", "GE": ">=",
+				"EQ": "=", "LT": "<", "LE": "<=", "GT": ">", "GE": ">=",
 			}[op]
 			val, err := extractKeyConditionDynamoValue(vals[0])
 			if err != nil {
@@ -676,14 +665,6 @@ func extractKeyConditionDynamoValue(attr *dynamodb.AttributeValue) (interface{},
 	return nil, errors.New("ValidationException")
 }
 
-func addAndIfNeeded(where string) string {
-	trim := strings.TrimSpace(where)
-	if trim != "WHERE" && !strings.HasSuffix(trim, "AND") && !strings.HasSuffix(trim, "WHERE") {
-		return where + " AND "
-	}
-	return where
-}
-
 // addAndIfNeeded appends "AND" to the given WHERE clause string if needed.
 //
 // If the input string is not just "WHERE" and does not already end with "AND" or "WHERE",
@@ -694,6 +675,14 @@ func addAndIfNeeded(where string) string {
 //
 // Returns:
 //   - The WHERE clause string, with " AND " appended if appropriate.
+func addAndIfNeeded(where string) string {
+	trim := strings.TrimSpace(where)
+	if trim != "WHERE" && !strings.HasSuffix(trim, "AND") && !strings.HasSuffix(trim, "WHERE") {
+		return where + " AND "
+	}
+	return where
+}
+
 func parseOffset(query *models.Query) (string, int64) { // TODO: Support timestamp and big.rat
 	logger.Debug(query)
 	if query.StartFrom != nil {

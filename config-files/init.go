@@ -135,9 +135,6 @@ func generateTableDDL(tableName string, spannerTableName string, client *dynamod
 	var columns []string
 	for column, dataType := range attributes {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
-		if column == "expiresAt" { // TODO: Remove this opinionated column
-			spannerDataType = "TIMESTAMP"
-		}
 		columns = append(columns, fmt.Sprintf("%s %s", column, spannerDataType))
 	}
 	primaryKey := fmt.Sprintf("PRIMARY KEY (%s%s)", partitionKey, func() string {
@@ -163,9 +160,6 @@ func generateInsertQueries(tableName string, spannerTableName string, client *dy
 
 	for column, dataType := range attributes {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
-		if column == "expiresAt" { // TODO: Remove this opinionated column
-			spannerDataType = "TIMESTAMP"
-		}
 		query := fmt.Sprintf(
 			`INSERT INTO dynamodb_adapter_table_ddl
 			(column, tableName, dynamoDataType, originalColumn, partitionKey, sortKey, spannerIndexName, actualTable, spannerDataType)
@@ -241,9 +235,6 @@ func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, span
 	for column, dynamoType := range attributes {
 		if _, exists := spannerSchema[column]; !exists {
 			spannerType := utils.ConvertDynamoTypeToSpannerType(dynamoType)
-			if column == "expiresAt" { // TODO: Remove this opinionated column
-				spannerType = "TIMESTAMP"
-			}
 			fmt.Println("Adding column:", column, "with type:", spannerType)
 			ddlStatements = append(ddlStatements, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", spannerTableName, column, spannerType))
 		}
@@ -314,9 +305,6 @@ func migrateDynamoTableToSpanner(ctx context.Context, db, tableName string, span
 	var mutations []*spanner.Mutation
 	for column, dataType := range attributes {
 		spannerDataType := utils.ConvertDynamoTypeToSpannerType(dataType)
-		if column == "expiresAt" { // TODO: Remove this opinionated column
-			spannerDataType = "TIMESTAMP"
-		}
 		mutations = append(mutations, spanner.InsertOrUpdate(
 			"dynamodb_adapter_table_ddl",
 			[]string{"column", "tableName", "dynamoDataType", "originalColumn", "partitionKey", "sortKey", "spannerIndexName", "actualTable", "spannerDataType"},
