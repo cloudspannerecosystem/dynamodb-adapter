@@ -13,7 +13,7 @@ require (
 	github.com/gavv/httpexpect/v2 v2.1.0
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/imkira/go-interpol v1.1.0 // indirect
 	github.com/robfig/cron v1.2.0
 	github.com/stretchr/testify v1.11.1
